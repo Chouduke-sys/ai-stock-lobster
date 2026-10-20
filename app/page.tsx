@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
 type RankRow = { symbol: string; name: string; netShares: number | null; status: "待串接" };
-type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; recent: { date: string | null; value: number | null }[] };
+type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type StockResult = {
   status: string;
   symbol: string;
@@ -14,8 +14,10 @@ type StockResult = {
   dataSource: string;
   lastUpdatedAt: string;
   isRealtime: boolean;
+  delaySeconds?: number | null;
 };
 const formatPrice = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+const ageLabel = (s: number | null | undefined) => s == null ? "報價時間未確認" : s < 60 ? `距報價 ${s} 秒` : `距報價 ${Math.floor(s / 60)} 分鐘`;
 const formatVolume = (value: number | null | undefined) => value == null ? "—" : Math.round(value).toLocaleString("zh-TW");
 const sampleNames = [
   { symbol: "2330", name: "台積電" },
@@ -72,7 +74,8 @@ export default function Home() {
       }
     }
     void loadQuote();
-    return () => controller.abort();
+    const timer = setInterval(() => { void loadQuote(); }, 15000);
+    return () => { controller.abort(); clearInterval(timer); };
   }, [symbol]);
 
   useEffect(() => {
@@ -90,7 +93,8 @@ export default function Home() {
       }
     }
     void loadIndex();
-    return () => controller.abort();
+    const timer = setInterval(() => { void loadIndex(); }, 15000);
+    return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
   function lookupStock() {
@@ -133,7 +137,7 @@ export default function Home() {
         </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "證交所每日收盤資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· 非即時` : loadingTaiex ? "載入官方日行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 不保證即時` : loadingTaiex ? "載入官方日行情中…" : taiexError}</small></div>
           <div className="sparkline" aria-label="沒有實際數據，暫不顯示走勢圖">
             <div className="spark-grid"></div>
             {taiex && taiex.recent.filter(p => p.value !== null).length >= 2 ? (() => {
@@ -149,7 +153,7 @@ export default function Home() {
       </section>
 
       <section className="stats-grid">
-        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（非即時）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
+        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
         <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人合計</span><strong>—</strong><small>等待官方日報</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> 買超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 賣超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
@@ -169,14 +173,14 @@ export default function Home() {
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>證交所上市股票每日行情；歷史日 K、週 K、月 K 尚待串接。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市股票盤中報價測試版，每 15 秒查詢；可能延遲，歷史 K 線尚待串接。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
         <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><div className="toggle-group">{["日K","週K","月K"].map(p => <button key={p} className={period === p ? "active" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>
-        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 上市日行情</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "官方日行情" : "尚無資料"}</span></div>
+        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 上市盤中行情</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "官方日行情" : "尚無資料"}</span></div>
         {stockData ? (
           <>
             <div className="quote-summary"><div><small>收盤價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
             <div className="indicator-grid"><div><small>開盤</small><strong>{formatPrice(stockData.quote.open)}</strong></div><div><small>最高</small><strong>{formatPrice(stockData.quote.high)}</strong></div><div><small>最低</small><strong>{formatPrice(stockData.quote.low)}</strong></div><div><small>成交量（股）</small><strong>{formatVolume(stockData.quote.volume)}</strong></div></div>
-            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。非盤中即時行情，交易日期未提供時請以官方資料為準。</p>
+            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 15 秒查詢，不保證即時。</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
         <p className="footnote">你目前選擇 {period}；歷史 K 線及 MA、RSI 等技術指標尚未提供，避免顯示假資料。</p></div>
@@ -196,7 +200,7 @@ export default function Home() {
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
-      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。上市個股日行情已串接官方來源；歷史 K 線、新聞、法人排名與 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
+      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。上市個股盤中行情測試中；歷史 K 線、新聞、法人排名與 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
 }
