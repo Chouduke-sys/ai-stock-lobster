@@ -25,7 +25,7 @@ const chartPeriod: Record<string,string> = { "日K":"day", "週K":"week", "月K"
 
 export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
-  const [market, setMarket] = useState("all");
+  const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
   const [period, setPeriod] = useState("日K");
   const [symbol, setSymbol] = useState("2330");
@@ -166,8 +166,8 @@ export default function Home() {
           <div className="trust-line"><ShieldCheck size={15}/> 資料來源與更新時間透明標示</div>
         </div>
         <div className="hero-visual">
-          <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "證交所每日收盤資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 不保證即時` : loadingTaiex ? "載入官方日行情中…" : taiexError}</small></div>
+          <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div className="sparkline" aria-label="沒有實際數據，暫不顯示走勢圖">
             <div className="spark-grid"></div>
             {taiex && taiex.recent.filter(p => p.value !== null).length >= 2 ? (() => {
