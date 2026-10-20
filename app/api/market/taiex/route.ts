@@ -12,13 +12,13 @@ type IndexRow = {
 };
 
 function parseNumber(value?: string): number | null {
-  if (!value || !/^-?[\\d,]+(?:\\.\\d+)?$/.test(value.trim())) return null;
+  if (!value || !/^-?[\d,]+(?:\.\d+)?$/.test(value.trim())) return null;
   const number = Number(value.replaceAll(",", ""));
   return Number.isFinite(number) ? number : null;
 }
 
 function parseDate(value?: string): string | null {
-  if (!value || !/^\\d{7}$/.test(value)) return null;
+  if (!value || !/^\d{7}$/.test(value)) return null;
   return `${Number(value.slice(0, 3)) + 1911}-${value.slice(3, 5)}-${value.slice(5, 7)}`;
 }
 
