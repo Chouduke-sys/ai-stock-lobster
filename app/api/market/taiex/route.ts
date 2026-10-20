@@ -22,6 +22,12 @@ function parseDate(value?: string): string | null {
   return `${Number(value.slice(0, 3)) + 1911}-${value.slice(3, 5)}-${value.slice(5, 7)}`;
 }
 
+function taiwanToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+}
+
 export async function GET() {
   try {
     const response = await fetch(
@@ -38,6 +44,16 @@ export async function GET() {
     const latest = rows[rows.length - 1];
     if (!latest) {
       return NextResponse.json({ error: "目前無加權指數資料" }, { status: 503 });
+    }
+    const dataDate = parseDate(latest.Date);
+    if (dataDate !== taiwanToday()) {
+      return NextResponse.json({
+        status: "not_available_today",
+        error: "證交所尚未公布今天的加權指數日資料（休市日也不會有當日行情）",
+        dataDate,
+        today: taiwanToday(),
+        isRealtime: false
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
     const value = parseNumber(latest.TAIEX);
     const change = parseNumber(latest.Change);
