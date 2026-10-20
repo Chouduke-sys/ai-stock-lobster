@@ -38,6 +38,8 @@ export default function Home() {
   const [quoteError, setQuoteError] = useState("");
   const [taiex, setTaiex] = useState<TaiexResult | null>(null);
   const [taiexError, setTaiexError] = useState("");
+  const [indexTrend, setIndexTrend] = useState<{date:string;value:number}[]>([]);
+  const [indexTrendError, setIndexTrendError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
   const [rankRows, setRankRows] = useState<RankRow[]>([]);
   const [rankError, setRankError] = useState("");
@@ -138,6 +140,22 @@ export default function Home() {
     return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadTrend() {
+      try {
+        const response=await fetch("/api/market/taiex/history",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok || data.status!=="ok")throw new Error(data.error || "走勢資料讀取失敗");
+        setIndexTrend(data.recent);
+      }catch(e){
+        if(!controller.signal.aborted)setIndexTrendError(e instanceof Error?e.message:"走勢資料讀取失敗");
+      }
+    }
+    void loadTrend();
+    return ()=>controller.abort();
+  }, []);
+
   function lookupStock() {
     const value = search.trim();
     if (!/^\d{4,6}$/.test(value)) {
@@ -179,17 +197,17 @@ export default function Home() {
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
           <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 10 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
-          <div className="sparkline" aria-label="沒有實際數據，暫不顯示走勢圖">
+          <div className="sparkline" aria-label="近期加權指數歷史收盤走勢">
             <div className="spark-grid"></div>
-            {taiex && taiex.recent.filter(p => p.value !== null).length >= 2 ? (() => {
-              const values = taiex.recent.filter((p): p is { date: string | null; value: number } => p.value !== null).map(p => p.value);
+            {indexTrend.length >= 2 ? (() => {
+              const values = indexTrend.map(p => p.value);
               const low = Math.min(...values), high = Math.max(...values);
               const range = Math.max(high - low, 1);
               const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1) * 100).toFixed(2)},${(90 - (v - low) / range * 80).toFixed(2)}`).join(" ");
-              return <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:"relative",width:"100%",height:"100%"}} role="img" aria-label="近期收盤走勢折線圖"><polyline points={points} fill="none" stroke="#fb725b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>;
-            })() : <div className="spark-empty"><Activity size={24}/><span>{loadingTaiex ? "讀取走勢中" : "暫無可繪製的走勢資料"}</span></div>}
+              return <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:"relative",width:"100%",height:"100%"}} role="img" aria-label="最近 30 個交易日加權指數收盤走勢圖"><polyline points={points} fill="none" stroke="#fb725b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>;
+            })() : <div className="spark-empty"><Activity size={24}/><span>{loadingTaiex ? "讀取走勢中" : "{indexTrendError || "暫無可繪製的走勢資料"}"}</span></div>}
           </div>
-          <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
+          <p className="footnote">走勢圖：最近 30 個交易日收盤資料，與每 10 秒查詢的盤中指數分開顯示。</p><div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
       </section>
 
