@@ -1,23 +1,9 @@
 import { NextResponse } from "next/server";
 
-export async function GET(_request: Request, context: { params: { symbol: string } }) {
-  const symbol = context.params.symbol;
-  if (!/^\d{4,6}$/.test(symbol)) {
-    return NextResponse.json({ error: "Invalid stock symbol" }, { status: 400 });
-  }
-  return NextResponse.json({
-    status: "not_configured",
-    symbol,
-    name: null,
-    quote: null,
-    dataSource: null,
-    lastUpdatedAt: null
-  }, { status: 503, headers: { "Cache-Control": "no-store" } });
-}
-
 export const runtime = "nodejs";
 
 type TwseStock = {
+  Date?: string;
   Code?: string;
   Name?: string;
   TradeVolume?: string;
@@ -31,21 +17,28 @@ type TwseStock = {
 };
 
 function toNumber(value?: string): number | null {
-  if (!value || value.trim() === "" || value === "-") {
+  if (!value || !/^-?[\d,]+(?:\.\d+)?$/.test(value.trim())) {
     return null;
   }
-
-  const result = Number(value.replaceAll(",", ""));
-  return Number.isFinite(result) ? result : null;
+  const number = Number(value.replaceAll(",", ""));
+  return Number.isFinite(number) ? number : null;
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const code = (searchParams.get("code") ?? "").trim();
+function rocDateToIso(value?: string): string | null {
+  if (!value || !/^\d{7}$/.test(value)) return null;
+  const year = Number(value.slice(0, 3)) + 1911;
+  return `${year}-${value.slice(3, 5)}-${value.slice(5, 7)}`;
+}
 
-  if (!/^\d{4,6}$/.test(code)) {
-    return Response.json(
-      { error: "請輸入有效的股票代號，例如 2330" },
+export async function GET(
+  _request: Request,
+  context: { params: { symbol: string } }
+) {
+  const symbol = context.params.symbol;
+
+  if (!/^\d{4,6}$/.test(symbol)) {
+    return NextResponse.json(
+      { error: "請輸入 4 至 6 位數字的股票代號" },
       { status: 400 }
     );
   }
@@ -57,42 +50,48 @@ export async function GET(request: Request) {
     );
 
     if (!response.ok) {
-      return Response.json(
-        { error: "暫時無法取得證交所行情資料" },
+      return NextResponse.json(
+        { error: "證交所行情服務暫時無法使用" },
         { status: 502 }
       );
     }
 
-    const stocks: TwseStock[] = await response.json();
-    const item = stocks.find((stock) => stock.Code === code);
+    const data: unknown = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Unexpected TWSE response");
+    }
 
-    if (!item) {
-      return Response.json(
-        { error: "查無此上市股票，或資料尚未提供" },
+    const stock = (data as TwseStock[]).find((row) => row.Code === symbol);
+    if (!stock) {
+      return NextResponse.json(
+        { error: "查無此上市股票的日行情資料（不含上櫃股票）" },
         { status: 404 }
       );
     }
 
-    return Response.json({
-      source: "臺灣證券交易所 OpenAPI",
-      market: "上市",
-      fetchedAt: new Date().toISOString(),
-      stock: {
-        code: item.Code,
-        name: item.Name,
-        volume: toNumber(item.TradeVolume),
-        tradeValue: toNumber(item.TradeValue),
-        open: toNumber(item.OpeningPrice),
-        high: toNumber(item.HighestPrice),
-        low: toNumber(item.LowestPrice),
-        close: toNumber(item.ClosingPrice),
-        change: toNumber(item.Change),
-        transactions: toNumber(item.Transaction),
+    return NextResponse.json({
+      status: "ok",
+      symbol,
+      name: stock.Name ?? null,
+      market: "TWSE",
+      dataDate: rocDateToIso(stock.Date),
+      quote: {
+        open: toNumber(stock.OpeningPrice),
+        high: toNumber(stock.HighestPrice),
+        low: toNumber(stock.LowestPrice),
+        close: toNumber(stock.ClosingPrice),
+        change: toNumber(stock.Change),
+        volume: toNumber(stock.TradeVolume),
+        tradeValue: toNumber(stock.TradeValue),
+        transactions: toNumber(stock.Transaction)
       },
+      dataSource: "TWSE STOCK_DAY_ALL",
+      lastUpdatedAt: new Date().toISOString(),
+      isRealtime: false
     });
   } catch {
-    return Response.json(
-      { error: "行情資料連線失敗，請稍後再試" },
+    return NextResponse.json(
+      { error: "取得台股行情失敗，請稍後再試" },
       { status: 502 }
     );
   }
