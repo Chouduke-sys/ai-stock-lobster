@@ -35,7 +35,7 @@ export async function GET(request: Request, context: {params:{symbol:string}}) {
         });
       } catch {return [];}
     }));
-    const sorted=[...new Map(results.flat().map(row=>[row.date,row])).values()].sort((a,b)=>a.date.localeCompare(b.date));
+    const sorted=Array.from(new Map(results.flat().map(row=>[row.date,row] as const)).values()).sort((a,b)=>a.date.localeCompare(b.date));
     if(!sorted.length) return NextResponse.json({error:"暫時無法取得上市股票歷史行情，或股票代號不存在"},{status:503});
     const candles=aggregate(sorted,period as "day"|"week"|"month");
     const metrics=indicators(candles);
