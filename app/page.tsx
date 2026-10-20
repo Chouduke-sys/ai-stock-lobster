@@ -47,7 +47,6 @@ export default function Home() {
   const [historyError, setHistoryError] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [quoteRefreshAt, setQuoteRefreshAt] = useState<string | null>(null);
-  const [indexRefreshAt, setIndexRefreshAt] = useState<string | null>(null);
 
   const rows = rankRows;
 
@@ -127,7 +126,6 @@ export default function Home() {
         const result = await response.json();
         if (!response.ok || result.status !== "ok") throw new Error(result.error || "加權指數查詢失敗");
         setTaiex(result as TaiexResult);
-        setIndexRefreshAt(new Date().toISOString());
       } catch (error) {
         if (!controller.signal.aborted) { setTaiex(null); setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
       } finally {
