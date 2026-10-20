@@ -46,6 +46,8 @@ export default function Home() {
   const [history, setHistory] = useState<HistoryResult | null>(null);
   const [historyError, setHistoryError] = useState("");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [quoteRefreshAt, setQuoteRefreshAt] = useState<string | null>(null);
+  const [indexRefreshAt, setIndexRefreshAt] = useState<string | null>(null);
 
   const rows = rankRows;
 
@@ -84,7 +86,10 @@ export default function Home() {
 
   useEffect(() => {
     const controller = new AbortController();
+    let inFlight = false;
     async function loadQuote() {
+      if (inFlight) return;
+      inFlight = true;
       setLoadingQuote(true);
       setQuoteError("");
       setStockData(null);
@@ -95,35 +100,43 @@ export default function Home() {
           throw new Error(result.error || "行情查詢失敗");
         }
         setStockData(result as StockResult);
+        setQuoteRefreshAt(new Date().toISOString());
       } catch (error) {
         if (!controller.signal.aborted) {
+          setStockData(null);
           setQuoteError(error instanceof Error ? error.message : "行情查詢失敗");
         }
       } finally {
+        inFlight = false;
         if (!controller.signal.aborted) setLoadingQuote(false);
       }
     }
     void loadQuote();
-    const timer = setInterval(() => { void loadQuote(); }, 15000);
+    const timer = setInterval(() => { void loadQuote(); }, 10000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [symbol]);
 
   useEffect(() => {
     const controller = new AbortController();
+    let inFlight = false;
     async function loadIndex() {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const response = await fetch("/api/market/taiex", { signal: controller.signal });
         const result = await response.json();
         if (!response.ok || result.status !== "ok") throw new Error(result.error || "加權指數查詢失敗");
         setTaiex(result as TaiexResult);
+        setIndexRefreshAt(new Date().toISOString());
       } catch (error) {
-        if (!controller.signal.aborted) setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗");
+        if (!controller.signal.aborted) { setTaiex(null); setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
       } finally {
+        inFlight = false;
         if (!controller.signal.aborted) setLoadingTaiex(false);
       }
     }
     void loadIndex();
-    const timer = setInterval(() => { void loadIndex(); }, 15000);
+    const timer = setInterval(() => { void loadIndex(); }, 10000);
     return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
@@ -167,7 +180,7 @@ export default function Home() {
         </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 10 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div className="sparkline" aria-label="沒有實際數據，暫不顯示走勢圖">
             <div className="spark-grid"></div>
             {taiex && taiex.recent.filter(p => p.value !== null).length >= 2 ? (() => {
@@ -184,7 +197,7 @@ export default function Home() {
 
       <section className="stats-grid">
         <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
-        <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人合計</span><strong>—</strong><small>等待官方日報</small></article>
+        <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人合計</span><strong>—</strong><small>法人日報盤後公布，非盤中即時</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> 買超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 賣超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
       </section>
@@ -203,14 +216,14 @@ export default function Home() {
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市盤中報價每 15 秒查詢；歷史 K 線及技術指標以實際歷史行情計算。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市盤中報價每 10 秒查詢；歷史 K 線及技術指標以實際歷史行情計算。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
         <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><div className="toggle-group">{["日K","週K","月K"].map(p => <button key={p} className={period === p ? "active" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>
         <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "盤中行情（測試）" : "尚無資料"}</span></div>
         {stockData ? (
           <>
             <div className="quote-summary"><div><small>最新成交價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
             <div className="indicator-grid"><div><small>開盤</small><strong>{formatPrice(stockData.quote.open)}</strong></div><div><small>最高</small><strong>{formatPrice(stockData.quote.high)}</strong></div><div><small>最低</small><strong>{formatPrice(stockData.quote.low)}</strong></div><div><small>成交量（股）</small><strong>{formatVolume(stockData.quote.volume)}</strong></div></div>
-            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 15 秒查詢，不保證即時。</p>
+            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 10 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
         <div className="history-panel">
