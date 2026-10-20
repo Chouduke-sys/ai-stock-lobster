@@ -1,116 +1,49 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-type TwseStock = {
-  Date?: string;
-  Code?: string;
-  Name?: string;
-  TradeVolume?: string;
-  TradeValue?: string;
-  OpeningPrice?: string;
-  HighestPrice?: string;
-  LowestPrice?: string;
-  ClosingPrice?: string;
-  Change?: string;
-  Transaction?: string;
+type MisRow = { c?: string; n?: string; d?: string; t?: string; tlong?: string; z?: string; y?: string; o?: string; h?: string; l?: string; v?: string; tv?: string; a?: string };
+type MisResponse = { msgArray?: MisRow[] };
+
+const number = (v?: string): number | null => {
+  if (!v || !/^-?[0-9,]+(?:\.[0-9]+)?$/.test(v.trim())) return null;
+  const n = Number(v.replaceAll(",", ""));
+  return Number.isFinite(n) ? n : null;
+};
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const dateOf = (d?: string) => d && /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null;
+const timeOf = (row: MisRow): string | null => {
+  if (!dateOf(row.d) || !/^\d{2}:\d{2}:\d{2}$/.test(row.t ?? "")) return null;
+  return `${dateOf(row.d)}T${row.t}+08:00`;
 };
 
-function toNumber(value?: string): number | null {
-  if (!value || !/^-?[\d,]+(?:\.\d+)?$/.test(value.trim())) {
-    return null;
-  }
-  const number = Number(value.replaceAll(",", ""));
-  return Number.isFinite(number) ? number : null;
-}
-
-function rocDateToIso(value?: string): string | null {
-  if (!value || !/^\d{7}$/.test(value)) return null;
-  const year = Number(value.slice(0, 3)) + 1911;
-  return `${year}-${value.slice(3, 5)}-${value.slice(5, 7)}`;
-}
-
-function taiwanToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(new Date());
-}
-
-export async function GET(
-  _request: Request,
-  context: { params: { symbol: string } }
-) {
+export async function GET(_request: Request, context: { params: { symbol: string } }) {
   const symbol = context.params.symbol;
-
-  if (!/^\d{4,6}$/.test(symbol)) {
-    return NextResponse.json(
-      { error: "請輸入 4 至 6 位數字的股票代號" },
-      { status: 400 }
-    );
-  }
-
+  if (!/^\d{4,6}$/.test(symbol)) return NextResponse.json({ error: "股票代號格式錯誤" }, { status: 400 });
   try {
-    const response = await fetch(
-      "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
-      { next: { revalidate: 300 } }
-    );
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "證交所行情服務暫時無法使用" },
-        { status: 502 }
-      );
-    }
-
-    const data: unknown = await response.json();
-    if (!Array.isArray(data)) {
-      throw new Error("Unexpected TWSE response");
-    }
-
-    const stock = (data as TwseStock[]).find((row) => row.Code === symbol);
-    if (!stock) {
-      return NextResponse.json(
-        { error: "查無此上市股票的日行情資料（不含上櫃股票）" },
-        { status: 404 }
-      );
-    }
-
-    const dataDate = rocDateToIso(stock.Date);
-    if (dataDate !== taiwanToday()) {
-      return NextResponse.json({
-        status: "not_available_today",
-        error: "證交所尚未提供今天的個股日行情（或資料未附交易日期），不顯示舊資料",
-        symbol,
-        dataDate,
-        today: taiwanToday(),
-        isRealtime: false
-      }, { status: 409, headers: { "Cache-Control": "no-store" } });
-    }
-
+    const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${symbol}.tw&json=1&delay=0`;
+    const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json", Referer: "https://mis.twse.com.tw/stock/" }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error("行情來源暫時無法連線");
+    const payload = await response.json() as MisResponse;
+    const row = payload.msgArray?.find(r => r.c === symbol);
+    if (!row) return NextResponse.json({ error: "查無上市股票報價" }, { status: 404 });
+    const dataDate = dateOf(row.d);
+    const quoteTime = timeOf(row);
+    if (dataDate !== today()) return NextResponse.json({ status: "not_available_today", error: "目前沒有今天的成交報價（尚未開盤、休市或資料尚未更新）", dataDate }, { status: 409 });
+    const last = number(row.z);
+    const reference = number(row.y);
+    const price = last ?? number(row.a?.split("_").find(x => number(x) !== null));
+    const change = last !== null && reference !== null ? Math.round((last - reference) * 100) / 100 : null;
+    const delaySeconds = quoteTime ? Math.max(0, Math.round((Date.now() - new Date(quoteTime).getTime()) / 1000)) : null;
     return NextResponse.json({
-      status: "ok",
-      symbol,
-      name: stock.Name ?? null,
-      market: "TWSE",
-      dataDate: rocDateToIso(stock.Date),
-      quote: {
-        open: toNumber(stock.OpeningPrice),
-        high: toNumber(stock.HighestPrice),
-        low: toNumber(stock.LowestPrice),
-        close: toNumber(stock.ClosingPrice),
-        change: toNumber(stock.Change),
-        volume: toNumber(stock.TradeVolume),
-        tradeValue: toNumber(stock.TradeValue),
-        transactions: toNumber(stock.Transaction)
-      },
-      dataSource: "TWSE STOCK_DAY_ALL",
-      lastUpdatedAt: new Date().toISOString(),
-      isRealtime: false
-    });
+      status: "ok", symbol, name: row.n ?? null, dataDate, quoteTime,
+      delaySeconds, delayDescription: delaySeconds === null ? "無法確認延遲" : `距最後成交 ${delaySeconds} 秒（不代表供應商延遲）`,
+      isRealtime: false, dataSource: "TWSE MIS（非正式公開 API，供測試）",
+      quote: { open: number(row.o), high: number(row.h), low: number(row.l), close: price, last, reference, change, volume: number(row.v), tradeValue: null, transactions: null },
+      lastUpdatedAt: new Date().toISOString()
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json(
-      { error: "取得台股行情失敗，請稍後再試" },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: "盤中報價暫時無法取得" }, { status: 502 });
   }
 }
