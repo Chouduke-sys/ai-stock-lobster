@@ -30,6 +30,12 @@ function rocDateToIso(value?: string): string | null {
   return `${year}-${value.slice(3, 5)}-${value.slice(5, 7)}`;
 }
 
+function taiwanToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+}
+
 export async function GET(
   _request: Request,
   context: { params: { symbol: string } }
@@ -67,6 +73,18 @@ export async function GET(
         { error: "查無此上市股票的日行情資料（不含上櫃股票）" },
         { status: 404 }
       );
+    }
+
+    const dataDate = rocDateToIso(stock.Date);
+    if (dataDate !== taiwanToday()) {
+      return NextResponse.json({
+        status: "not_available_today",
+        error: "證交所尚未提供今天的個股日行情（或資料未附交易日期），不顯示舊資料",
+        symbol,
+        dataDate,
+        today: taiwanToday(),
+        isRealtime: false
+      }, { status: 409, headers: { "Cache-Control": "no-store" } });
     }
 
     return NextResponse.json({
