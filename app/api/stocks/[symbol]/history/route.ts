@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { aggregate, indicators, numberValue, rocDate, type Candle } from "../../../../lib/technical";
+import { aggregate, indicators, numberValue, rocDate, type Candle } from "../../../../../lib/technical";
 export const runtime = "nodejs";
 
 type TwseMonth = { stat?: string; data?: unknown[][] };
