@@ -205,7 +205,7 @@ export default function Home() {
               const range = Math.max(high - low, 1);
               const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1) * 100).toFixed(2)},${(90 - (v - low) / range * 80).toFixed(2)}`).join(" ");
               return <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:"relative",width:"100%",height:"100%"}} role="img" aria-label="最近 30 個交易日加權指數收盤走勢圖"><polyline points={points} fill="none" stroke="#fb725b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>;
-            })() : <div className="spark-empty"><Activity size={24}/><span>{loadingTaiex ? "讀取走勢中" : "{indexTrendError || "暫無可繪製的走勢資料"}"}</span></div>}
+            })() : <div className="spark-empty"><Activity size={24}/><span>{loadingTaiex ? "讀取走勢中" : indexTrendError || "暫無可繪製的走勢資料"}</span></div>}
           </div>
           <p className="footnote">走勢圖：最近 30 個交易日收盤資料，與每 10 秒查詢的盤中指數分開顯示。</p><div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
