@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
 type RankRow = { symbol: string; name: string; netShares: number | null; status: "待串接" };
+type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; recent: { date: string | null; value: number | null }[] };
 type StockResult = {
   status: string;
   symbol: string;
@@ -37,6 +38,9 @@ export default function Home() {
   const [stockData, setStockData] = useState<StockResult | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [quoteError, setQuoteError] = useState("");
+  const [taiex, setTaiex] = useState<TaiexResult | null>(null);
+  const [taiexError, setTaiexError] = useState("");
+  const [loadingTaiex, setLoadingTaiex] = useState(true);
 
   const rows: RankRow[] = useMemo(() => (rankSide === "buy" ? sampleNames : [
     { symbol: "—", name: "賣超資料待串接 A" },
@@ -71,9 +75,27 @@ export default function Home() {
     return () => controller.abort();
   }, [symbol]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadIndex() {
+      try {
+        const response = await fetch("/api/market/taiex", { signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok || result.status !== "ok") throw new Error(result.error || "加權指數查詢失敗");
+        setTaiex(result as TaiexResult);
+      } catch (error) {
+        if (!controller.signal.aborted) setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗");
+      } finally {
+        if (!controller.signal.aborted) setLoadingTaiex(false);
+      }
+    }
+    void loadIndex();
+    return () => controller.abort();
+  }, []);
+
   function lookupStock() {
     const value = search.trim();
-    if (!/^\\d{4,6}$/.test(value)) {
+    if (!/^\d{4,6}$/.test(value)) {
       setMessage("請輸入 4 至 6 位數字股票代號。");
       return;
     }
@@ -110,17 +132,24 @@ export default function Home() {
           <div className="trust-line"><ShieldCheck size={15}/> 資料來源與更新時間透明標示</div>
         </div>
         <div className="hero-visual">
-          <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">資料服務待連接</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>—</strong><small>等待正式行情 API</small></div>
+          <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "證交所每日收盤資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· 非即時` : loadingTaiex ? "載入官方日行情中…" : taiexError}</small></div>
           <div className="sparkline" aria-label="沒有實際數據，暫不顯示走勢圖">
-            <div className="spark-grid"></div><div className="spark-empty"><Activity size={24}/><span>連接行情後顯示市場走勢</span></div>
+            <div className="spark-grid"></div>
+            {taiex && taiex.recent.filter(p => p.value !== null).length >= 2 ? (() => {
+              const values = taiex.recent.filter((p): p is { date: string | null; value: number } => p.value !== null).map(p => p.value);
+              const low = Math.min(...values), high = Math.max(...values);
+              const range = Math.max(high - low, 1);
+              const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1) * 100).toFixed(2)},${(90 - (v - low) / range * 80).toFixed(2)}`).join(" ");
+              return <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{position:"relative",width:"100%",height:"100%"}} role="img" aria-label="近期收盤走勢折線圖"><polyline points={points} fill="none" stroke="#fb725b" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>;
+            })() : <div className="spark-empty"><Activity size={24}/><span>{loadingTaiex ? "讀取走勢中" : "暫無可繪製的走勢資料"}</span></div>}
           </div>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
       </section>
 
       <section className="stats-grid">
-        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>—</strong><small>尚未連接行情</small></article>
+        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（非即時）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
         <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人合計</span><strong>—</strong><small>等待官方日報</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> 買超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 賣超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
