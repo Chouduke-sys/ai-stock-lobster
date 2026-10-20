@@ -29,7 +29,7 @@ export function aggregate(candles: Candle[], period: "day" | "week" | "month"): 
     const prev = groups.get(key);
     groups.set(key, prev ? { ...prev, date: candle.date, high: Math.max(prev.high, candle.high), low: Math.min(prev.low, candle.low), close: candle.close, volume: prev.volume + candle.volume } : { ...candle });
   }
-  return [...groups.values()];
+  return Array.from(groups.values());
 }
 export function indicators(candles: Candle[]) {
   const closes = candles.map(c => c.close);
