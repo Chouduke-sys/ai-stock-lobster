@@ -1,9 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
 type RankRow = { symbol: string; name: string; netShares: number | null; status: "待串接" };
+type StockResult = {
+  status: string;
+  symbol: string;
+  name: string | null;
+  dataDate: string | null;
+  quote: { open: number | null; high: number | null; low: number | null; close: number | null; change: number | null; volume: number | null; tradeValue: number | null; transactions: number | null };
+  dataSource: string;
+  lastUpdatedAt: string;
+  isRealtime: boolean;
+};
+const formatPrice = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
+const formatVolume = (value: number | null | undefined) => value == null ? "—" : Math.round(value).toLocaleString("zh-TW");
 const sampleNames = [
   { symbol: "2330", name: "台積電" },
   { symbol: "2317", name: "鴻海" },
@@ -22,6 +34,9 @@ export default function Home() {
   const [showLogin, setShowLogin] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const [message, setMessage] = useState("");
+  const [stockData, setStockData] = useState<StockResult | null>(null);
+  const [loadingQuote, setLoadingQuote] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
 
   const rows: RankRow[] = useMemo(() => (rankSide === "buy" ? sampleNames : [
     { symbol: "—", name: "賣超資料待串接 A" },
@@ -31,14 +46,39 @@ export default function Home() {
     { symbol: "—", name: "賣超資料待串接 E" }
   ]).map((x) => ({ ...x, netShares: null, status: "待串接" as const })), [rankSide]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadQuote() {
+      setLoadingQuote(true);
+      setQuoteError("");
+      setStockData(null);
+      try {
+        const response = await fetch(`/api/stocks/${symbol}`, { signal: controller.signal });
+        const result = await response.json();
+        if (!response.ok || result.status !== "ok") {
+          throw new Error(result.error || "行情查詢失敗");
+        }
+        setStockData(result as StockResult);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setQuoteError(error instanceof Error ? error.message : "行情查詢失敗");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingQuote(false);
+      }
+    }
+    void loadQuote();
+    return () => controller.abort();
+  }, [symbol]);
+
   function lookupStock() {
     const value = search.trim();
-    if (!/^\d{4,6}$/.test(value)) {
+    if (!/^\\d{4,6}$/.test(value)) {
       setMessage("請輸入 4 至 6 位數字股票代號。");
       return;
     }
     setSymbol(value);
-    setMessage(`已切換至 ${value}；接通行情服務後才會顯示真實 K 線。`);
+    setMessage("");
   }
 
   return (
@@ -100,9 +140,17 @@ export default function Home() {
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股 K 線分析</h2><p>以歷史 OHLCV 數據繪製日 K、週 K 與月 K。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>證交所上市股票每日行情；歷史日 K、週 K、月 K 尚待串接。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
         <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><div className="toggle-group">{["日K","週K","月K"].map(p => <button key={p} className={period === p ? "active" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>
-        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}</strong><span> · {period}</span></div><span className="tag tag-amber">OHLCV 尚未載入</span></div><div className="chart-placeholder"><BarChart3 size={30}/><strong>等待真實 K 線資料</strong><span>接通官方或授權行情 API 後，顯示開盤、最高、最低、收盤與成交量。</span></div><div className="indicator-grid"><div><small>MA5</small><strong>—</strong></div><div><small>RSI</small><strong>—</strong></div><div><small>成交量</small><strong>—</strong></div><div><small>最後更新</small><strong>—</strong></div></div></div>
+        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 上市日行情</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "官方日行情" : "尚無資料"}</span></div>
+        {stockData ? (
+          <>
+            <div className="quote-summary"><div><small>收盤價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
+            <div className="indicator-grid"><div><small>開盤</small><strong>{formatPrice(stockData.quote.open)}</strong></div><div><small>最高</small><strong>{formatPrice(stockData.quote.high)}</strong></div><div><small>最低</small><strong>{formatPrice(stockData.quote.low)}</strong></div><div><small>成交量（股）</small><strong>{formatVolume(stockData.quote.volume)}</strong></div></div>
+            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。非盤中即時行情，交易日期未提供時請以官方資料為準。</p>
+          </>
+        ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
+        <p className="footnote">你目前選擇 {period}；歷史 K 線及 MA、RSI 等技術指標尚未提供，避免顯示假資料。</p></div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
 
@@ -119,7 +167,7 @@ export default function Home() {
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
-      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。行情、新聞、法人排名與 AI 分析功能尚未連接正式資料來源，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
+      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。上市個股日行情已串接官方來源；歷史 K 線、新聞、法人排名與 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
 }
