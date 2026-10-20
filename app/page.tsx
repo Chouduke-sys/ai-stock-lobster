@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
-type RankRow = { symbol: string; name: string; netShares: number | null; status: "待串接" };
+type RankRow = { symbol: string; name: string; netShares: number };
+type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
+type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
 type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type StockResult = {
   status: string;
@@ -19,13 +21,7 @@ type StockResult = {
 const formatPrice = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
 const ageLabel = (s: number | null | undefined) => s == null ? "報價時間未確認" : s < 60 ? `距報價 ${s} 秒` : `距報價 ${Math.floor(s / 60)} 分鐘`;
 const formatVolume = (value: number | null | undefined) => value == null ? "—" : Math.round(value).toLocaleString("zh-TW");
-const sampleNames = [
-  { symbol: "2330", name: "台積電" },
-  { symbol: "2317", name: "鴻海" },
-  { symbol: "2454", name: "聯發科" },
-  { symbol: "2382", name: "廣達" },
-  { symbol: "3711", name: "日月光投控" }
-];
+const chartPeriod: Record<string,string> = { "日K":"day", "週K":"week", "月K":"month" };
 
 export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
@@ -43,14 +39,48 @@ export default function Home() {
   const [taiex, setTaiex] = useState<TaiexResult | null>(null);
   const [taiexError, setTaiexError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
+  const [rankRows, setRankRows] = useState<RankRow[]>([]);
+  const [rankError, setRankError] = useState("");
+  const [rankDate, setRankDate] = useState("");
+  const [loadingRank, setLoadingRank] = useState(true);
+  const [history, setHistory] = useState<HistoryResult | null>(null);
+  const [historyError, setHistoryError] = useState("");
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const rows: RankRow[] = useMemo(() => (rankSide === "buy" ? sampleNames : [
-    { symbol: "—", name: "賣超資料待串接 A" },
-    { symbol: "—", name: "賣超資料待串接 B" },
-    { symbol: "—", name: "賣超資料待串接 C" },
-    { symbol: "—", name: "賣超資料待串接 D" },
-    { symbol: "—", name: "賣超資料待串接 E" }
-  ]).map((x) => ({ ...x, netShares: null, status: "待串接" as const })), [rankSide]);
+  const rows = rankRows;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadRanks() {
+      setLoadingRank(true); setRankError(""); setRankRows([]);
+      try {
+        const params = new URLSearchParams({market,investor,side:rankSide});
+        const response = await fetch(`/api/institutional?${params}`,{signal:controller.signal});
+        const data = await response.json();
+        if(!response.ok || data.status!=="ok")throw new Error(data.error || "法人排行暫無資料");
+        setRankRows(data.rows);setRankDate(data.dataDate);
+      }catch(e){if(!controller.signal.aborted)setRankError(e instanceof Error?e.message:"法人排行讀取失敗");}
+      finally{if(!controller.signal.aborted)setLoadingRank(false);}
+    }
+    void loadRanks();
+    return ()=>controller.abort();
+  },[market,investor,rankSide]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadHistory() {
+      setLoadingHistory(true);setHistoryError("");setHistory(null);
+      try {
+        const response = await fetch(`/api/stocks/${symbol}/history?period=${chartPeriod[period]}`,{signal:controller.signal});
+        const data = await response.json();
+        if(!response.ok || data.status!=="ok")throw new Error(data.error || "K 線資料暫無法取得");
+        setHistory(data);
+      }catch(e){if(!controller.signal.aborted)setHistoryError(e instanceof Error?e.message:"K 線資料讀取失敗");}
+      finally{if(!controller.signal.aborted)setLoadingHistory(false);}
+    }
+    void loadHistory();
+    return ()=>controller.abort();
+  },[symbol,period]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -160,30 +190,58 @@ export default function Home() {
       </section>
 
       <section className="section" id="rankings">
-        <div className="section-heading"><div><div className="eyebrow">INSTITUTIONAL FLOW</div><h2>三大法人買賣超排行</h2><p>近五個交易日 · 每日買超與賣超前五名</p></div><span className="tag tag-amber">尚未連接真實資料</span></div>
+        <div className="section-heading"><div><div className="eyebrow">INSTITUTIONAL FLOW</div><h2>三大法人買賣超排行</h2><p>當日買超與賣超前五名 · 盤後公布</p></div><span className="tag tag-amber">{rankDate && rows.length ? `資料日 ${rankDate}` : loadingRank ? "讀取中" : "今日資料尚未確認"}</span></div>
         <div className="filters">
-          <label>市場<select value={market} onChange={e => setMarket(e.target.value)}><option value="all">上市＋上櫃</option><option value="twse">上市股票</option><option value="tpex">上櫃股票</option></select></label>
+          <label>市場<select value={market} onChange={e => setMarket(e.target.value)}><option value="all">上市＋上櫃（開發中）</option><option value="twse">上市股票</option><option value="tpex">上櫃股票（開發中）</option></select></label>
           <label>法人<select value={investor} onChange={e => setInvestor(e.target.value)}><option value="all">三大法人合計</option><option value="foreign">外資及陸資</option><option value="trust">投信</option><option value="dealer">自營商</option></select></label>
           <div className="toggle-group"><button className={rankSide === "buy" ? "active buy" : ""} onClick={() => setRankSide("buy")}>買超前五</button><button className={rankSide === "sell" ? "active sell" : ""} onClick={() => setRankSide("sell")}>賣超前五</button></div>
         </div>
         <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>淨買賣超（股）</th><th>資料狀態</th></tr></thead><tbody>
-          {rows.map((r, i) => <tr key={`${rankSide}-${i}`}><td><span className="rank-number">{i + 1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>—</td><td><span className="status-pending">待串接</span></td></tr>)}
+          {rows.map((r, i) => <tr key={`${rankSide}-${i}`}><td><span className="rank-number">{i + 1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td>TWSE</td></tr>)}
         </tbody></table></div>
-        <p className="footnote"><CircleHelp size={14}/> 股票名稱為介面測試用例，不代表實際法人排名；正式資料將依淨買賣超股數排序。</p>
+        <p className="footnote"><CircleHelp size={14}/> {loadingRank ? "正在讀取法人日報…" : rankError || `資料日期 ${rankDate}；依淨買賣超股數排序。上櫃資料尚未完成。`}</p>
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市股票盤中報價測試版，每 15 秒查詢；可能延遲，歷史 K 線尚待串接。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市盤中報價每 15 秒查詢；歷史 K 線及技術指標以實際歷史行情計算。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
         <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><div className="toggle-group">{["日K","週K","月K"].map(p => <button key={p} className={period === p ? "active" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>
-        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 上市盤中行情</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "官方日行情" : "尚無資料"}</span></div>
+        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "盤中行情（測試）" : "尚無資料"}</span></div>
         {stockData ? (
           <>
-            <div className="quote-summary"><div><small>收盤價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
+            <div className="quote-summary"><div><small>最新成交價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
             <div className="indicator-grid"><div><small>開盤</small><strong>{formatPrice(stockData.quote.open)}</strong></div><div><small>最高</small><strong>{formatPrice(stockData.quote.high)}</strong></div><div><small>最低</small><strong>{formatPrice(stockData.quote.low)}</strong></div><div><small>成交量（股）</small><strong>{formatVolume(stockData.quote.volume)}</strong></div></div>
             <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 15 秒查詢，不保證即時。</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
-        <p className="footnote">你目前選擇 {period}；歷史 K 線及 MA、RSI 等技術指標尚未提供，避免顯示假資料。</p></div>
+        <div className="history-panel">
+          <h3>{period} 歷史 K 線與技術指標</h3>
+          {history?.candles.length ? (() => {
+            const data = history.candles.slice(-65);
+            const low = Math.min(...data.map(c=>c.low)), high = Math.max(...data.map(c=>c.high)), range=Math.max(1,high-low);
+            const x=(i:number)=>(i+.5)*800/data.length;
+            const y=(v:number)=>20+(high-v)/range*240;
+            const latest=history.candles[history.candles.length-1];
+            return <>
+              <svg viewBox="0 0 800 290" role="img" aria-label={`${symbol} ${period} 真實歷史 K 線圖`} className="candle-svg">
+                {data.map((c,i)=><g key={c.date} stroke={c.close>=c.open?"#fb725b":"#59d7a1"}>
+                  <line x1={x(i)} y1={y(c.high)} x2={x(i)} y2={y(c.low)} strokeWidth="1.4"/>
+                  <rect x={x(i)-Math.max(2,320/data.length)} y={Math.min(y(c.open),y(c.close))} width={Math.max(4,640/data.length)} height={Math.max(1,Math.abs(y(c.open)-y(c.close)))} fill={c.close>=c.open?"#fb725b":"#59d7a1"} />
+                </g>)}
+                {(["ma5","ma10","ma20"] as const).map((key,i)=>{
+                  const points=data.map((c,j)=>c[key]===null?null:`${x(j)},${y(c[key]!)}`).filter(Boolean).join(" ");
+                  return <polyline key={key} points={points} fill="none" stroke={["#f7c66b","#7aa7ff","#c39bfa"][i]} strokeWidth="1.6" vectorEffect="non-scaling-stroke"/>;
+                })}
+              </svg>
+              <div className="indicator-grid">
+                <div><small>MA5 / MA10</small><strong>{formatPrice(latest.ma5)} / {formatPrice(latest.ma10)}</strong></div>
+                <div><small>MA20 / MA60</small><strong>{formatPrice(latest.ma20)} / {formatPrice(latest.ma60)}</strong></div>
+                <div><small>RSI(14)</small><strong>{formatPrice(latest.rsi14)}</strong></div>
+                <div><small>MACD (DIF / Signal / Histogram)</small><strong>{formatPrice(latest.dif)} / {formatPrice(latest.signal)} / {formatPrice(latest.histogram)}</strong></div>
+              </div>
+              <p className="footnote">來源：{history.dataSource}；最新歷史交易日：{history.asOf}。紅色上漲、綠色下跌；MA5 黃、MA10 藍、MA20 紫。非盤中即時 K 線，週月 K 為日線彙整。</p>
+            </>;
+          })() : <p className="footnote">{loadingHistory ? "歷史行情讀取中…" : historyError || "目前沒有歷史行情"}</p>}
+        </div></div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
 
@@ -200,7 +258,7 @@ export default function Home() {
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
-      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。上市個股盤中行情測試中；歷史 K 線、新聞、法人排名與 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
+      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
 }
