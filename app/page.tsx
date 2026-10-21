@@ -344,7 +344,22 @@ export default function Home() {
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 三日法人動向</span><strong>{fiveLoading?"查詢中":fiveRows.length?fiveRows[0].name:"待確認"}</strong><small>{fiveRows.length?`三日合計 ${formatVolume(fiveRows[0].netShares)} 股`:"尚無完整三日排行"}</small></article>
       </section>
 
-      <section className="section" id="rankings">
+      <style>{`
+        .institutional-side-by-side { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; align-items:start; margin:24px 0 32px; }
+        .institutional-side-by-side .institutional-panel { min-width:0; margin:0; padding:24px 0; }
+        .institutional-side-by-side .section-heading { align-items:flex-start; gap:12px; flex-wrap:wrap; }
+        .institutional-side-by-side .section-heading h2 { font-size:clamp(24px,2vw,30px); }
+        .institutional-side-by-side .section-heading p { font-size:15px; line-height:1.6; }
+        .institutional-side-by-side .table-wrap { overflow-x:auto; }
+        .institutional-side-by-side table { min-width:560px; }
+        .institutional-side-by-side th { font-size:14px; padding:15px 12px; white-space:nowrap; }
+        .institutional-side-by-side td { font-size:16px; padding:17px 12px; white-space:nowrap; }
+        .institutional-side-by-side .filters { flex-wrap:wrap; gap:12px; }
+        .institutional-side-by-side .footnote { font-size:13px; line-height:1.65; }
+        @media(max-width:1050px){ .institutional-side-by-side { grid-template-columns:minmax(0,1fr); gap:12px; } }
+      `}</style>
+      <div className="institutional-side-by-side">
+      <section className="section institutional-panel" id="rankings">
         <div className="section-heading"><div><div className="eyebrow">INSTITUTIONAL FLOW</div><h2>三大法人買賣超排行</h2><p>當日買超與賣超前五名 · 盤後公布</p></div><span className="tag tag-amber">{rankDate && rows.length ? `資料日 ${rankDate}` : loadingRank ? "讀取中" : "最新交易日資料待確認"}</span></div>
         <div className="filters">
           <label>市場<select value={market} onChange={e => setMarket(e.target.value)}><option value="all">上市＋上櫃</option><option value="twse">上市股票</option><option value="tpex">上櫃股票</option></select></label>
@@ -357,14 +372,16 @@ export default function Home() {
         <p className="footnote"><CircleHelp size={14}/> {loadingRank ? "正在讀取法人日報…" : rankError || `資料日期 ${rankDate}；依淨買賣超股數排序，單位為股；盤後公布，非即時。`}</p>
       </section>
 
-      <section className="section" id="five-day-institutional">
+      <section className="section institutional-panel" id="five-day-institutional">
         <div className="section-heading"><div><div className="eyebrow">THREE-DAY INSTITUTIONAL FLOW</div><h2>三大法人連續 3 日買賣超</h2><p>依上方市場、法人及買賣方向同步篩選；以最近三個已公布交易日計算</p></div><span className="tag tag-amber">{fiveDates.length===3?fiveDates[2]+" ～ "+fiveDates[0]:"資料待確認"}</span></div>
         <div className="filters"><div className="toggle-group"><button className={fiveMode==="streak"?"active buy":""} onClick={()=>setFiveMode("streak")}>連續三日同方向</button><button className={fiveMode==="sum"?"active buy":""} onClick={()=>setFiveMode("sum")}>近三日累計</button></div><small style={{color:"#94a3b8"}}>正數＝買超；負數＝賣超；單位：股</small></div>
         <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>三日淨買賣超（股）</th><th>三日逐日數據（新→舊）</th></tr></thead><tbody>
-          {fiveRows.map((r,i)=><tr key={r.symbol}><td><span className="rank-number">{i+1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td style={{fontSize:12}}>{r.dailyShares.map(v=>v>0?"+"+formatVolume(v):formatVolume(v)).join(" / ")}</td></tr>)}
+          {fiveRows.map((r,i)=><tr key={r.symbol}><td><span className="rank-number">{i+1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td style={{fontSize:14,lineHeight:1.6}}>{r.dailyShares.map(v=>v>0?"+"+formatVolume(v):formatVolume(v)).join(" / ")}</td></tr>)}
         </tbody></table></div>
         <p className="footnote"><CircleHelp size={14}/>{fiveLoading?"正在取得最近三個交易日資料…":fiveError||(!fiveRows.length?"符合條件的股票為 0 檔。":"資料來源：TWSE T86；盤後資料，非即時。")}</p>
       </section>
+
+      </div>
 
       <section className="section" id="charts">
         <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 5 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
