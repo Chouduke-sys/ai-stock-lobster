@@ -276,7 +276,7 @@ export default function Home() {
     <main className="site-shell">
       <header className="topbar">
         <a className="brand" href="#" aria-label="AI股市龍蝦首頁">
-          <span className="brand-mark"><TrendingUp size={24} /></span>
+          <span className="brand-mark brand-mark-custom"><img src="/ai-stock-lobster-logo.png" alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span>
           <span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE · TAIWAN</small></span>
         </a>
         <nav className="nav-links"><a href="#rankings">法人排行</a><a href="#charts">個股走勢</a><a href="#global">全球資訊</a><a href="#membership">會員方案</a></nav>
@@ -412,7 +412,7 @@ export default function Home() {
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
-      <footer><a className="brand footer-brand" href="#"><span className="brand-mark"><TrendingUp size={20}/></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
+      <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src="/ai-stock-lobster-logo.png" alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
 }
