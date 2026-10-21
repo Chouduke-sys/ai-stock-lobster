@@ -72,11 +72,26 @@ function readPoints(kind:"taiex"|"tx"):Point[]{
 }
 function HourChart({points,base}:{points:Point[];base:number|null}){
  if(!points.length)return <div className="spark-empty"><Activity size={20}/><span>尚未取得有效盤中報價；取得後開始記錄走勢</span></div>;
- const values=points.map(p=>p.value-(base??points[0].value)),lo=Math.min(0,...values),hi=Math.max(0,...values),range=Math.max(hi-lo,1);
- const x=(i:number)=>points.length===1?50:3+i/(points.length-1)*94;
- const y=(v:number)=>90-(v-lo)/range*80;
+ const values=points.map(p=>p.value-(base??points[0].value));
+ const low=Math.min(0,...values),high=Math.max(0,...values);
+ const margin=Math.max((high-low)*0.1,1);
+ const lo=low-margin,hi=high+margin,range=hi-lo;
+ const x=(i:number)=>points.length===1?50:2+i/(points.length-1)*96;
+ const y=(v:number)=>100-(v-lo)/range*100;
  const path=values.map((v,i)=>x(i).toFixed(2)+","+y(v).toFixed(2)).join(" ");
- return <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="盤中報價取樣漲跌點數走勢" style={{position:"relative",width:"100%",height:"100%"}}><line x1="0" x2="100" y1={y(0)} y2={y(0)} stroke="#64748b" strokeDasharray="2 2"/>{points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:<circle cx="50" cy={y(values[0])} r="2.5" fill="#fb725b"/>}</svg>;
+ const fmt=(v:number)=>v>0?"+"+v.toFixed(0):v.toFixed(0);
+ const clock=(v:string)=>v.slice(-5);
+ return <div className="axis-chart">
+   <span className="axis-y-title">漲跌（點）</span>
+   <div className="axis-y-labels"><span>{fmt(hi)}</span><span>{fmt((hi+lo)/2)}</span><span>{fmt(lo)}</span></div>
+   <div className="axis-plot">
+     <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="加權指數盤中漲跌點數走勢，橫軸為台灣時間，縱軸為漲跌點數" style={{display:"block",width:"100%",height:"100%"}}>
+       <line x1="0" x2="100" y1={y(0)} y2={y(0)} stroke="#64748b" strokeDasharray="2 2"/>
+       {points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:<circle cx="50" cy={y(values[0])} r="2.5" fill="#fb725b"/>}
+     </svg>
+   </div>
+   <div className="axis-x-labels"><span>{clock(points[0].time)}</span><span>台灣時間</span><span>{clock(points[points.length-1].time)}</span></div>
+ </div>;
 }
 
 export default function Home() {
