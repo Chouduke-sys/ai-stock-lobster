@@ -1,48 +1,98 @@
 import { NextResponse } from "next/server";
-export const runtime = "nodejs";
-type RecordRow = Record<string,string>;
-const n=(s?:string)=>{if(!s)return null;const v=Number(s.replace(/,/g,"").replace(/\+/g,"").trim());return Number.isFinite(v)?v:null;};
-const day=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-const fields={
-  symbol:["證券代號","股票代號","代號"],
-  name:["證券名稱","股票名稱","名稱"],
-  foreign:["外陸資買賣超股數(不含外資自營商)","外陸資買賣超股數","外資及陸資買賣超股數","外資買賣超股數"],
-  trust:["投信買賣超股數"],
-  dealer:["自營商買賣超股數","自營商買賣超股數(自行買賣)"]
+export const runtime="nodejs";
+type Obj=Record<string,unknown>;
+type Item={symbol:string;name:string;market:"twse"|"tpex";foreign:number;trust:number;dealer:number;total:number};
+type MarketData={date:string;rows:Item[];source:string};
+const num=(v:unknown):number|null=>{
+ if(typeof v==="number")return Number.isSafeInteger(v)?v:null;
+ if(typeof v!=="string"||!/^[-+]?\d[\d,]*$/.test(v.trim()))return null;
+ const n=Number(v.replace(/,/g,""));return Number.isSafeInteger(n)?n:null;
 };
-function get(row:RecordRow,keys:string[]) {
-  for(const key of keys) if(row[key]!==undefined) return row[key];
-  return undefined;
+const pick=(r:Obj,keys:string[]):unknown=>{for(const k of keys)if(r[k]!==undefined&&r[k]!==null)return r[k];return null;};
+const parseDate=(v:unknown):string|null=>{
+ if(typeof v!=="string")return null;
+ const s=v.trim();
+ if(/^\d{7}$/.test(s))return String(Number(s.slice(0,3))+1911)+"-"+s.slice(3,5)+"-"+s.slice(5,7);
+ if(/^\d{8}$/.test(s))return s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8);
+ const m=s.match(/(\d{2,4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+ return m?String(Number(m[1])+(m[1].length<=3?1911:0))+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"):null;
+};
+function today(){
+ const p=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+ const get=(t:string)=>p.find(x=>x.type===t)?.value??"";
+ return get("year")+"-"+get("month")+"-"+get("day");
 }
-function parseDate(s?:string) {
-  if(!s)return null;
-  const m=s.match(/(\d{2,4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
-  if(!m)return null;
-  const year=Number(m[1])+(m[1].length<=3?1911:0);
-  return `${year}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+async function twse():Promise<MarketData|null>{
+ const start=new Date(today()+"T12:00:00+08:00");
+ for(let i=0;i<8;i++){
+  const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
+  const url="https://www.twse.com.tw/rwd/zh/fund/T86?date="+d.replace(/-/g,"")+"&selectType=ALL&response=json";
+  try{
+   const response=await fetch(url,{next:{revalidate:300},signal:AbortSignal.timeout(6000)});
+   if(!response.ok)continue;
+   const body:unknown=await response.json();
+   if(!body||typeof body!=="object"||Array.isArray(body))continue;
+   const r=body as Obj;
+   if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))continue;
+   const names=["證券代號","證券名稱","外陸資買賣超股數(不含外資自營商)","投信買賣超股數","自營商買賣超股數","三大法人買賣超股數"];
+   const indices=names.map(k=>(r.fields as string[]).indexOf(k));
+   if(indices.some(k=>k<0))continue;
+   const rows:Item[]=[];
+   for(const item of r.data){
+    if(!Array.isArray(item))continue;
+    const symbol=String(item[indices[0]]??"").trim();
+    if(!/^\d{4}$/.test(symbol))continue;
+    const values=indices.slice(2).map(j=>num(item[j]));
+    if(values.some(v=>v===null))continue;
+    const [foreign,trust,dealer,total]=values as number[];
+    if(Math.abs(foreign+trust+dealer-total)>1)continue;
+    rows.push({symbol,name:String(item[indices[1]]??symbol).trim(),market:"twse",foreign,trust,dealer,total});
+   }
+   const date=parseDate(r.date)??d;
+   if(rows.length&&date===d)return {date,rows,source:"TWSE T86"};
+  }catch{continue;}
+ }
+ return null;
 }
-export async function GET(request:Request) {
-  const params=new URL(request.url).searchParams;
-  const market=params.get("market")??"twse",investor=params.get("investor")??"all",side=params.get("side")??"buy";
-  if(market!=="twse" || !["all","foreign","trust","dealer"].includes(investor) || !["buy","sell"].includes(side))
-    return NextResponse.json({error:"目前僅提供上市股票法人排行；上櫃排行待完成可靠資料來源"},{status:400});
-  try {
-    const response=await fetch("https://openapi.twse.com.tw/v1/fund/T86",{next:{revalidate:300},signal:AbortSignal.timeout(10000)});
-    if(!response.ok)throw new Error("Unavailable");
-    const body:unknown=await response.json();
-    if(!Array.isArray(body))throw new Error("Invalid data");
-    const data=body as RecordRow[];
-    const dates=data.map(row=>parseDate(row["日期"]??row["Date"])).filter((v):v is string=>!!v);
-    const dataDate=dates[0]??null;
-    if(!dataDate || dataDate!==day())return NextResponse.json({status:"not_available_today",error:"今日上市法人資料尚未公布，或來源未提供可驗證日期",dataDate},{status:409});
-    const rows=data.flatMap(row=>{
-      const symbol=get(row,fields.symbol)?.trim(),name=get(row,fields.name)?.trim();
-      if(!symbol || !/^\d{4,6}$/.test(symbol))return [];
-      const foreign=n(get(row,fields.foreign)),trust=n(get(row,fields.trust)),dealer=n(get(row,fields.dealer));
-      const net=investor==="foreign"?foreign:investor==="trust"?trust:investor==="dealer"?dealer:foreign!==null&&trust!==null&&dealer!==null?foreign+trust+dealer:null;
-      return net===null?[]:[{symbol,name:name??symbol,netShares:net}];
-    }).sort((a,b)=>side==="buy"?b.netShares-a.netShares:a.netShares-b.netShares).slice(0,5);
-    if(!rows.length)return NextResponse.json({error:"無法辨識法人欄位，未顯示排行"},{status:503});
-    return NextResponse.json({status:"ok",market,investor,side,dataDate,rows,dataSource:"TWSE T86",isRealtime:false});
-  } catch {return NextResponse.json({error:"上市法人資料目前無法取得"},{status:502});}
+async function tpex():Promise<MarketData|null>{
+ try{
+  const response=await fetch("https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading",{next:{revalidate:300},signal:AbortSignal.timeout(9000)});
+  if(!response.ok)return null;
+  const body:unknown=await response.json();if(!Array.isArray(body))return null;
+  const rows:Item[]=[];let date:string|null=null;
+  for(const item of body){
+   if(!item||typeof item!=="object"||Array.isArray(item))continue;
+   const r=item as Obj;
+   const rowDate=parseDate(pick(r,["Date","date","日期"]));
+   if(!rowDate)continue;
+   if(date===null)date=rowDate;
+   if(rowDate!==date)continue;
+   const symbol=String(pick(r,["SecuritiesCompanyCode","SecuritiesCode","Code","證券代號"])??"").trim();
+   if(!/^\d{4}$/.test(symbol))continue;
+   const foreign=num(pick(r,["Foreign Investors include Mainland Area Investors (Foreign Dealers excluded)-Difference","Foreign Investors include Mainland Area Investors (Foreign Dealers excluded) -Difference"]));
+   const trust=num(pick(r,["SecuritiesInvestmentTrustCompanies-Difference"]));
+   const dealer=num(pick(r,["Dealers-Difference"]));
+   const total=num(pick(r,["TotalDifference"]));
+   if(foreign===null||trust===null||dealer===null||total===null||Math.abs(foreign+trust+dealer-total)>1)continue;
+   rows.push({symbol,name:String(pick(r,["CompanyName","SecuritiesCompanyName","SecuritiesName","Name","證券名稱"])??symbol),market:"tpex",foreign,trust,dealer,total});
+  }
+  return date&&rows.length?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
+ }catch{return null;}
+}
+export async function GET(request:Request){
+ const q=new URL(request.url).searchParams;
+ const market=q.get("market")??"twse",investor=q.get("investor")??"all",side=q.get("side")??"buy";
+ if(!["twse","tpex","all"].includes(market)||!["all","foreign","trust","dealer"].includes(investor)||!["buy","sell"].includes(side))
+  return NextResponse.json({error:"查詢參數不正確"},{status:400});
+ const [a,b]=await Promise.all([market!=="tpex"?twse():Promise.resolve(null),market!=="twse"?tpex():Promise.resolve(null)]);
+ if((market==="twse"&&!a)||(market==="tpex"&&!b)||(market==="all"&&(!a||!b)))
+  return NextResponse.json({error:"官方法人資料尚未完整取得，請稍後重試",availableDates:{twse:a?.date??null,tpex:b?.date??null}},{status:503});
+ if(market==="all"&&a?.date!==b?.date)
+  return NextResponse.json({error:"上市與上櫃資料日期不同，暫不合併排行",availableDates:{twse:a?.date,tpex:b?.date}},{status:409});
+ const datasets=[a,b].filter((v):v is MarketData=>v!==null);
+ const key=investor as "all"|"foreign"|"trust"|"dealer";
+ const rows=datasets.flatMap(d=>d.rows.map(r=>({symbol:r.symbol,name:r.name,market:r.market,netShares:key==="all"?r.total:r[key]})))
+  .sort((x,y)=>side==="buy"?y.netShares-x.netShares:x.netShares-y.netShares).slice(0,5);
+ if(!rows.length)return NextResponse.json({error:"沒有可驗證的法人排行"},{status:503});
+ return NextResponse.json({status:"ok",market,investor,side,dataDate:datasets[0].date,rows,dataSource:datasets.map(d=>d.source).join(" + "),isRealtime:false});
 }
