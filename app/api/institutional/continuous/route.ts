@@ -12,8 +12,9 @@ async function fetchDay(date:string):Promise<Day|null>{
   const raw:unknown=await res.json();if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
   const r=raw as Record<string,unknown>;if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))return null;
   const fields=r.fields as string[];
-  const names=["證券代號","證券名稱","外陸資買賣超股數(不含外資自營商)","投信買賣超股數","自營商買賣超股數","三大法人買賣超股數"];
-  const ix=names.map(k=>fields.findIndex(f=>f.replace(/<[^>]+>/g,"").replace(/\s/g,"")===k));
+  const normalize=(v:string)=>v.replace(/<[^>]+>/g,"").replace(/[\s（）()]/g,"").trim();
+  const match=(name:string)=>fields.findIndex(f=>normalize(f)===normalize(name));
+  const ix=["證券代號","證券名稱","外陸資買賣超股數(不含外資自營商)","投信買賣超股數","自營商買賣超股數","三大法人買賣超股數"].map(match);
   if(ix.some(i=>i<0))return null;
   const rows:Entry[]=[];
   for(const item of r.data){if(!Array.isArray(item))continue;const symbol=String(item[ix[0]]??"").trim();if(!/^\d{4}$/.test(symbol))continue;
@@ -31,9 +32,15 @@ export async function GET(req:Request){
  if(!["all","foreign","trust","dealer"].includes(investor)||!["buy","sell"].includes(side)||!["streak","sum"].includes(mode)||market!=="twse")
   return NextResponse.json({error:"連續三日目前僅支援上市股票，請選擇上市市場"},{status:400});
  const start=new Date(taiwanDate()+"T12:00:00+08:00");
- const dates=Array.from({length:13},(_,i)=>new Date(start.getTime()-i*86400000).toISOString().slice(0,10)).filter(d=>{const w=new Date(d+"T12:00:00+08:00").getUTCDay();return w!==0&&w!==6;});
- const results=await Promise.all(dates.map(fetchDay));
- const days=results.filter((d):d is Day=>d!==null).slice(0,3);
+ const dates=Array.from({length:15},(_,i)=>new Date(start.getTime()-i*86400000).toISOString().slice(0,10)).filter(d=>{const w=new Date(d+"T12:00:00+08:00").getUTCDay();return w!==0&&w!==6;});
+ const days:Day[]=[];
+ // Query in small batches instead of hitting TWSE with 9+ simultaneous requests.
+ for(let i=0;i<dates.length&&days.length<3;i+=2){
+  const batch=await Promise.all(dates.slice(i,i+2).map(fetchDay));
+  for(const day of batch)if(day)days.push(day);
+ }
+ days.sort((a,b)=>b.date.localeCompare(a.date));
+ days.splice(3);
  if(days.length!==3)return NextResponse.json({error:"目前無法取得完整三個交易日的官方法人資料",availableDates:days.map(d=>d.date)},{status:503});
  const maps=days.map(d=>new Map(d.rows.map(r=>[r.symbol,r])));
  const key=investor==="all"?"total":investor as "foreign"|"trust"|"dealer";
