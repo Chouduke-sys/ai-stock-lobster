@@ -70,27 +70,25 @@ function record(kind:"taiex"|"tx",iso:string,value:number):Point[]{
 function readPoints(kind:"taiex"|"tx"):Point[]{
  try{const raw=JSON.parse(localStorage.getItem("lobster-minute-"+kind)||"[]") as Point[];return Array.isArray(raw)?raw.filter(p=>Number.isFinite(p.value)&&typeof p.time==="string"):[];}catch{return [];}
 }
-function HourChart({points,base}:{points:Point[];base:number|null}){
- if(!points.length)return <div className="spark-empty"><Activity size={20}/><span>尚無可用盤中走勢資料；收到首筆報價後即顯示</span></div>;
- const values=points.map(p=>p.value-(base??points[0].value));
- const low=Math.min(0,...values),high=Math.max(0,...values);
- const margin=Math.max((high-low)*0.1,1);
- const lo=low-margin,hi=high+margin,range=hi-lo;
- const x=(i:number)=>points.length===1?50:2+i/(points.length-1)*96;
- const y=(v:number)=>100-(v-lo)/range*100;
- const path=values.map((v,i)=>x(i).toFixed(2)+","+y(v).toFixed(2)).join(" ");
- const fmt=(v:number)=>v>0?"+"+v.toFixed(0):v.toFixed(0);
- const clock=(v:string)=>v.slice(-5);
+function HourChart({points,base,session="day"}:{points:Point[];base:number|null;session?:"day"|"night"}){
+ const start=session==="day"?540:900;
+ const duration=session==="day"?270:840;
+ const ticks=session==="day"?["09:00","10:30","12:00","13:30"]:["15:00","19:00","23:00","01:00","05:00"];
+ const pct=(v:number)=>base&&base>0?(v-base)/base*100:0;
+ const minuteOf=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return null;let minute=Number(m[1])*60+Number(m[2]);if(session==="night"&&minute<900)minute+=1440;return minute;};
+ const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration?[]:[{x:(minute-start)/duration*100,y:50-pct(p.value)*5}];});
+ const poly=plot.map(p=>p.x.toFixed(2)+","+p.y.toFixed(2)).join(" ");
  return <div className="axis-chart">
-   <span className="axis-y-title">漲跌（點）</span>
-   <div className="axis-y-labels"><span>{fmt(hi)}</span><span>{fmt((hi+lo)/2)}</span><span>{fmt(lo)}</span></div>
+   <span className="axis-y-title">漲跌（%）</span>
+   <div className="axis-y-labels"><span>+10%</span><span>+5%</span><span>0%</span><span>−5%</span><span>−10%</span></div>
    <div className="axis-plot">
-     <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="加權指數盤中漲跌點數走勢，橫軸為台灣時間，縱軸為漲跌點數" style={{display:"block",width:"100%",height:"100%"}}>
-       <line x1="0" x2="100" y1={y(0)} y2={y(0)} stroke="#64748b" strokeDasharray="2 2"/>
-       {points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:<circle cx="50" cy={y(values[0])} r="2.5" fill="#fb725b"/>}
+     <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="固定正負百分之十漲跌幅與完整交易時段走勢圖" style={{display:"block",width:"100%",height:"100%"}}>
+       {[0,25,50,75,100].map(y=><line key={y} x1="0" x2="100" y1={y} y2={y} stroke={y===50?"#8492a6":"#334155"} strokeDasharray={y===50?"2 2":"1 3"} strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
+       {plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={plot[0].y} r="1.3" fill="#fb725b"/>:null}
      </svg>
+     {!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}
    </div>
-   <div className="axis-x-labels"><span>{clock(points[0].time)}</span><span>台灣時間</span><span>{clock(points[points.length-1].time)}</span></div>
+   <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
  </div>;
 }
 
@@ -394,10 +392,10 @@ export default function Home() {
             </span>
           </div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <p className="footnote">日盤 09:00～13:30，以前一交易日收盤為 0% 基準；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
-          <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null}/></div>
-          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，相對本次記錄首筆價格；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
+          <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
+          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，以本次記錄首筆價格為 0% 基準；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
       </section>
