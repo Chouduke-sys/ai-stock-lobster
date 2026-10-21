@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null};
-function pick(o:Record<string,unknown>,keys:string[]):unknown{for(const k of keys){if(o[k]!==undefined&&o[k]!==null)return o[k];}return null;}
-function normalized(raw:unknown):News[]{
+function pick(o:Record<string,unknown>,keys:string[]):unknown{for(const k of keys)if(o[k]!==undefined&&o[k]!==null)return o[k];return null;}
+function parseTime(value:unknown):string|null{
+ if(typeof value==="number"){const d=new Date(value<1e12?value*1000:value);return Number.isFinite(d.getTime())?d.toISOString():null;}
+ if(typeof value==="string"){
+  if(/^\d{10,13}$/.test(value))return parseTime(Number(value));
+  const d=new Date(value.replace(" ","T")+"+08:00");
+  if(Number.isFinite(d.getTime()))return d.toISOString();
+  const direct=new Date(value);return Number.isFinite(direct.getTime())?direct.toISOString():null;
+ }
+ return null;
+}
+function parseNews(raw:unknown):News[]{
  const root=raw&&typeof raw==="object"?raw as Record<string,unknown>:{};
- const data=root.data&&typeof root.data==="object"?root.data as Record<string,unknown>:{};
- const candidates=[raw,root.list,root.news,root.items,root.results,data.list,data.news,data.items,data.results,data.records];
- const list=candidates.find(Array.isArray);
+ if(root.code!==undefined&&root.code!==0)return [];
+ const data=root.data;
+ const nested=data&&typeof data==="object"&&!Array.isArray(data)?data as Record<string,unknown>:{};
+ const list=[data,root.list,root.news,root.items,root.results,nested.list,nested.news,nested.items,nested.results,nested.records].find(Array.isArray);
  if(!Array.isArray(list))return [];
- const seen=new Set<string>();
  return list.flatMap((item:unknown)=>{
   if(!item||typeof item!=="object")return [];
   const r=item as Record<string,unknown>;
@@ -16,35 +26,40 @@ function normalized(raw:unknown):News[]{
   const link=pick(r,["url","link","news_url","newsUrl","web_url","webUrl"]);
   if(typeof title!=="string"||!title.trim()||typeof link!=="string")return [];
   let url:URL;try{url=new URL(link);}catch{return [];}
-  if(url.protocol!=="https:"||!/(^|\.)futunn\.com$|(^|\.)moomoo\.com$/.test(url.hostname))return [];
-  if(seen.has(url.href))return [];seen.add(url.href);
-  const timestamp=pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"]);
-  let publishedAt:string|null=null;
-  if(typeof timestamp==="number"){const d=new Date(timestamp<1e12?timestamp*1000:timestamp);if(Number.isFinite(d.getTime()))publishedAt=d.toISOString();}
-  else if(typeof timestamp==="string"){const d=new Date(timestamp);if(Number.isFinite(d.getTime()))publishedAt=d.toISOString();}
-  const source=pick(r,["source","publisher","author","media"]);
-  const image=pick(r,["image","image_url","imageUrl","cover","cover_url","coverUrl","thumbnail","thumbnail_url","thumbnailUrl","thumb","pic","pic_url","picUrl"]);
+  if(url.protocol!=="https:"&&url.protocol!=="http:")return [];
+  const img=pick(r,["img_url","image_url","imageUrl","cover_url","coverUrl","thumbnail_url","thumbnailUrl","image","cover","thumbnail","pic_url","picUrl"]);
+  const imgValue=typeof img==="string"?img:img&&typeof img==="object"?pick(img as Record<string,unknown>,["url","src"]):null;
   let imageUrl:string|null=null;
-  const imageValue=typeof image==="string"?image:image&&typeof image==="object"?pick(image as Record<string,unknown>,["url","src","original"]):null;
-  if(typeof imageValue==="string"){try{const u=new URL(imageValue);if(u.protocol==="https:"&&u.username===""&&u.password==="")imageUrl=u.href;}catch{}}
-  return [{title:title.trim().slice(0,180),url:url.href,publishedAt,source:typeof source==="string"?source.slice(0,60):"富途牛牛",imageUrl}];
- }).slice(0,12);
+  if(typeof imgValue==="string"){try{const u=new URL(imgValue,url);if(u.protocol==="https:")imageUrl=u.href;}catch{}}
+  const source=pick(r,["source","publisher","author","media"]);
+  return [{title:title.trim(),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl}];
+ });
 }
 export async function GET(){
  try{
-  const endpoint=process.env.FUTU_NEWS_API_URL || "https://ai-news-search.futunn.com/news_search";
-  const url=new URL(endpoint);
-  if(url.protocol!=="https:"||!url.hostname.endsWith(".futunn.com"))throw Error("Invalid Futu endpoint");
-  if(!url.searchParams.has("keyword"))url.searchParams.set("keyword","美聯儲 美股 全球經濟");
-  if(!url.searchParams.has("lang"))url.searchParams.set("lang","zh-HK");
-  if(!url.searchParams.has("sort"))url.searchParams.set("sort","2");
-  if(!url.searchParams.has("type"))url.searchParams.set("type","1");
-  const response=await fetch(url.toString(),{next:{revalidate:300},signal:AbortSignal.timeout(9000),headers:{Accept:"application/json"}});
-  if(!response.ok)throw Error("Futu news service unavailable");
-  const news=normalized(await response.json());
-  if(!news.length)throw Error("No compatible news results");
-  return NextResponse.json({status:"ok",news,source:"富途牛牛",fetchedAt:new Date().toISOString(),refreshSeconds:300});
+  const endpoint=process.env.FUTU_NEWS_API_URL||"https://ai-news-search.futunn.com/news_search";
+  const base=new URL(endpoint);
+  if(base.protocol!=="https:"||base.hostname!=="ai-news-search.futunn.com")throw Error("Invalid Futu news endpoint");
+  const keywords=["美股","聯準會","AI","全球經濟"];
+  const batches=await Promise.all(keywords.map(async keyword=>{
+   try{
+    const url=new URL(base);
+    url.searchParams.set("keyword",keyword);
+    url.searchParams.set("size","15");
+    url.searchParams.set("news_type","1");
+    url.searchParams.set("lang","zh-HK");
+    url.searchParams.set("sort_type","2");
+    const response=await fetch(url.toString(),{next:{revalidate:300},signal:AbortSignal.timeout(8500),headers:{"Accept":"application/json","User-Agent":"futunn-news-search/0.0.2 (Skill)"}});
+    if(!response.ok)return [];
+    return parseNews(await response.json());
+   }catch{return [];}
+  }));
+  const seen=new Set<string>();
+  const news=batches.flat().filter(n=>{if(seen.has(n.url))return false;seen.add(n.url);return true;})
+   .sort((a,b)=>(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,15);
+  if(!news.length)throw Error("No verified Futu news");
+  return NextResponse.json({status:"ok",news,source:"富途牛牛新聞搜尋",fetchedAt:new Date().toISOString(),refreshSeconds:300});
  }catch{
-  return NextResponse.json({status:"unavailable",error:"富途新聞服務暫時無法取得可驗證的新聞資料，請前往富途閱讀最新快訊。",news:[],sourceUrl:"https://news.futunn.com/main"},{status:503});
+  return NextResponse.json({status:"unavailable",error:"富途新聞來源目前沒有可用資料，請點擊富途新聞入口查看最新消息。",news:[],sourceUrl:"https://news.futunn.com/main"},{status:503});
  }
 }
