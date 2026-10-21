@@ -73,3 +73,9 @@
 .holdings-divider{height:1px;background:#2b3b50;margin-top:18px}
 .holdings-note{margin:8px 0 0}
 @media(max-width:640px){.holdings-panel{padding:14px;margin-top:18px}.holdings-row{grid-template-columns:minmax(90px,1fr) minmax(50px,1fr) 54px;gap:6px;font-size:11px}}
+
+.axis-plot{position:relative;overflow:hidden}
+.axis-waiting{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;color:#91a2ba;white-space:nowrap;pointer-events:none}
+.axis-y-labels{top:16px;bottom:26px}
+.axis-x-labels span{white-space:nowrap}
+@media(max-width:640px){.axis-x-labels{font-size:8px;gap:2px}}
