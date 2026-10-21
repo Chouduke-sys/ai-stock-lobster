@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
@@ -39,7 +40,7 @@ function saveStockPoint(symbol:string,iso:string,price:number):IntradayPoint[]{
 }
 function IntradayChart({points,reference}:{points:IntradayPoint[];reference:number|null}){
  const baseline=reference&&reference>0?reference:points[0]?.price??null;
- const x=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return 52;return 52+Math.max(0,Math.min(270,Number(m[1])*60+Number(m[2])-540))/270*716;};
+ const x=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return 52;return 52+Math.max(0,Math.min(270,Number(m[1])*60+Number(m[2])-540))/270*716;};
  const y=(price:number)=>baseline?140-(price-baseline)/baseline*100*10.5:140;
  const path=points.map(p=>x(p.time).toFixed(1)+","+y(p.price).toFixed(1)).join(" ");
  return <div><svg viewBox="0 0 800 290" className="candle-svg" role="img" aria-label="個股盤中漲跌幅，縱軸固定正負百分之十，橫軸完整交易時段">
@@ -70,7 +71,7 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const duration=session==="day"?270:840;
  const ticks=session==="day"?["09:00","10:30","12:00","13:30"]:["15:00","19:00","23:00","01:00","05:00"];
  const pct=(v:number)=>base&&base>0?(v-base)/base*100:0;
- const minuteOf=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return null;let minute=Number(m[1])*60+Number(m[2]);if(session==="night"&&minute<900)minute+=1440;return minute;};
+ const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let minute=Number(m[1])*60+Number(m[2]);if(session==="night"&&minute<900)minute+=1440;return minute;};
  const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration?[]:[{x:(minute-start)/duration*100,y:50-pct(p.value)*5}];});
  const poly=plot.map(p=>p.x.toFixed(2)+","+p.y.toFixed(2)).join(" ");
  return <div className="axis-chart">
@@ -104,6 +105,8 @@ export default function Home() {
   },[]);
   const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
   const [symbol, setSymbol] = useState("2330");
+  const minuteHistory=useIntradayHistory(symbol);
+  const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
   const [newsError, setNewsError] = useState("");
@@ -464,7 +467,7 @@ export default function Home() {
             <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 5 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。{quoteError ? "最新更新失敗："+quoteError+"；仍顯示前次成功報價。" : ""}</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
-        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={stockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">每 5 秒查詢、按分鐘記錄有效成交價；僅保存目前瀏覽器本機的當日取樣。網頁關閉期間無法補齊資料，報價可能延遲；不是完整即時分時歷史圖。</p></div>
+        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={displayedStockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">來源：{minuteHistory.source || "本機報價取樣"}。優先載入當日可取得的分鐘歷史資料，並合併本機每 5 秒查詢的有效報價；來源可能延遲或缺漏。</p></div>
         </div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>

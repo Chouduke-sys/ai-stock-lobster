@@ -6,7 +6,7 @@ const twDate=(date:Date)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei
 const twTime=(date:Date)=>new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(date);
 export async function GET(_request:Request,{params}:{params:{symbol:string}}){
  const symbol=params.symbol;
- if(!/^\\d{4,6}$/.test(symbol))return NextResponse.json({error:"股票代號格式錯誤"},{status:400});
+ if(!/^\d{4,6}$/.test(symbol))return NextResponse.json({error:"股票代號格式錯誤"},{status:400});
  const today=twDate(new Date());
  for(const suffix of [".TW",".TWO"]){
   try{
