@@ -44,6 +44,6 @@ export async function GET(req:Request){
   if(mode==="streak"&&!values.every(v=>side==="buy"?v>0:v<0))return [];
   if(mode==="sum"&&(side==="buy"?total<=0:total>=0))return [];
   return [{symbol:first.symbol,name:first.name,market:"twse",netShares:total,dailyShares:values}];
- }).sort((a,b)=>side==="buy"?b.netShares-a.netShares:a.netShares-b.netShares).slice(0,3);
+ }).sort((a,b)=>side==="buy"?b.netShares-a.netShares:a.netShares-b.netShares).slice(0,5);
  return NextResponse.json({status:"ok",market,investor,side,mode,dates:days.map(d=>d.date),rows,dataSource:"TWSE T86 三個交易日",isRealtime:false});
 }
