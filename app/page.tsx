@@ -355,7 +355,13 @@ export default function Home() {
             <div><small>上市市場 · 成交金額</small><strong>{closing?.tradeValue!=null?(closing.tradeValue/100000000).toLocaleString("zh-TW",{maximumFractionDigits:2})+" 億元":"—"}</strong><small>{closing?closing.date+" · TWSE FMTQIK 官方盤後統計":"盤後資料尚未取得"}</small></div>
           </div>
           <p className="footnote">交易量與成交金額採證交所公布的上市市場每日統計；收盤後待官方資料更新才顯示當日總量。未更新前保留最近公布交易日與日期，不以盤中取樣冒充當日總量。</p>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（開盤每秒查詢）</div>
+          <div className="taiex-trend-heading">
+            <span>加權指數 · 日盤走勢圖（開盤每秒查詢）</span>
+            <span className={taiex?.change == null ? "taiex-live-change neutral" : taiex.change > 0 ? "taiex-live-change up" : taiex.change < 0 ? "taiex-live-change down" : "taiex-live-change neutral"}>
+              目前漲跌 {taiex?.change == null ? "—" : (taiex.change > 0 ? "+" : "") + formatPrice(taiex.change) + " 點"}
+              {taiex?.changePercent != null ? "（" + (taiex.changePercent > 0 ? "+" : "") + formatPrice(taiex.changePercent) + "%）" : ""}
+            </span>
+          </div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
           <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
