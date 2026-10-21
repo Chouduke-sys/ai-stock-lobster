@@ -7,6 +7,8 @@ type RankRow = { symbol: string; name: string; netShares: number };
 type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
 type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
+type CloseResult={status:string;date:string;value:number;change:number|null;dataSource:string};
+type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string};
 type StockResult = {
   status: string;
   symbol: string;
@@ -38,6 +40,10 @@ export default function Home() {
   const [quoteError, setQuoteError] = useState("");
   const [taiex, setTaiex] = useState<TaiexResult | null>(null);
   const [taiexError, setTaiexError] = useState("");
+  const [closing, setClosing] = useState<CloseResult|null>(null);
+  const [closingError, setClosingError] = useState("");
+  const [night, setNight] = useState<NightResult|null>(null);
+  const [nightError, setNightError] = useState("");
   const [indexTrend, setIndexTrend] = useState<{date:string;value:number}[]>([]);
   const [indexTrendError, setIndexTrendError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
@@ -156,6 +162,39 @@ export default function Home() {
     return ()=>controller.abort();
   }, []);
 
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function loadClose(){
+      try{
+        const response=await fetch("/api/market/taiex/close",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"收盤資料讀取失敗");
+        setClosing(data);setClosingError("");
+      }catch(e){if(!controller.signal.aborted){setClosing(null);setClosingError(e instanceof Error?e.message:"收盤資料讀取失敗");}}
+    }
+    void loadClose();
+    const timer=setInterval(()=>{void loadClose();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    let inFlight=false;
+    async function loadNight(){
+      if(inFlight)return;
+      inFlight=true;
+      try{
+        const response=await fetch("/api/market/taiex/night",{cache:"no-store",signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"夜盤行情暫不可用");
+        setNight(data);setNightError("");
+      }catch(e){if(!controller.signal.aborted){setNight(null);setNightError(e instanceof Error?e.message:"夜盤行情暫不可用");}}
+      finally{inFlight=false;}
+    }
+    void loadNight();
+    const timer=setInterval(()=>{void loadNight();},10000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+
   function lookupStock() {
     const value = search.trim();
     if (!/^\d{4,6}$/.test(value)) {
@@ -197,6 +236,18 @@ export default function Home() {
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
           <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 10 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
+            <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
+              <small>加權指數 · 最近收盤</small>
+              <strong style={{display:"block",fontSize:24}}>{formatPrice(closing?.value)}</strong>
+              <small>{closing ? `${closing.date} 收盤 · ${closing.dataSource}` : closingError || "讀取中"}</small>
+            </div>
+            <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
+              <small>臺股期貨 TX · 夜盤（不同於加權指數）</small>
+              <strong style={{display:"block",fontSize:24}}>{formatPrice(night?.price)}</strong>
+              <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 10 秒查詢` : nightError || "讀取中"}</small>
+            </div>
+          </div>
           <div className="sparkline" aria-label="近期加權指數歷史收盤走勢">
             <div className="spark-grid"></div>
             {indexTrend.length >= 2 ? (() => {
