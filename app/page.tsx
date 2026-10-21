@@ -334,7 +334,6 @@ export default function Home() {
             <a href="https://news.futunn.com/main" target="_blank" rel="noopener noreferrer" style={{color:"#fb725b",fontSize:14}}>前往富途牛牛查看最新新聞 ↗</a>
             <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
           </div>
-        </div>
         <section className="holdings-panel" aria-label="台灣知名操盤人公開持倉">
           <div className="holdings-heading"><span>台灣知名操盤人持倉追蹤</span><small>公開揭露資料 · 非即時個人帳戶</small></div>
           <div className="holdings-fund-title">瑤池金母 陳釧瑤 <span>00981A 主動統一台股增長</span></div>
@@ -353,6 +352,7 @@ export default function Home() {
           <div className="holdings-fund-title">雷家軍／其他投顧</div>
           <p className="holdings-note">尚待確認「雷家軍」所指團隊。投顧老師的個人持股比例通常沒有法定公開揭露資料，不能把節目推薦股當成真實持倉；有可查證的公開基金或 ETF 才會列出權重。</p>
         </section>
+        </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
           <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 開盤每 1 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
