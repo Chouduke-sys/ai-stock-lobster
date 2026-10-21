@@ -374,7 +374,7 @@ export default function Home() {
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
         <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={stockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">每 10 秒查詢、按分鐘記錄有效成交價；僅保存目前瀏覽器本機的當日取樣。網頁關閉期間無法補齊資料，報價可能延遲；不是完整即時分時歷史圖。</p></div>
-        </div></div>
+        </div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
 
