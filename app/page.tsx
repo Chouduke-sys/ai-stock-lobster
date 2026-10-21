@@ -52,6 +52,11 @@ export default function Home() {
   const [indexTrendError, setIndexTrendError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
   const [rankRows, setRankRows] = useState<RankRow[]>([]);
+  const [fiveMode,setFiveMode]=useState<"streak"|"sum">("streak");
+  const [fiveRows,setFiveRows]=useState<(RankRow & {dailyShares:number[]})[]>([]);
+  const [fiveDates,setFiveDates]=useState<string[]>([]);
+  const [fiveError,setFiveError]=useState("");
+  const [fiveLoading,setFiveLoading]=useState(false);
   const [rankError, setRankError] = useState("");
   const [rankDate, setRankDate] = useState("");
   const [loadingRank, setLoadingRank] = useState(true);
@@ -78,6 +83,24 @@ export default function Home() {
     void loadRanks();
     return ()=>controller.abort();
   },[market,investor,rankSide]);
+
+  useEffect(() => {
+    const controller=new AbortController();
+    async function loadFive(){
+      setFiveLoading(true);setFiveRows([]);setFiveDates([]);setFiveError("");
+      if(market!=="twse"){setFiveError("連續五日功能目前先提供上市股票，請選擇上市股票。");setFiveLoading(false);return;}
+      try{
+        const q=new URLSearchParams({market,investor,side:rankSide,mode:fiveMode});
+        const response=await fetch("/api/institutional/continuous?"+q,{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"五日資料無法取得");
+        setFiveRows(data.rows);setFiveDates(data.dates);
+      }catch(e){if(!controller.signal.aborted)setFiveError(e instanceof Error?e.message:"五日資料讀取失敗");}
+      finally{if(!controller.signal.aborted)setFiveLoading(false);}
+    }
+    void loadFive();
+    return ()=>controller.abort();
+  },[market,investor,rankSide,fiveMode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -314,6 +337,15 @@ export default function Home() {
           {rows.map((r, i) => <tr key={`${rankSide}-${i}`}><td><span className="rank-number">{i + 1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td>{r.market==="twse"?"上市 TWSE":"上櫃 TPEx"}</td></tr>)}
         </tbody></table></div>
         <p className="footnote"><CircleHelp size={14}/> {loadingRank ? "正在讀取法人日報…" : rankError || `資料日期 ${rankDate}；依淨買賣超股數排序，單位為股；盤後公布，非即時。`}</p>
+      </section>
+
+      <section className="section" id="five-day-institutional">
+        <div className="section-heading"><div><div className="eyebrow">FIVE-DAY INSTITUTIONAL FLOW</div><h2>三大法人連續 5 日買賣超</h2><p>依上方市場、法人及買賣方向同步篩選；以最近五個已公布交易日計算</p></div><span className="tag tag-amber">{fiveDates.length===5?fiveDates[4]+" ～ "+fiveDates[0]:"資料待確認"}</span></div>
+        <div className="filters"><div className="toggle-group"><button className={fiveMode==="streak"?"active buy":""} onClick={()=>setFiveMode("streak")}>連續五日同方向</button><button className={fiveMode==="sum"?"active buy":""} onClick={()=>setFiveMode("sum")}>近五日累計</button></div><small style={{color:"#94a3b8"}}>正數＝買超；負數＝賣超；單位：股</small></div>
+        <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>五日淨買賣超（股）</th><th>五日逐日數據（新→舊）</th></tr></thead><tbody>
+          {fiveRows.map((r,i)=><tr key={r.symbol}><td><span className="rank-number">{i+1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td style={{fontSize:12}}>{r.dailyShares.map(v=>v>0?"+"+formatVolume(v):formatVolume(v)).join(" / ")}</td></tr>)}
+        </tbody></table></div>
+        <p className="footnote"><CircleHelp size={14}/>{fiveLoading?"正在取得最近五個交易日資料…":fiveError||(!fiveRows.length?"符合條件的股票為 0 檔。":"資料來源：TWSE T86；盤後資料，非即時。")}</p>
       </section>
 
       <section className="section" id="charts">
