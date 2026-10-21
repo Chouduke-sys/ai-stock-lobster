@@ -45,3 +45,9 @@
 .axis-plot{height:100%;width:100%;min-height:0;border-left:1px solid #43536a;border-bottom:1px solid #43536a}
 .axis-x-labels{position:absolute;left:56px;right:8px;bottom:4px;display:flex;justify-content:space-between;gap:4px;font-size:10px;color:#a6b8ce;font-variant-numeric:tabular-nums}
 @media(max-width:640px){.axis-chart{padding-left:52px}.axis-y-labels{width:43px}.axis-x-labels{left:52px;font-size:9px}}
+
+.market-volume-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.market-volume-card>div{min-width:0;padding:14px;border:1px solid #334155;border-radius:12px;background:#0c1728}
+.market-volume-card small{display:block;color:#9caec4;font-size:11px;line-height:1.6}
+.market-volume-card strong{display:block;margin:8px 0;font-size:clamp(18px,2vw,25px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:640px){.market-volume-card{grid-template-columns:1fr;gap:9px}.market-volume-card>div{padding:12px}}
