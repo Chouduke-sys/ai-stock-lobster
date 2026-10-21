@@ -79,3 +79,11 @@
 .axis-y-labels{top:16px;bottom:26px}
 .axis-x-labels span{white-space:nowrap}
 @media(max-width:640px){.axis-x-labels{font-size:8px;gap:2px}}
+
+.daily-market-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.daily-market-quote{display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid #2b3c52;border-radius:10px;background:#101f33;min-width:0}
+.daily-market-quote small{font-size:11px;color:#9fb1c8}
+.daily-market-quote strong{font-size:15px;color:#f1f5f9;overflow-wrap:anywhere}
+.daily-market-quote span{font-size:12px;color:#a6b8ce}
+.daily-market-quote .market-up{color:#fb725b}
+.daily-market-quote .market-down{color:#59d7a1}
