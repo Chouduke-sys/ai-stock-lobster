@@ -37,3 +37,11 @@
  .sparkline{width:100%}
  .sparkline svg{display:block;width:100%;height:100%}
 }
+
+/* TAIEX intraday axes: points relative to prior close and Taiwan clock time */
+.axis-chart{position:relative;z-index:1;width:100%;height:100%;padding:16px 8px 22px 56px;box-sizing:border-box}
+.axis-y-title{position:absolute;left:5px;top:3px;font-size:10px;color:#b7c6d8}
+.axis-y-labels{position:absolute;left:3px;top:19px;bottom:26px;width:47px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:10px;color:#a6b8ce;font-variant-numeric:tabular-nums}
+.axis-plot{height:100%;width:100%;min-height:0;border-left:1px solid #43536a;border-bottom:1px solid #43536a}
+.axis-x-labels{position:absolute;left:56px;right:8px;bottom:4px;display:flex;justify-content:space-between;gap:4px;font-size:10px;color:#a6b8ce;font-variant-numeric:tabular-nums}
+@media(max-width:640px){.axis-chart{padding-left:52px}.axis-y-labels{width:43px}.axis-x-labels{left:52px;font-size:9px}}
