@@ -38,7 +38,7 @@ function saveStockPoint(symbol:string,iso:string,price:number):IntradayPoint[]{
  }catch{return [point];}
 }
 function IntradayChart({points,reference}:{points:IntradayPoint[];reference:number|null}){
- if(points.length<2)return <div className="spark-empty" style={{minHeight:250}}><Activity size={20}/><span>正在累積盤中報價，至少需要兩個不同分鐘的有效成交價</span></div>;
+ if(!points.length)return <div className="spark-empty" style={{minHeight:250}}><Activity size={20}/><span>正在取得首筆有效盤中報價；已有歷史資料時會立即顯示</span></div>;
  const prices=points.map(p=>p.price),min=Math.min(...prices,reference??Infinity),max=Math.max(...prices,reference??-Infinity);
  const pad=Math.max((max-min)*.12,max*.002,.1),lo=min-pad,hi=max+pad;
  const x=(i:number)=>52+i/Math.max(points.length-1,1)*716;
@@ -48,7 +48,7 @@ function IntradayChart({points,reference}:{points:IntradayPoint[];reference:numb
  return <div><svg viewBox="0 0 800 290" className="candle-svg" role="img" aria-label="盤中股價取樣走勢圖">
   {[0,1,2,3,4].map(i=><g key={i}><line x1="52" x2="768" y1={35+i*52.5} y2={35+i*52.5} stroke="#334155" strokeDasharray="3 5"/><text x="5" y={39+i*52.5} fontSize="12" fill="#94a3b8">{(hi-(hi-lo)*i/4).toFixed(2)}</text></g>)}
   {reference!==null&&<line x1="52" x2="768" y1={y(reference)} y2={y(reference)} stroke="#eab308" strokeDasharray="5 5"/>}
-  <polyline points={path} fill="none" stroke="#fb725b" strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>
+  {points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>:<circle cx={x(0)} cy={y(last.price)} r="5" fill="#fb725b"/>}
   <circle cx={x(points.length-1)} cy={y(last.price)} r="4" fill="#fb725b"/>
   <text x="52" y="276" fontSize="12" fill="#94a3b8">{points[0].time.slice(11)}</text><text x="768" y="276" textAnchor="end" fontSize="12" fill="#94a3b8">{last.time.slice(11)}</text>
  </svg><p className="footnote">最新取樣 {last.time.slice(11)} · {formatPrice(last.price)} 元 · 黃色虛線為前收參考價（如有）</p></div>;
@@ -71,7 +71,7 @@ function readPoints(kind:"taiex"|"tx"):Point[]{
  try{const raw=JSON.parse(localStorage.getItem("lobster-minute-"+kind)||"[]") as Point[];return Array.isArray(raw)?raw.filter(p=>Number.isFinite(p.value)&&typeof p.time==="string"):[];}catch{return [];}
 }
 function HourChart({points,base}:{points:Point[];base:number|null}){
- if(!points.length)return <div className="spark-empty"><Activity size={20}/><span>尚未取得有效盤中報價；取得後開始記錄走勢</span></div>;
+ if(!points.length)return <div className="spark-empty"><Activity size={20}/><span>尚無可用盤中走勢資料；收到首筆報價後即顯示</span></div>;
  const values=points.map(p=>p.value-(base??points[0].value));
  const low=Math.min(0,...values),high=Math.max(0,...values);
  const margin=Math.max((high-low)*0.1,1);
@@ -118,7 +118,15 @@ export default function Home() {
   const [nightError, setNightError] = useState("");
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
-  useEffect(()=>{setDayPoints(readPoints("taiex"));setNightPoints(readPoints("tx"));},[]);
+  useEffect(()=>{
+    setDayPoints(readPoints("taiex"));setNightPoints(readPoints("tx"));
+    try{
+      const cached=JSON.parse(localStorage.getItem("lobster-last-taiex")||"null") as TaiexResult|null;
+      if(cached?.status==="ok"&&cached.date===parts(new Date().toISOString()).date&&typeof cached.value==="number"){
+        setTaiex(cached);setLoadingTaiex(false);
+      }
+    }catch{}
+  },[]);
   const [indexTrendError, setIndexTrendError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
   const [rankRows, setRankRows] = useState<RankRow[]>([]);
@@ -218,10 +226,11 @@ export default function Home() {
         const response = await fetch("/api/market/taiex", { signal: controller.signal });
         const result = await response.json();
         if (!response.ok || result.status !== "ok") throw new Error(result.error || "加權指數查詢失敗");
-        setTaiex(result as TaiexResult);
+        setTaiex(result as TaiexResult);setTaiexError("");
+        try{localStorage.setItem("lobster-last-taiex",JSON.stringify(result));}catch{}
         if(typeof result.value==="number"&&typeof result.quoteTime==="string"){const t=parts(result.quoteTime);if((t.hour>=9&&t.hour<13)||(t.hour===13&&t.minute<=30))setDayPoints(record("taiex",result.quoteTime,result.value));}
       } catch (error) {
-        if (!controller.signal.aborted) { setTaiex(null); setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
+        if (!controller.signal.aborted) { setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
       } finally {
         inFlight = false;
         if (!controller.signal.aborted) setLoadingTaiex(false);
