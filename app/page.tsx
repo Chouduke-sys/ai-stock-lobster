@@ -88,7 +88,7 @@ export default function Home() {
     const controller=new AbortController();
     async function loadFive(){
       setFiveLoading(true);setFiveRows([]);setFiveDates([]);setFiveError("");
-      if(market!=="twse"){setFiveError("連續五日功能目前先提供上市股票，請選擇上市股票。");setFiveLoading(false);return;}
+      if(market!=="twse"){setFiveError("連續三日功能目前先提供上市股票，請選擇上市股票。");setFiveLoading(false);return;}
       try{
         const q=new URLSearchParams({market,investor,side:rankSide,mode:fiveMode});
         const response=await fetch("/api/institutional/continuous?"+q,{signal:controller.signal});
@@ -340,12 +340,12 @@ export default function Home() {
       </section>
 
       <section className="section" id="five-day-institutional">
-        <div className="section-heading"><div><div className="eyebrow">FIVE-DAY INSTITUTIONAL FLOW</div><h2>三大法人連續 5 日買賣超</h2><p>依上方市場、法人及買賣方向同步篩選；以最近五個已公布交易日計算</p></div><span className="tag tag-amber">{fiveDates.length===5?fiveDates[4]+" ～ "+fiveDates[0]:"資料待確認"}</span></div>
-        <div className="filters"><div className="toggle-group"><button className={fiveMode==="streak"?"active buy":""} onClick={()=>setFiveMode("streak")}>連續五日同方向</button><button className={fiveMode==="sum"?"active buy":""} onClick={()=>setFiveMode("sum")}>近五日累計</button></div><small style={{color:"#94a3b8"}}>正數＝買超；負數＝賣超；單位：股</small></div>
-        <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>五日淨買賣超（股）</th><th>五日逐日數據（新→舊）</th></tr></thead><tbody>
+        <div className="section-heading"><div><div className="eyebrow">THREE-DAY INSTITUTIONAL FLOW</div><h2>三大法人連續 3 日買賣超</h2><p>依上方市場、法人及買賣方向同步篩選；以最近三個已公布交易日計算</p></div><span className="tag tag-amber">{fiveDates.length===3?fiveDates[2]+" ～ "+fiveDates[0]:"資料待確認"}</span></div>
+        <div className="filters"><div className="toggle-group"><button className={fiveMode==="streak"?"active buy":""} onClick={()=>setFiveMode("streak")}>連續三日同方向</button><button className={fiveMode==="sum"?"active buy":""} onClick={()=>setFiveMode("sum")}>近三日累計</button></div><small style={{color:"#94a3b8"}}>正數＝買超；負數＝賣超；單位：股</small></div>
+        <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>三日淨買賣超（股）</th><th>三日逐日數據（新→舊）</th></tr></thead><tbody>
           {fiveRows.map((r,i)=><tr key={r.symbol}><td><span className="rank-number">{i+1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td style={{fontSize:12}}>{r.dailyShares.map(v=>v>0?"+"+formatVolume(v):formatVolume(v)).join(" / ")}</td></tr>)}
         </tbody></table></div>
-        <p className="footnote"><CircleHelp size={14}/>{fiveLoading?"正在取得最近五個交易日資料…":fiveError||(!fiveRows.length?"符合條件的股票為 0 檔。":"資料來源：TWSE T86；盤後資料，非即時。")}</p>
+        <p className="footnote"><CircleHelp size={14}/>{fiveLoading?"正在取得最近三個交易日資料…":fiveError||(!fiveRows.length?"符合條件的股票為 0 檔。":"資料來源：TWSE T86；盤後資料，非即時。")}</p>
       </section>
 
       <section className="section" id="charts">
