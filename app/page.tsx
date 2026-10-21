@@ -335,6 +335,24 @@ export default function Home() {
             <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
           </div>
         </div>
+        <section className="holdings-panel" aria-label="台灣知名操盤人公開持倉">
+          <div className="holdings-heading"><span>台灣知名操盤人持倉追蹤</span><small>公開揭露資料 · 非即時個人帳戶</small></div>
+          <div className="holdings-fund-title">瑤池金母 陳釧瑤 <span>00981A 主動統一台股增長</span></div>
+          <p className="holdings-date">資料日期：2026/10/20 · 持股權重占基金淨值</p>
+          {[
+            ["2330","台積電",11.30],["2383","台光電",7.93],["2454","聯發科",7.91],
+            ["3017","奇鋐",7.82],["3037","欣興",7.63],["3653","健策",6.19],
+            ["2345","智邦",4.57],["2327","國巨",4.56],["6223","旺矽",4.55],["2308","台達電",4.51]
+          ].map(([symbol,name,weight])=><div className="holdings-row" key={String(symbol)}>
+            <span className="holdings-name">{name} <small>{symbol}</small></span>
+            <div className="holdings-bar"><i style={{width:String(Number(weight)/12*100)+"%"}} /></div>
+            <strong>{Number(weight).toFixed(2)}%</strong>
+          </div>)}
+          <a className="holdings-source" href="https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981a.tw&topc=" target="_blank" rel="noopener noreferrer">查看 MoneyDJ 持股來源 ↗</a>
+          <div className="holdings-divider" />
+          <div className="holdings-fund-title">雷家軍／其他投顧</div>
+          <p className="holdings-note">尚待確認「雷家軍」所指團隊。投顧老師的個人持股比例通常沒有法定公開揭露資料，不能把節目推薦股當成真實持倉；有可查證的公開基金或 ETF 才會列出權重。</p>
+        </section>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
           <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 開盤每 1 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
