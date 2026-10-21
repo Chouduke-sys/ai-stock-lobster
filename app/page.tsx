@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
+type NewsRow={title:string;url:string;publishedAt:string|null;source:string};
 type RankRow = { symbol: string; name: string; netShares: number };
 type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
@@ -32,6 +33,9 @@ export default function Home() {
   const [period, setPeriod] = useState("日K");
   const [symbol, setSymbol] = useState("2330");
   const [search, setSearch] = useState("");
+  const [news, setNews] = useState<NewsRow[]>([]);
+  const [newsError, setNewsError] = useState("");
+  const [newsFetchedAt, setNewsFetchedAt] = useState<string|null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const [message, setMessage] = useState("");
@@ -195,6 +199,24 @@ export default function Home() {
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
 
+  useEffect(()=>{
+    const controller=new AbortController();
+    let inFlight=false;
+    async function loadNews(){
+      if(inFlight)return;inFlight=true;
+      try{
+        const response=await fetch("/api/news/futu",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok"||!Array.isArray(data.news))throw new Error(data.error||"新聞讀取失敗");
+        setNews(data.news);setNewsFetchedAt(new Date().toISOString());setNewsError("");
+      }catch(e){if(!controller.signal.aborted){setNewsError(e instanceof Error?e.message:"新聞讀取失敗");setNews([]);}}
+      finally{inFlight=false;}
+    }
+    void loadNews();
+    const timer=setInterval(()=>{void loadNews();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+
   function lookupStock() {
     const value = search.trim();
     if (!/^\d{4,6}$/.test(value)) {
@@ -226,12 +248,20 @@ export default function Home() {
       </section>}
 
       <section className="hero">
-        <div className="hero-copy">
-          <div className="eyebrow"><span className="live-dot"></span> MARKET INTELLIGENCE PLATFORM</div>
-          <h1>看懂法人資金，<br/><span>掌握市場脈動。</span></h1>
-          <p>整合台股法人動向、個股 K 線與全球市場資訊，為你的投資研究建立清晰的數據視野。</p>
-          <div className="hero-actions"><a className="btn btn-primary" href="#rankings">查看法人排行 <ArrowUpRight size={16}/></a><a className="btn btn-outline" href="#charts">探索個股圖表</a></div>
-          <div className="trust-line"><ShieldCheck size={15}/> 資料來源與更新時間透明標示</div>
+        <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
+          <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 富途牛牛</div>
+          <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
+          <p style={{margin:"0 0 12px",fontSize:13}}>富途牛牛新聞搜尋 · 每 5 分鐘重新查詢 · 標題點擊閱讀原文</p>
+          {news.length>0 ? <div style={{display:"grid",gap:0,maxHeight:360,overflowY:"auto",paddingRight:6}}>
+            {news.slice(0,8).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"10px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
+              <div style={{fontSize:14,fontWeight:600,lineHeight:1.55}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
+              <small style={{color:"#94a3b8"}}>{item.source} · {item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"發布時間未提供"}</small>
+            </a>)}
+          </div> : <div style={{padding:"22px 0",fontSize:14,color:"#94a3b8"}}>{newsError||"正在載入富途牛牛財經新聞…"}</div>}
+          <div style={{marginTop:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+            <a href="https://news.futunn.com/main" target="_blank" rel="noopener noreferrer" style={{color:"#fb725b",fontSize:14}}>前往富途牛牛查看最新新聞 ↗</a>
+            <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
+          </div>
         </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
