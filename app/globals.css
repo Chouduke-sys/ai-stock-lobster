@@ -58,3 +58,18 @@
 .taiex-live-change.down{color:#59d7a1}
 .taiex-live-change.neutral{color:#a6b8ce}
 @media(max-width:640px){.taiex-trend-heading{align-items:flex-start;flex-direction:column}.taiex-live-change{font-size:17px}}
+
+.holdings-panel{margin-top:24px;background:#0d1625;border:1px solid #223248;border-radius:15px;padding:20px;min-width:0}
+.holdings-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:17px;font-weight:800;color:#f1f5fa}
+.holdings-heading small,.holdings-date,.holdings-note{font-size:11px;color:#9cacc1;line-height:1.7}
+.holdings-fund-title{font-size:14px;font-weight:700;color:#f1f5fa;margin-top:17px}
+.holdings-fund-title span{display:block;font-size:11px;font-weight:400;color:#9cacc1;margin-top:3px}
+.holdings-date{margin:6px 0 13px}
+.holdings-row{display:grid;grid-template-columns:minmax(100px,1.1fr) minmax(70px,1fr) 62px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #24324777;font-size:12px}
+.holdings-name{color:#e2e8f0;white-space:nowrap}.holdings-name small{color:#8193ac;margin-left:4px}
+.holdings-bar{height:8px;background:#263449;border-radius:99px;overflow:hidden}.holdings-bar i{display:block;height:100%;background:#fb725b;border-radius:99px}
+.holdings-row strong{color:#e2e8f0;text-align:right;font-variant-numeric:tabular-nums}
+.holdings-source{display:inline-block;margin-top:12px;color:#fb725b;font-size:12px;text-decoration:none}
+.holdings-divider{height:1px;background:#2b3b50;margin-top:18px}
+.holdings-note{margin:8px 0 0}
+@media(max-width:640px){.holdings-panel{padding:14px;margin-top:18px}.holdings-row{grid-template-columns:minmax(90px,1fr) minmax(50px,1fr) 54px;gap:6px;font-size:11px}}
