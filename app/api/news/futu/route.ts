@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
+function plainText(value:string):string{
+ const entities:Record<string,string>={amp:"&",lt:"<",gt:">",quot:'"',apos:"'",nbsp:" ",hellip:"…",mdash:"—",ndash:"–",bull:"•",ldquo:"“",rdquo:"”",lsquo:"‘",rsquo:"’"};
+ let result=value;
+ for(let i=0;i<3;i++){
+  const next=result.replace(/<[^>]*>/g,"").replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi,(_all,entity:string)=>{
+   if(entity[0]==="#"){
+    const hex=entity[1]?.toLowerCase()==="x";
+    const n=parseInt(entity.slice(hex?2:1),hex?16:10);
+    return Number.isInteger(n)&&n>0&&n<=0x10ffff&&(n<0xd800||n>0xdfff)?String.fromCodePoint(n):"";
+   }
+   return entities[entity.toLowerCase()]??_all;
+  });
+  if(next===result)break;
+  result=next;
+ }
+ return result.replace(/\s+/g," ").trim();
+}
 function pick(o:Record<string,unknown>,keys:string[]):unknown{for(const k of keys)if(o[k]!==undefined&&o[k]!==null)return o[k];return null;}
 function parseTime(value:unknown):string|null{
  if(typeof value==="number"){const d=new Date(value<1e12?value*1000:value);return Number.isFinite(d.getTime())?d.toISOString():null;}
@@ -33,8 +50,8 @@ function parseNews(raw:unknown):News[]{
   if(typeof imgValue==="string"){try{const u=new URL(imgValue,url);if(u.protocol==="https:")imageUrl=u.href;}catch{}}
   const source=pick(r,["source","publisher","author","media"]);
   const excerpt=pick(r,["summary","description","abstract","news_summary","newsSummary","brief","intro","digest"]);
-  const summary=typeof excerpt==="string" ? excerpt.replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim().slice(0,120) || null : null;
-  return [{title:title.trim(),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl,summary}];
+  const summary=typeof excerpt==="string" ? plainText(excerpt).slice(0,120) || null : null;
+  return [{title:plainText(title),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl,summary}];
  });
 }
 export async function GET(){
