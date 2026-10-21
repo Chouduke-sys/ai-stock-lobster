@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
-type Row={Date?:string;TAIEX?:string;Change?:string};
+type Row={Date?:string;TAIEX?:string;Change?:string;TradeVolume?:string;TradeValue?:string;Transaction?:string};
 function dateOf(s?:string):string|null {
  if(!s)return null;
  if(/^\d{7}$/.test(s))return `${Number(s.slice(0,3))+1911}-${s.slice(3,5)}-${s.slice(5,7)}`;
@@ -15,8 +15,8 @@ export async function GET(){
  const response=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/FMTQIK",{next:{revalidate:300},signal:AbortSignal.timeout(9000)});
  if(!response.ok)throw Error("Source failed");
  const body:unknown=await response.json();if(!Array.isArray(body))throw Error("Unexpected response");
- const rows=(body as Row[]).flatMap(r=>{const date=dateOf(r.Date),value=number(r.TAIEX);return date&&value!==null?[{date,value,change:number(r.Change)}]:[]}).sort((a,b)=>a.date.localeCompare(b.date));
+ const rows=(body as Row[]).flatMap(r=>{const date=dateOf(r.Date),value=number(r.TAIEX);return date&&value!==null?[{date,value,change:number(r.Change),tradeVolume:number(r.TradeVolume),tradeValue:number(r.TradeValue),transactions:number(r.Transaction)}]:[]}).sort((a,b)=>a.date.localeCompare(b.date));
  const latest=rows[rows.length-1];if(!latest)return NextResponse.json({error:"尚無可驗證的加權指數收盤資料"},{status:503});
- return NextResponse.json({status:"ok",name:"加權指數收盤",date:latest.date,value:latest.value,change:latest.change,dataSource:"TWSE FMTQIK（正式收盤日資料）",isRealtime:false});
+ return NextResponse.json({status:"ok",name:"加權指數收盤",date:latest.date,value:latest.value,change:latest.change,tradeVolume:latest.tradeVolume,tradeValue:latest.tradeValue,transactions:latest.transactions,dataSource:"TWSE FMTQIK（正式收盤日資料）",isRealtime:false});
  }catch{return NextResponse.json({error:"加權指數收盤資料暫時無法取得"},{status:502});}
 }
