@@ -38,20 +38,15 @@ function saveStockPoint(symbol:string,iso:string,price:number):IntradayPoint[]{
  }catch{return [point];}
 }
 function IntradayChart({points,reference}:{points:IntradayPoint[];reference:number|null}){
- if(!points.length)return <div className="spark-empty" style={{minHeight:250}}><Activity size={20}/><span>正在取得首筆有效盤中報價；已有歷史資料時會立即顯示</span></div>;
- const prices=points.map(p=>p.price),min=Math.min(...prices,reference??Infinity),max=Math.max(...prices,reference??-Infinity);
- const pad=Math.max((max-min)*.12,max*.002,.1),lo=min-pad,hi=max+pad;
- const x=(i:number)=>52+i/Math.max(points.length-1,1)*716;
- const y=(v:number)=>245-(v-lo)/(hi-lo)*210;
- const path=points.map((p,i)=>x(i).toFixed(1)+","+y(p.price).toFixed(1)).join(" ");
- const last=points[points.length-1];
- return <div><svg viewBox="0 0 800 290" className="candle-svg" role="img" aria-label="盤中股價取樣走勢圖">
-  {[0,1,2,3,4].map(i=><g key={i}><line x1="52" x2="768" y1={35+i*52.5} y2={35+i*52.5} stroke="#334155" strokeDasharray="3 5"/><text x="5" y={39+i*52.5} fontSize="12" fill="#94a3b8">{(hi-(hi-lo)*i/4).toFixed(2)}</text></g>)}
-  {reference!==null&&<line x1="52" x2="768" y1={y(reference)} y2={y(reference)} stroke="#eab308" strokeDasharray="5 5"/>}
-  {points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>:<circle cx={x(0)} cy={y(last.price)} r="5" fill="#fb725b"/>}
-  <circle cx={x(points.length-1)} cy={y(last.price)} r="4" fill="#fb725b"/>
-  <text x="52" y="276" fontSize="12" fill="#94a3b8">{points[0].time.slice(11)}</text><text x="768" y="276" textAnchor="end" fontSize="12" fill="#94a3b8">{last.time.slice(11)}</text>
- </svg><p className="footnote">最新取樣 {last.time.slice(11)} · {formatPrice(last.price)} 元 · 黃色虛線為前收參考價（如有）</p></div>;
+ const baseline=reference&&reference>0?reference:points[0]?.price??null;
+ const x=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return 52;return 52+Math.max(0,Math.min(270,Number(m[1])*60+Number(m[2])-540))/270*716;};
+ const y=(price:number)=>baseline?140-(price-baseline)/baseline*100*10.5:140;
+ const path=points.map(p=>x(p.time).toFixed(1)+","+y(p.price).toFixed(1)).join(" ");
+ return <div><svg viewBox="0 0 800 290" className="candle-svg" role="img" aria-label="個股盤中漲跌幅，縱軸固定正負百分之十，橫軸完整交易時段">
+  {[10,5,0,-5,-10].map(pct=><g key={pct}><line x1="52" x2="768" y1={140-pct*10.5} y2={140-pct*10.5} stroke={pct===0?"#eab308":"#334155"} strokeDasharray="3 5"/><text x="5" y={144-pct*10.5} fontSize="12" fill="#94a3b8">{pct>0?"+":""}{pct}%</text></g>)}
+  {points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>:points.length===1?<circle cx={x(points[0].time)} cy={y(points[0].price)} r="4" fill="#fb725b"/>:null}
+  {["09:00","10:30","12:00","13:30"].map((time,i)=><text key={time} x={52+i*716/3} y="276" textAnchor={i===0?"start":i===3?"end":"middle"} fontSize="12" fill="#94a3b8">{time}</text>)}
+ </svg><p className="footnote">{points.length?"最新取樣 "+points[points.length-1].time.slice(11)+" · "+formatPrice(points[points.length-1].price)+" 元":"尚無有效盤中報價"} · 固定 ±10% 漲跌幅；{reference?"以前收價為 0% 基準":"以前次有效取樣價為暫時基準"}</p></div>;
 }
 
 type Point={time:string;value:number;session:string};
