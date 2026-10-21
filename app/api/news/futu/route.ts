@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
-type News={title:string;url:string;publishedAt:string|null;source:string};
+type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null};
 function pick(o:Record<string,unknown>,keys:string[]):unknown{for(const k of keys){if(o[k]!==undefined&&o[k]!==null)return o[k];}return null;}
 function normalized(raw:unknown):News[]{
  const root=raw&&typeof raw==="object"?raw as Record<string,unknown>:{};
@@ -23,7 +23,11 @@ function normalized(raw:unknown):News[]{
   if(typeof timestamp==="number"){const d=new Date(timestamp<1e12?timestamp*1000:timestamp);if(Number.isFinite(d.getTime()))publishedAt=d.toISOString();}
   else if(typeof timestamp==="string"){const d=new Date(timestamp);if(Number.isFinite(d.getTime()))publishedAt=d.toISOString();}
   const source=pick(r,["source","publisher","author","media"]);
-  return [{title:title.trim().slice(0,180),url:url.href,publishedAt,source:typeof source==="string"?source.slice(0,60):"富途牛牛"}];
+  const image=pick(r,["image","image_url","imageUrl","cover","cover_url","coverUrl","thumbnail","thumbnail_url","thumbnailUrl","thumb","pic","pic_url","picUrl"]);
+  let imageUrl:string|null=null;
+  const imageValue=typeof image==="string"?image:image&&typeof image==="object"?pick(image as Record<string,unknown>,["url","src","original"]):null;
+  if(typeof imageValue==="string"){try{const u=new URL(imageValue);if(u.protocol==="https:"&&u.username===""&&u.password==="")imageUrl=u.href;}catch{}}
+  return [{title:title.trim().slice(0,180),url:url.href,publishedAt,source:typeof source==="string"?source.slice(0,60):"富途牛牛",imageUrl}];
  }).slice(0,12);
 }
 export async function GET(){
