@@ -51,3 +51,10 @@
 .market-volume-card small{display:block;color:#9caec4;font-size:11px;line-height:1.6}
 .market-volume-card strong{display:block;margin:8px 0;font-size:clamp(18px,2vw,25px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 @media(max-width:640px){.market-volume-card{grid-template-columns:1fr;gap:9px}.market-volume-card>div{padding:12px}}
+
+.taiex-trend-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:13px;font-weight:700}
+.taiex-live-change{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.taiex-live-change.up{color:#fb725b}
+.taiex-live-change.down{color:#59d7a1}
+.taiex-live-change.neutral{color:#a6b8ce}
+@media(max-width:640px){.taiex-trend-heading{align-items:flex-start;flex-direction:column}.taiex-live-change{font-size:17px}}
