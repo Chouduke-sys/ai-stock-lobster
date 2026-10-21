@@ -24,7 +24,33 @@ type StockResult = {
 const formatPrice = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
 const ageLabel = (s: number | null | undefined) => s == null ? "報價時間未確認" : s < 60 ? `距報價 ${s} 秒` : `距報價 ${Math.floor(s / 60)} 分鐘`;
 const formatVolume = (value: number | null | undefined) => value == null ? "—" : Math.round(value).toLocaleString("zh-TW");
-const chartPeriod: Record<string,string> = { "日K":"day", "週K":"week", "月K":"month" };
+type IntradayPoint={time:string;price:number;date:string};
+function saveStockPoint(symbol:string,iso:string,price:number):IntradayPoint[]{
+ const t=parts(iso),key="lobster-stock-intraday-"+symbol;
+ const point={time:t.date+" "+String(t.hour).padStart(2,"0")+":"+String(t.minute).padStart(2,"0"),price,date:t.date};
+ try{
+  const prev=JSON.parse(localStorage.getItem(key)||"[]") as IntradayPoint[];
+  const rows=prev.filter(x=>x.date===t.date&&x.time!==point.time&&Number.isFinite(x.price));
+  rows.push(point);rows.sort((a,b)=>a.time.localeCompare(b.time));
+  const limited=rows.slice(-350);localStorage.setItem(key,JSON.stringify(limited));return limited;
+ }catch{return [point];}
+}
+function IntradayChart({points,reference}:{points:IntradayPoint[];reference:number|null}){
+ if(points.length<2)return <div className="spark-empty" style={{minHeight:250}}><Activity size={20}/><span>正在累積盤中報價，至少需要兩個不同分鐘的有效成交價</span></div>;
+ const prices=points.map(p=>p.price),min=Math.min(...prices,reference??Infinity),max=Math.max(...prices,reference??-Infinity);
+ const pad=Math.max((max-min)*.12,max*.002,.1),lo=min-pad,hi=max+pad;
+ const x=(i:number)=>52+i/Math.max(points.length-1,1)*716;
+ const y=(v:number)=>245-(v-lo)/(hi-lo)*210;
+ const path=points.map((p,i)=>x(i).toFixed(1)+","+y(p.price).toFixed(1)).join(" ");
+ const last=points[points.length-1];
+ return <div><svg viewBox="0 0 800 290" className="candle-svg" role="img" aria-label="盤中股價取樣走勢圖">
+  {[0,1,2,3,4].map(i=><g key={i}><line x1="52" x2="768" y1={35+i*52.5} y2={35+i*52.5} stroke="#334155" strokeDasharray="3 5"/><text x="5" y={39+i*52.5} fontSize="12" fill="#94a3b8">{(hi-(hi-lo)*i/4).toFixed(2)}</text></g>)}
+  {reference!==null&&<line x1="52" x2="768" y1={y(reference)} y2={y(reference)} stroke="#eab308" strokeDasharray="5 5"/>}
+  <polyline points={path} fill="none" stroke="#fb725b" strokeWidth="2.5" vectorEffect="non-scaling-stroke"/>
+  <circle cx={x(points.length-1)} cy={y(last.price)} r="4" fill="#fb725b"/>
+  <text x="52" y="276" fontSize="12" fill="#94a3b8">{points[0].time.slice(11)}</text><text x="768" y="276" textAnchor="end" fontSize="12" fill="#94a3b8">{last.time.slice(11)}</text>
+ </svg><p className="footnote">最新取樣 {last.time.slice(11)} · {formatPrice(last.price)} 元 · 黃色虛線為前收參考價（如有）</p></div>;
+}
 
 type Point={time:string;value:number;session:string};
 function parts(iso:string){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso));const v=(k:string)=>p.find(x=>x.type===k)?.value??"";return {date:v("year")+"-"+v("month")+"-"+v("day"),hour:Number(v("hour")),minute:Number(v("minute"))};}
@@ -45,7 +71,7 @@ export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
-  const [period, setPeriod] = useState("日K");
+  const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
   const [symbol, setSymbol] = useState("2330");
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
@@ -76,9 +102,9 @@ export default function Home() {
   const [rankError, setRankError] = useState("");
   const [rankDate, setRankDate] = useState("");
   const [loadingRank, setLoadingRank] = useState(true);
-  const [history, setHistory] = useState<HistoryResult | null>(null);
-  const [historyError, setHistoryError] = useState("");
-  const [loadingHistory, setLoadingHistory] = useState(false);
+
+
+
   const [quoteRefreshAt, setQuoteRefreshAt] = useState<string | null>(null);
 
   const rows = rankRows;
@@ -118,21 +144,7 @@ export default function Home() {
     return ()=>controller.abort();
   },[market,investor,rankSide,fiveMode]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function loadHistory() {
-      setLoadingHistory(true);setHistoryError("");setHistory(null);
-      try {
-        const response = await fetch(`/api/stocks/${symbol}/history?period=${chartPeriod[period]}`,{signal:controller.signal});
-        const data = await response.json();
-        if(!response.ok || data.status!=="ok")throw new Error(data.error || "K 線資料暫無法取得");
-        setHistory(data);
-      }catch(e){if(!controller.signal.aborted)setHistoryError(e instanceof Error?e.message:"K 線資料讀取失敗");}
-      finally{if(!controller.signal.aborted)setLoadingHistory(false);}
-    }
-    void loadHistory();
-    return ()=>controller.abort();
-  },[symbol,period]);
+  useEffect(()=>{try{const raw=JSON.parse(localStorage.getItem("lobster-stock-intraday-"+symbol)||"[]") as IntradayPoint[];const now=parts(new Date().toISOString()).date;setStockPoints(raw.filter(x=>x.date===now&&Number.isFinite(x.price)));}catch{setStockPoints([]);}},[symbol]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,6 +162,10 @@ export default function Home() {
           throw new Error(result.error || "行情查詢失敗");
         }
         setStockData(result as StockResult);
+        if(typeof result.quote?.last==="number"&&typeof result.quoteTime==="string"){
+          const t=parts(result.quoteTime);
+          if((t.hour===9||t.hour===10||t.hour===11||t.hour===12||(t.hour===13&&t.minute<=30))&&t.date===parts(new Date().toISOString()).date)setStockPoints(saveStockPoint(symbol,result.quoteTime,result.quote.last));
+        }
         setQuoteRefreshAt(new Date().toISOString());
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -259,7 +275,7 @@ export default function Home() {
           <span className="brand-mark"><TrendingUp size={24} /></span>
           <span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE · TAIWAN</small></span>
         </a>
-        <nav className="nav-links"><a href="#rankings">法人排行</a><a href="#charts">個股 K 線</a><a href="#global">全球資訊</a><a href="#membership">會員方案</a></nav>
+        <nav className="nav-links"><a href="#rankings">法人排行</a><a href="#charts">個股走勢</a><a href="#global">全球資訊</a><a href="#membership">會員方案</a></nav>
         <button className="btn btn-outline login-btn" onClick={() => setShowLogin(!showLogin)}><LockKeyhole size={16}/> 會員登入</button>
         <button className="icon-btn mobile-menu" aria-label="開啟登入面板" onClick={() => setShowLogin(!showLogin)}><Menu size={20}/></button>
       </header>
@@ -347,8 +363,8 @@ export default function Home() {
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>上市盤中報價每 10 秒查詢；歷史 K 線及技術指標以實際歷史行情計算。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
-        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><div className="toggle-group">{["日K","週K","月K"].map(p => <button key={p} className={period === p ? "active" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 10 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><span className="tag tag-amber">盤中走勢 · 10 秒查詢</span></div>
         <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "盤中行情（測試）" : "尚無資料"}</span></div>
         {stockData ? (
           <>
@@ -357,34 +373,7 @@ export default function Home() {
             <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 10 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
-        <div className="history-panel">
-          <h3>{period} 歷史 K 線與技術指標</h3>
-          {history?.candles.length ? (() => {
-            const data = history.candles.slice(-65);
-            const low = Math.min(...data.map(c=>c.low)), high = Math.max(...data.map(c=>c.high)), range=Math.max(1,high-low);
-            const x=(i:number)=>(i+.5)*800/data.length;
-            const y=(v:number)=>20+(high-v)/range*240;
-            const latest=history.candles[history.candles.length-1];
-            return <>
-              <svg viewBox="0 0 800 290" role="img" aria-label={`${symbol} ${period} 真實歷史 K 線圖`} className="candle-svg">
-                {data.map((c,i)=><g key={c.date} stroke={c.close>=c.open?"#fb725b":"#59d7a1"}>
-                  <line x1={x(i)} y1={y(c.high)} x2={x(i)} y2={y(c.low)} strokeWidth="1.4"/>
-                  <rect x={x(i)-Math.max(2,320/data.length)} y={Math.min(y(c.open),y(c.close))} width={Math.max(4,640/data.length)} height={Math.max(1,Math.abs(y(c.open)-y(c.close)))} fill={c.close>=c.open?"#fb725b":"#59d7a1"} />
-                </g>)}
-                {(["ma5","ma10","ma20"] as const).map((key,i)=>{
-                  const points=data.map((c,j)=>c[key]===null?null:`${x(j)},${y(c[key]!)}`).filter(Boolean).join(" ");
-                  return <polyline key={key} points={points} fill="none" stroke={["#f7c66b","#7aa7ff","#c39bfa"][i]} strokeWidth="1.6" vectorEffect="non-scaling-stroke"/>;
-                })}
-              </svg>
-              <div className="indicator-grid">
-                <div><small>MA5 / MA10</small><strong>{formatPrice(latest.ma5)} / {formatPrice(latest.ma10)}</strong></div>
-                <div><small>MA20 / MA60</small><strong>{formatPrice(latest.ma20)} / {formatPrice(latest.ma60)}</strong></div>
-                <div><small>RSI(14)</small><strong>{formatPrice(latest.rsi14)}</strong></div>
-                <div><small>MACD (DIF / Signal / Histogram)</small><strong>{formatPrice(latest.dif)} / {formatPrice(latest.signal)} / {formatPrice(latest.histogram)}</strong></div>
-              </div>
-              <p className="footnote">來源：{history.dataSource}；最新歷史交易日：{history.asOf}。紅色上漲、綠色下跌；MA5 黃、MA10 藍、MA20 紫。非盤中即時 K 線，週月 K 為日線彙整。</p>
-            </>;
-          })() : <p className="footnote">{loadingHistory ? "歷史行情讀取中…" : historyError || "目前沒有歷史行情"}</p>}
+        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={stockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">每 10 秒查詢、按分鐘記錄有效成交價；僅保存目前瀏覽器本機的當日取樣。網頁關閉期間無法補齊資料，報價可能延遲；不是完整即時分時歷史圖。</p></div>
         </div></div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
