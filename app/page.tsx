@@ -321,9 +321,9 @@ export default function Home() {
 
       <section className="stats-grid">
         <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
-        <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人合計</span><strong>—</strong><small>法人日報盤後公布，非盤中即時</small></article>
-        <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> 買超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
-        <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 賣超榜首</span><strong>待更新</strong><small>未驗證排名不顯示</small></article>
+        <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人排行</span><strong>{rankDate || "待公布"}</strong><small>{rankDate ? "最新已取得交易日 · 盤後資料" : "等待官方日報，非盤中即時"}</small></article>
+        <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> {rankSide==="buy"?"買超":"賣超"}榜首</span><strong>{rows[0]?.name || "待更新"}</strong><small>{rows[0]?`${rows[0].symbol} · ${formatVolume(rows[0].netShares)} 股`:"尚無可驗證排名"}</small></article>
+        <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 三日法人動向</span><strong>{fiveLoading?"查詢中":fiveRows.length?fiveRows[0].name:"待確認"}</strong><small>{fiveRows.length?`三日合計 ${formatVolume(fiveRows[0].netShares)} 股`:"尚無完整三日排行"}</small></article>
       </section>
 
       <section className="section" id="rankings">
