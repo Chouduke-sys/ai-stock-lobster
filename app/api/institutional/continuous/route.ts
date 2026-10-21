@@ -29,12 +29,12 @@ export async function GET(req:Request){
  const q=new URL(req.url).searchParams;
  const investor=q.get("investor")??"all",side=q.get("side")??"buy",mode=q.get("mode")??"streak",market=q.get("market")??"twse";
  if(!["all","foreign","trust","dealer"].includes(investor)||!["buy","sell"].includes(side)||!["streak","sum"].includes(mode)||market!=="twse")
-  return NextResponse.json({error:"連續五日目前僅支援上市股票，請選擇上市市場"},{status:400});
+  return NextResponse.json({error:"連續三日目前僅支援上市股票，請選擇上市市場"},{status:400});
  const start=new Date(taiwanDate()+"T12:00:00+08:00");
  const dates=Array.from({length:13},(_,i)=>new Date(start.getTime()-i*86400000).toISOString().slice(0,10)).filter(d=>{const w=new Date(d+"T12:00:00+08:00").getUTCDay();return w!==0&&w!==6;});
  const results=await Promise.all(dates.map(fetchDay));
- const days=results.filter((d):d is Day=>d!==null).slice(0,5);
- if(days.length!==5)return NextResponse.json({error:"目前無法取得完整五個交易日的官方法人資料",availableDates:days.map(d=>d.date)},{status:503});
+ const days=results.filter((d):d is Day=>d!==null).slice(0,3);
+ if(days.length!==3)return NextResponse.json({error:"目前無法取得完整三個交易日的官方法人資料",availableDates:days.map(d=>d.date)},{status:503});
  const maps=days.map(d=>new Map(d.rows.map(r=>[r.symbol,r])));
  const key=investor==="all"?"total":investor as "foreign"|"trust"|"dealer";
  const rows=Array.from(maps[0].values()).flatMap(first=>{
@@ -44,6 +44,6 @@ export async function GET(req:Request){
   if(mode==="streak"&&!values.every(v=>side==="buy"?v>0:v<0))return [];
   if(mode==="sum"&&(side==="buy"?total<=0:total>=0))return [];
   return [{symbol:first.symbol,name:first.name,market:"twse",netShares:total,dailyShares:values}];
- }).sort((a,b)=>side==="buy"?b.netShares-a.netShares:a.netShares-b.netShares).slice(0,5);
- return NextResponse.json({status:"ok",market,investor,side,mode,dates:days.map(d=>d.date),rows,dataSource:"TWSE T86 五個交易日",isRealtime:false});
+ }).sort((a,b)=>side==="buy"?b.netShares-a.netShares:a.netShares-b.netShares).slice(0,3);
+ return NextResponse.json({status:"ok",market,investor,side,mode,dates:days.map(d=>d.date),rows,dataSource:"TWSE T86 三個交易日",isRealtime:false});
 }
