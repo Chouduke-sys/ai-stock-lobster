@@ -55,16 +55,21 @@ function IntradayChart({points,reference}:{points:IntradayPoint[];reference:numb
 type Point={time:string;value:number;session:string};
 function parts(iso:string){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso));const v=(k:string)=>p.find(x=>x.type===k)?.value??"";return {date:v("year")+"-"+v("month")+"-"+v("day"),hour:Number(v("hour")),minute:Number(v("minute"))};}
 function record(kind:"taiex"|"tx",iso:string,value:number):Point[]{
- const t=parts(iso),time=t.date+" "+String(t.hour).padStart(2,"0")+":00";
+ const t=parts(iso),time=t.date+" "+String(t.hour).padStart(2,"0")+":"+String(t.minute).padStart(2,"0");
  const session=kind==="taiex"?t.date:t.hour<5?new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10):t.date;
- const key="lobster-hour-"+kind;
- try{const prev=JSON.parse(localStorage.getItem(key)||"[]") as Point[];const list=prev.filter(p=>p.session===session&&p.time!==time&&Number.isFinite(p.value));list.push({time,value,session});list.sort((a,b)=>a.time.localeCompare(b.time));localStorage.setItem(key,JSON.stringify(list.slice(-15)));return list;}catch{return [{time,value,session}];}
+ const key="lobster-minute-"+kind;
+ try{const prev=JSON.parse(localStorage.getItem(key)||"[]") as Point[];const list=prev.filter(p=>p.session===session&&p.time!==time&&Number.isFinite(p.value));list.push({time,value,session});list.sort((a,b)=>a.time.localeCompare(b.time));const limited=list.slice(-900);localStorage.setItem(key,JSON.stringify(limited));return limited;}catch{return [{time,value,session}];}
+}
+function readPoints(kind:"taiex"|"tx"):Point[]{
+ try{const raw=JSON.parse(localStorage.getItem("lobster-minute-"+kind)||"[]") as Point[];return Array.isArray(raw)?raw.filter(p=>Number.isFinite(p.value)&&typeof p.time==="string"):[];}catch{return [];}
 }
 function HourChart({points,base}:{points:Point[];base:number|null}){
- if(points.length<2||base===null)return <div className="spark-empty"><Activity size={20}/><span>尚無兩個小時的有效報價，正在累積資料</span></div>;
- const values=points.map(p=>p.value-base),lo=Math.min(0,...values),hi=Math.max(0,...values),range=Math.max(hi-lo,1);
- const path=values.map((v,i)=>(i/(values.length-1)*100).toFixed(2)+","+(90-(v-lo)/range*80).toFixed(2)).join(" ");
- return <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="每小時漲跌點數走勢" style={{position:"relative",width:"100%",height:"100%"}}><line x1="0" x2="100" y1={90-(0-lo)/range*80} y2={90-(0-lo)/range*80} stroke="#64748b" strokeDasharray="2 2"/><polyline points={path} fill="none" stroke="#fb725b" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/></svg>;
+ if(!points.length)return <div className="spark-empty"><Activity size={20}/><span>尚未取得有效盤中報價；取得後開始記錄走勢</span></div>;
+ const values=points.map(p=>p.value-(base??points[0].value)),lo=Math.min(0,...values),hi=Math.max(0,...values),range=Math.max(hi-lo,1);
+ const x=(i:number)=>points.length===1?50:3+i/(points.length-1)*94;
+ const y=(v:number)=>90-(v-lo)/range*80;
+ const path=values.map((v,i)=>x(i).toFixed(2)+","+y(v).toFixed(2)).join(" ");
+ return <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="盤中報價取樣漲跌點數走勢" style={{position:"relative",width:"100%",height:"100%"}}><line x1="0" x2="100" y1={y(0)} y2={y(0)} stroke="#64748b" strokeDasharray="2 2"/>{points.length>1?<polyline points={path} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:<circle cx="50" cy={y(values[0])} r="2.5" fill="#fb725b"/>}</svg>;
 }
 
 export default function Home() {
@@ -91,6 +96,7 @@ export default function Home() {
   const [nightError, setNightError] = useState("");
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
+  useEffect(()=>{setDayPoints(readPoints("taiex"));setNightPoints(readPoints("tx"));},[]);
   const [indexTrendError, setIndexTrendError] = useState("");
   const [loadingTaiex, setLoadingTaiex] = useState(true);
   const [rankRows, setRankRows] = useState<RankRow[]>([]);
@@ -323,12 +329,12 @@ export default function Home() {
               <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 10 秒查詢` : nightError || "讀取中"}</small>
             </div>
           </div>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤每小時漲跌點數</div>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（10 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 10 秒查詢並保留每小時最新有效報價。已記錄：{dayPoints.map(p=>p.time.slice(11)).join("、")||"無"}。本機取樣，非完整官方分時歷史。</p>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤 · 每小時漲跌點數</div>
+          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 10 秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（10 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null}/></div>
-          <p className="footnote">夜盤 15:00～次日 05:00，相對本次記錄首筆報價；需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
+          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，相對本次記錄首筆價格；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
       </section>
