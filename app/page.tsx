@@ -1,5 +1,6 @@
-import lobsterLogo from "../ai_stock_lobster_logo.png";
 "use client";
+
+import lobsterLogo from "../ai_stock_lobster_logo.png";
 
 import { useEffect, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
