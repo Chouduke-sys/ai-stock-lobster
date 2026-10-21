@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
-type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null};
+type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
 function pick(o:Record<string,unknown>,keys:string[]):unknown{for(const k of keys)if(o[k]!==undefined&&o[k]!==null)return o[k];return null;}
 function parseTime(value:unknown):string|null{
  if(typeof value==="number"){const d=new Date(value<1e12?value*1000:value);return Number.isFinite(d.getTime())?d.toISOString():null;}
@@ -32,7 +32,9 @@ function parseNews(raw:unknown):News[]{
   let imageUrl:string|null=null;
   if(typeof imgValue==="string"){try{const u=new URL(imgValue,url);if(u.protocol==="https:")imageUrl=u.href;}catch{}}
   const source=pick(r,["source","publisher","author","media"]);
-  return [{title:title.trim(),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl}];
+  const excerpt=pick(r,["summary","description","abstract","news_summary","newsSummary","brief","intro","digest"]);
+  const summary=typeof excerpt==="string" ? excerpt.replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim().slice(0,120) || null : null;
+  return [{title:title.trim(),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl,summary}];
  });
 }
 export async function GET(){
