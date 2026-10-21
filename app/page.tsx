@@ -307,12 +307,12 @@ export default function Home() {
               <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 10 秒查詢` : nightError || "讀取中"}</small>
             </div>
           </div>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 每小時漲跌點數</div>
-          <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={closing?.value??null}/></div>
-          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤。每 10 秒取樣，保留各小時最新有效報價。已記錄：{dayPoints.map(p=>p.time.slice(11)).join("、")||"無"}</p>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤每小時漲跌點數</div>
+          <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
+          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 10 秒查詢並保留每小時最新有效報價。已記錄：{dayPoints.map(p=>p.time.slice(11)).join("、")||"無"}。本機取樣，非完整官方分時歷史。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤 · 每小時漲跌點數</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null}/></div>
-          <p className="footnote">夜盤 15:00～次日 05:00，相對本次記錄首筆報價；須有授權夜盤行情來源。{nightError}</p>
+          <p className="footnote">夜盤 15:00～次日 05:00，相對本次記錄首筆報價；需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
         </div>
       </section>
