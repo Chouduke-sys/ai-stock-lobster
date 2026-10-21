@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
-type NewsRow={title:string;url:string;publishedAt:string|null;source:string};
+type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null};
 type RankRow = { symbol: string; name: string; netShares: number };
 type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
@@ -252,10 +252,13 @@ export default function Home() {
           <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 富途牛牛</div>
           <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
           <p style={{margin:"0 0 12px",fontSize:13}}>富途牛牛新聞搜尋 · 每 5 分鐘重新查詢 · 標題點擊閱讀原文</p>
-          {news.length>0 ? <div style={{display:"grid",gap:0,maxHeight:360,overflowY:"auto",paddingRight:6}}>
-            {news.slice(0,8).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"block",padding:"10px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
-              <div style={{fontSize:14,fontWeight:600,lineHeight:1.55}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
-              <small style={{color:"#94a3b8"}}>{item.source} · {item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"發布時間未提供"}</small>
+          {news.length>0 ? <div style={{display:"grid",gap:0,maxHeight:420,overflowY:"auto",paddingRight:6}}>
+            {news.slice(0,10).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
+              {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:92,height:68,flexShrink:0,objectFit:"cover",borderRadius:8,background:"#1e293b"}} onError={e=>{e.currentTarget.style.display="none";}}/> : <div aria-hidden="true" style={{width:92,height:68,flexShrink:0,borderRadius:8,background:"#182437",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8"}}><Newspaper size={24}/></div>}
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:14,fontWeight:600,lineHeight:1.55}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
+                <small style={{color:"#94a3b8",display:"block",marginTop:6}}>{item.source} · {item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"發布時間未提供"}</small>
+              </div>
             </a>)}
           </div> : <div style={{padding:"22px 0",fontSize:14,color:"#94a3b8"}}>{newsError||"正在載入富途牛牛財經新聞…"}</div>}
           <div style={{marginTop:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
