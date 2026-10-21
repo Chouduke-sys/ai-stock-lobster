@@ -91,6 +91,17 @@ export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
+  const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null}[]}|null>(null);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{const response=await fetch("/api/market/daily-analysis",{signal:controller.signal});const result=await response.json();if(response.ok&&result.status==="ok"&&!controller.signal.aborted)setDailyAnalysis(result);}
+      catch{}
+    }
+    void load();
+    const timer=setInterval(()=>{void load();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
   const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
   const [symbol, setSymbol] = useState("2330");
   const [search, setSearch] = useState("");
@@ -351,12 +362,13 @@ export default function Home() {
           </div>)}
           <a className="holdings-source" href="https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981a.tw&topc=" target="_blank" rel="noopener noreferrer">查看 MoneyDJ 持股來源 ↗</a>
           <div className="holdings-divider" />
-          <div className="holdings-fund-title">雷家軍｜金玉峰投顧 <span>雷老闆（王韋閔）·《從0抱豹》</span></div>
-          <p className="holdings-note">公開節目討論標的（非實際持倉）：台積電 2330、台達電 2308、群聯 8299、南亞科 2408、華邦電 2344、富喬 1815、金居 8358 等。以上為 2026/04/02 節目標籤所提及的股票，不代表目前持有、推薦買進或持倉比例。</p>
-          <p className="holdings-note">實際持股比例：未公開可核實資料，暫不顯示百分比。其他投顧也將遵循相同揭露標準。</p>
-          <a className="holdings-source" href="https://www.youtube.com/@Jin-Yu-Feng" target="_blank" rel="noopener noreferrer">金玉峰投顧官方頻道 ↗</a>
-          <span style={{margin:"0 8px",color:"#64748b"}}>·</span>
-          <a className="holdings-source" href="https://jinyufeng.com.tw/" target="_blank" rel="noopener noreferrer">金玉峰官方網站 ↗</a>
+          <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
+          <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
+          <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span></div>)}</div>
+          <p className="holdings-note"><b>日韓股影響：</b>{dailyAnalysis?.asia??"等待資料"}</p>
+          <p className="holdings-note"><b>台幣升貶影響：</b>{dailyAnalysis?.currency??"等待資料"}</p>
+          <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
+          <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
         </section>
         </div>
         <div className="hero-visual">
