@@ -56,6 +56,11 @@ function IntradayChart({points,reference}:{points:IntradayPoint[];reference:numb
 
 type Point={time:string;value:number;session:string};
 function parts(iso:string){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso));const v=(k:string)=>p.find(x=>x.type===k)?.value??"";return {date:v("year")+"-"+v("month")+"-"+v("day"),hour:Number(v("hour")),minute:Number(v("minute"))};}
+function isTaiexSessionNow():boolean{
+ const now=parts(new Date().toISOString());
+ const day=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short"}).format(new Date());
+ return day!=="Sat"&&day!=="Sun"&&now.hour*60+now.minute>=540&&now.hour*60+now.minute<=810;
+}
 function record(kind:"taiex"|"tx",iso:string,value:number):Point[]{
  const t=parts(iso),time=t.date+" "+String(t.hour).padStart(2,"0")+":"+String(t.minute).padStart(2,"0");
  const session=kind==="taiex"?t.date:t.hour<5?new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10):t.date;
@@ -208,8 +213,9 @@ export default function Home() {
       }
     }
     void loadIndex();
-    const timer = setInterval(() => { void loadIndex(); }, 5000);
-    return () => { controller.abort(); clearInterval(timer); };
+    const timer = setInterval(() => { if(isTaiexSessionNow())void loadIndex(); }, 1000);
+    const offHoursTimer=setInterval(()=>{if(!isTaiexSessionNow())void loadIndex();},30000);
+    return () => { controller.abort(); clearInterval(timer); clearInterval(offHoursTimer); };
   }, []);
 
   useEffect(()=>{
@@ -316,7 +322,7 @@ export default function Home() {
         </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 5 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 開盤每 1 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>加權指數 · 最近收盤</small>
@@ -329,9 +335,9 @@ export default function Home() {
               <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 5 秒查詢` : nightError || "讀取中"}</small>
             </div>
           </div>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（5 秒查詢）</div>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（開盤每秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 5 秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null}/></div>
           <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，相對本次記錄首筆價格；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
