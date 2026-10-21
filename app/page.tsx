@@ -160,7 +160,6 @@ export default function Home() {
       inFlight = true;
       setLoadingQuote(true);
       setQuoteError("");
-      setStockData(null);
       try {
         const response = await fetch(`/api/stocks/${symbol}`, { signal: controller.signal });
         const result = await response.json();
@@ -175,7 +174,6 @@ export default function Home() {
         setQuoteRefreshAt(new Date().toISOString());
       } catch (error) {
         if (!controller.signal.aborted) {
-          setStockData(null);
           setQuoteError(error instanceof Error ? error.message : "行情查詢失敗");
         }
       } finally {
@@ -184,7 +182,7 @@ export default function Home() {
       }
     }
     void loadQuote();
-    const timer = setInterval(() => { void loadQuote(); }, 10000);
+    const timer = setInterval(() => { void loadQuote(); }, 5000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [symbol]);
 
@@ -208,7 +206,7 @@ export default function Home() {
       }
     }
     void loadIndex();
-    const timer = setInterval(() => { void loadIndex(); }, 10000);
+    const timer = setInterval(() => { void loadIndex(); }, 5000);
     return () => { controller.abort(); clearInterval(timer); };
   }, []);
 
@@ -242,7 +240,7 @@ export default function Home() {
       finally{inFlight=false;}
     }
     void loadNight();
-    const timer=setInterval(()=>{void loadNight();},10000);
+    const timer=setInterval(()=>{void loadNight();},5000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
 
@@ -316,7 +314,7 @@ export default function Home() {
         </div>
         <div className="hero-visual">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 10 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 每 5 秒查詢 · 不保證即時` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>加權指數 · 最近收盤</small>
@@ -326,13 +324,13 @@ export default function Home() {
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>臺股期貨 TX · 夜盤（不同於加權指數）</small>
               <strong style={{display:"block",fontSize:24}}>{formatPrice(night?.price)}</strong>
-              <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 10 秒查詢` : nightError || "讀取中"}</small>
+              <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 5 秒查詢` : nightError || "讀取中"}</small>
             </div>
           </div>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（10 秒查詢）</div>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>加權指數 · 日盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 10 秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（10 秒查詢）</div>
+          <p className="footnote">日盤 09:00～13:30，相對前一交易日收盤；每 5 秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null}/></div>
           <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，相對本次記錄首筆價格；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
@@ -369,17 +367,17 @@ export default function Home() {
       </section>
 
       <section className="section" id="charts">
-        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 10 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
-        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><span className="tag tag-amber">盤中走勢 · 10 秒查詢</span></div>
-        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{loadingQuote ? "查詢中" : stockData ? "盤中行情（測試）" : "尚無資料"}</span></div>
+        <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 5 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
+        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><span className="tag tag-amber">盤中走勢 · 5 秒查詢</span></div>
+        <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{stockData ? (loadingQuote ? "盤中行情 · 更新中" : quoteError ? "沿用前次報價" : "盤中行情（測試）") : loadingQuote ? "查詢中" : "尚無資料"}</span></div>
         {stockData ? (
           <>
             <div className="quote-summary"><div><small>最新成交價（元）</small><strong>{formatPrice(stockData.quote.close)}</strong></div><div><small>當日漲跌（元）</small><strong>{formatPrice(stockData.quote.change)}</strong></div><div><small>資料交易日</small><strong>{stockData.dataDate ?? "官方未提供"}</strong></div></div>
             <div className="indicator-grid"><div><small>開盤</small><strong>{formatPrice(stockData.quote.open)}</strong></div><div><small>最高</small><strong>{formatPrice(stockData.quote.high)}</strong></div><div><small>最低</small><strong>{formatPrice(stockData.quote.low)}</strong></div><div><small>成交量（股）</small><strong>{formatVolume(stockData.quote.volume)}</strong></div></div>
-            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 10 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。</p>
+            <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 5 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。{quoteError ? "最新更新失敗："+quoteError+"；仍顯示前次成功報價。" : ""}</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
-        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={stockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">每 10 秒查詢、按分鐘記錄有效成交價；僅保存目前瀏覽器本機的當日取樣。網頁關閉期間無法補齊資料，報價可能延遲；不是完整即時分時歷史圖。</p></div>
+        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={stockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">每 5 秒查詢、按分鐘記錄有效成交價；僅保存目前瀏覽器本機的當日取樣。網頁關閉期間無法補齊資料，報價可能延遲；不是完整即時分時歷史圖。</p></div>
         </div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
