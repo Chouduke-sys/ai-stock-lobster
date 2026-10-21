@@ -349,8 +349,12 @@ export default function Home() {
           </div>)}
           <a className="holdings-source" href="https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981a.tw&topc=" target="_blank" rel="noopener noreferrer">查看 MoneyDJ 持股來源 ↗</a>
           <div className="holdings-divider" />
-          <div className="holdings-fund-title">雷家軍／其他投顧</div>
-          <p className="holdings-note">尚待確認「雷家軍」所指團隊。投顧老師的個人持股比例通常沒有法定公開揭露資料，不能把節目推薦股當成真實持倉；有可查證的公開基金或 ETF 才會列出權重。</p>
+          <div className="holdings-fund-title">雷家軍｜金玉峰投顧 <span>雷老闆（王韋閔）·《從0抱豹》</span></div>
+          <p className="holdings-note">公開節目討論標的（非實際持倉）：台積電 2330、台達電 2308、群聯 8299、南亞科 2408、華邦電 2344、富喬 1815、金居 8358 等。以上為 2026/04/02 節目標籤所提及的股票，不代表目前持有、推薦買進或持倉比例。</p>
+          <p className="holdings-note">實際持股比例：未公開可核實資料，暫不顯示百分比。其他投顧也將遵循相同揭露標準。</p>
+          <a className="holdings-source" href="https://www.youtube.com/@Jin-Yu-Feng" target="_blank" rel="noopener noreferrer">金玉峰投顧官方頻道 ↗</a>
+          <span style={{margin:"0 8px",color:"#64748b"}}>·</span>
+          <a className="holdings-source" href="https://jinyufeng.com.tw/" target="_blank" rel="noopener noreferrer">金玉峰官方網站 ↗</a>
         </section>
         </div>
         <div className="hero-visual">
