@@ -218,3 +218,9 @@
 .volume-leaders-panel .holdings-name small{font-size:14px}
 .volume-leaders-panel .holdings-row strong{font-size:17px;white-space:nowrap}
 @media(max-width:640px){.volume-leaders-panel .holdings-row{font-size:15px}.volume-leaders-panel .holdings-name{font-size:15px}.volume-leaders-panel .holdings-row strong{font-size:16px}}
+
+.morning-brief-lock{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:38px 20px;background:linear-gradient(145deg,#18273b,#0a1526);border:1px solid #34455e;border-radius:14px}
+.morning-brief-lock h3{font-size:23px;margin:0;color:#f3f6fa}
+.morning-brief-lock p{font-size:15px;line-height:1.8;color:#c5d3e4;margin:0}
+.morning-brief-login-actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:8px}
+.morning-brief-login-actions button{min-height:44px}
