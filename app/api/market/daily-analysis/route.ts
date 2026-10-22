@@ -1,18 +1,22 @@
 import {NextResponse} from "next/server";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
-type Quote={label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string};
-type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;chartPreviousClose?:number;previousClose?:number;regularMarketTime?:number}}>}};
+type Quote={label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string;trend5d:number[];trendDates:string[]};
+type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;chartPreviousClose?:number;previousClose?:number;regularMarketTime?:number};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
 async function getQuote(label:string,symbol:string):Promise<Quote>{
- const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）"};
+ const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
   const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=5d";
   const response=await fetch(url,{next:{revalidate:300},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
   if(!response.ok)return empty;
   const body=await response.json() as ChartResponse;
-  const meta=body.chart?.result?.[0]?.meta;
+  const result=body.chart?.result?.[0];
+  const meta=result?.meta;
+  const closes=result?.indicators?.quote?.[0]?.close??[];
+  const timestamps=result?.timestamp??[];
+  const history=closes.flatMap((close,i)=>typeof close==="number"&&Number.isFinite(close)&&close>0&&typeof timestamps[i]==="number"?[{value:close,date:new Date(timestamps[i]*1000).toISOString().slice(0,10)}]:[]).slice(-5);
   const value=meta?.regularMarketPrice,prev=meta?.chartPreviousClose??meta?.previousClose;
-  return {...empty,value:typeof value==="number"?value:null,changePct:typeof value==="number"&&typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null};
+  return {...empty,value:typeof value==="number"?value:null,changePct:typeof value==="number"&&typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:history.map(p=>p.value),trendDates:history.map(p=>p.date)};
  }catch{return empty;}
 }
 export async function GET(){
