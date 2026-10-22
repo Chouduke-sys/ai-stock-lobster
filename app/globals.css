@@ -127,3 +127,15 @@
 .market-analysis-below-index .holdings-note:last-child{font-size:12px;color:#9dafc5}
 .market-analysis-below-index .daily-market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:640px){.market-analysis-below-index .holdings-fund-title{font-size:19px}.market-analysis-below-index .holdings-note{font-size:14px}}
+
+/* Full-width daily briefing below the two-column hero */
+.market-analysis-wide{width:100%;margin:0 0 32px;padding:24px 28px;border:1px solid #293b52;border-radius:17px;background:linear-gradient(125deg,#101b2c,#0c1423)}
+.market-analysis-wide>.holdings-divider{display:none}
+.market-analysis-wide .holdings-fund-title{font-size:25px;line-height:1.5;margin:0 0 12px}
+.market-analysis-wide .holdings-fund-title span{font-size:13px;line-height:1.7}
+.market-analysis-wide .daily-market-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:20px 0}
+.market-analysis-wide .holdings-note{font-size:16px;line-height:1.9;color:#d2deed;margin:13px 0}
+.market-analysis-wide .holdings-note b{color:#fff}
+.market-analysis-wide .holdings-note:last-child{font-size:12px;color:#a0b0c6}
+@media(max-width:800px){.market-analysis-wide .daily-market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.market-analysis-wide{padding:17px 14px;margin-bottom:22px}.market-analysis-wide .holdings-fund-title{font-size:20px}.market-analysis-wide .holdings-note{font-size:14px}}
