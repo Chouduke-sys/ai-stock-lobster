@@ -81,13 +81,13 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const minuteOf=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
  const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{x:(minute-start)/duration*100,value:p.value,time:p.time}];});
  const values=plot.map(p=>p.value),lo=Math.min(...values),hi=Math.max(...values);
- const pad=values.length?Math.max((hi-lo)*0.12,hi*0.0005,10):100;
+ const pad=values.length?Math.max((hi-lo)*0.10,hi*0.00015,3):100;
  const min=values.length?lo-pad:(base??0)-pad,max=values.length?hi+pad:(base??0)+pad;
  const y=(v:number)=>(max-v)/(max-min)*100;
  const poly=plot.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ");
  const labels=Array.from({length:5},(_,i)=>max-(max-min)*i/4);
  return <div className="index-points-chart">
-  <div className="index-points-title">指數點數 <strong>{plot.length?formatPrice(plot[plot.length-1].value):"—"}</strong></div>
+  <div className="index-points-title">實際點數 · 局部放大波動 <strong>{plot.length?formatPrice(plot[plot.length-1].value):"—"}</strong></div>
   <div className="index-points-main">
    <div className="index-points-plot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="指數點數走勢圖，右側為實際指數點數" style={{display:"block",width:"100%",height:"100%"}}>
     {labels.map((_,i)=><line key={i} x1="0" x2="100" y1={i*25} y2={i*25} stroke="#34455b" strokeDasharray="1 3" strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
@@ -99,7 +99,7 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
   <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
   <div className="index-volume-title">成交量（股）</div>
   <div className="index-volume-empty">目前行情 API 未提供可驗證的逐分鐘成交量，暫不繪製虛構量柱。上方另有證交所公布的總成交量。</div>
-  <p className="footnote">數值軸自動縮放；每分鐘有效報價取樣，非完整歷史 K 線。</p>
+  <p className="footnote">以當日已取得的最高／最低點數局部放大，讓小幅波動也清楚；縱軸非從零起算，視覺振幅不代表漲跌百分比。每分鐘有效報價取樣，非完整歷史 K 線。</p>
  </div>;
 }
 
@@ -107,6 +107,17 @@ export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
+  const [vix,setVix]=useState<{value:number;change:number|null;quoteTime:string|null;source:string}|null>(null);
+  const [vixError,setVixError]=useState("");
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{const response=await fetch("/api/market/vix",{signal:controller.signal});const result=await response.json();if(!response.ok||result.status!=="ok")throw new Error(result.error||"VIX 暫無資料");if(!controller.signal.aborted){setVix(result);setVixError("");}}
+      catch(e){if(!controller.signal.aborted)setVixError(e instanceof Error?e.message:"VIX 讀取失敗");}
+    }
+    void load();const timer=setInterval(()=>{void load();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
   const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null}[]}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
@@ -451,6 +462,27 @@ export default function Home() {
           <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
           <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
 </div>
+
+      <section className="vix-panel" aria-label="全球市場恐慌程度">
+        <div className="section-heading"><div><div className="eyebrow">MARKET VOLATILITY</div><h2>全球市場恐慌指標 · VIX</h2><p>以美國 CBOE VIX 波動率指數觀察全球市場風險情緒，並非全球所有股市的綜合恐慌指數。</p></div></div>
+        <div className="vix-content">
+          <div className="vix-dial">
+            <svg viewBox="0 0 300 185" role="img" aria-label={vix?"VIX "+vix.value.toFixed(2)+"，"+(vix.value<15?"低波動":vix.value<20?"一般":vix.value<30?"偏高":vix.value<40?"高度緊張":"極度緊張"):"VIX 資料暫無法取得"}>
+              <path d="M 40 150 A 110 110 0 0 1 260 150" fill="none" stroke="#283649" strokeWidth="23" strokeLinecap="round"/>
+              {[[0,0.25,"#3abf92"],[0.25,0.5,"#a2be57"],[0.5,0.75,"#e8ae4e"],[0.75,1,"#e66b5e"]].map(([from,to,color],i)=>{const theta1=Math.PI*(1-Number(from)),theta2=Math.PI*(1-Number(to));const x1=150+110*Math.cos(theta1),y1=150-110*Math.sin(theta1),x2=150+110*Math.cos(theta2),y2=150-110*Math.sin(theta2);return <path key={i} d={`M ${x1} ${y1} A 110 110 0 0 1 ${x2} ${y2}`} fill="none" stroke={String(color)} strokeWidth="19"/>;})}
+              {vix&&<g transform={`rotate(${Math.min(1,Math.max(0,(vix.value-10)/40))*180-90} 150 150)`}><line x1="150" y1="150" x2="150" y2="51" stroke="#f7f9fc" strokeWidth="4" strokeLinecap="round"/><circle cx="150" cy="150" r="8" fill="#f7f9fc"/></g>}
+              <text x="150" y="145" fill="#f1f5f9" fontSize="26" fontWeight="700" textAnchor="middle">{vix?vix.value.toFixed(2):"—"}</text>
+              <text x="150" y="171" fill="#b8c7d9" fontSize="12" textAnchor="middle">VIX 指數</text>
+              <text x="33" y="180" fill="#a2b3c8" fontSize="11">10</text><text x="256" y="180" fill="#a2b3c8" fontSize="11">50+</text>
+            </svg>
+          </div>
+          <div className="vix-detail"><strong>{vix?(vix.value<15?"低波動":vix.value<20?"一般波動":vix.value<30?"市場緊張":vix.value<40?"高度恐慌":"極度恐慌"):"等待行情"}</strong>
+            <p>{vix?"VIX 越高代表市場預期未來約 30 天的美股波動越大；高 VIX 不一定代表股市會下跌。":"尚無可驗證的 VIX 行情。"+(vixError?" "+vixError:"")}</p>
+            <p>參考分級：低於 15 低波動、15–20 一般、20–30 緊張、30–40 高度恐慌、40 以上極度恐慌。這是本站的解讀區間，非 CBOE 官方分級。</p>
+            <small>來源：{vix?.source??"Yahoo Finance / CBOE VIX"} · {vix?.quoteTime?"報價時間 "+new Date(vix.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"報價時間待確認"} · 每 5 分鐘查詢，可能延遲</small>
+          </div>
+        </div>
+      </section>
 
       <section className="stats-grid">
         <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
