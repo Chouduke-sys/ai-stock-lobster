@@ -213,12 +213,16 @@ useEffect(()=>{
   const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null;trend5d:number[];trendDates:string[]}[]}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
+    let inFlight=false;
     async function load(){
+      if(inFlight||document.visibilityState==="hidden")return;
+      inFlight=true;
       try{const response=await fetch("/api/market/daily-analysis",{signal:controller.signal});const result=await response.json();if(response.ok&&result.status==="ok"&&!controller.signal.aborted)setDailyAnalysis(result);}
       catch{}
+      finally{inFlight=false;}
     }
     void load();
-    const timer=setInterval(()=>{void load();},300000);
+    const timer=setInterval(()=>{void load();},3000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
   const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
