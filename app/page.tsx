@@ -213,7 +213,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
-  const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;sections:{title:string;body:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
+  const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
@@ -496,7 +496,7 @@ export default function Home() {
       <section className="section morning-brief" aria-label="每日八點半台股盤前分析" style={{margin:"20px 0 26px"}}>
         <div className="section-heading"><div><div className="eyebrow">DAILY TAIWAN MARKET BRIEF · 08:30</div><h2>每日 08:30 台股盤前分析</h2><p>涵蓋美股期貨、台指期、法人買賣、融資融券、期貨籌碼、匯率、VIX、技術面、重大政策與操作情境。</p></div><span className="tag tag-amber">台灣時間 08:30 起更新</span></div>
         {morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
-        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className="morning-brief-item"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
+        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
       <section className="hero">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
