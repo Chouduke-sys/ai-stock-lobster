@@ -21,7 +21,7 @@ export async function GET(){
    const response=await fetch(pageUrl,{next:{revalidate:20},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept":"text/html,application/xhtml+xml","Accept-Language":"zh-TW,zh;q=0.9"}});
    if(!response.ok)continue;
    const html=await response.text();
-   const clean=html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi," ").replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
+   const clean=html.replace(new RegExp("<script[^>]*>[\\\\s\\\\S]*?</script>","gi")," ").replace(new RegExp("<style[^>]*>[\\\\s\\\\S]*?</style>","gi")," ").replace(new RegExp("<[^>]*>","g")," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
    if(!clean.includes("台指期近一"))continue;
    const header=clean.match(/(?:收盤|盤中|即時|更新)\\s*[|｜]?\\s*(20\\d{2})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})\\s*(\\d{1,2}):(\\d{2})(?:\\s*更新)?/);
    const dated=header??clean.match(/(?:資料時間|更新時間)\\s*[:：]?\\s*(20\\d{2})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})\\s*(\\d{1,2}):(\\d{2})/);
