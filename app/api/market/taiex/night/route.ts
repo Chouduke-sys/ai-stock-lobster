@@ -14,24 +14,27 @@ export async function GET(){
  const now=new Date();
  if(!session(now))return NextResponse.json({status:"closed",error:"目前非台指期夜盤交易時段（週一至週五 15:00～次日 05:00，休市日除外）",isRealtime:false},{status:409,headers:{"Cache-Control":"no-store"}});
 
- // Yahoo 股市台指期近一（WTX&）作為公開行情備援；只回傳可驗證的報價與時間。
- try{
-  const response=await fetch("https://tw.stock.yahoo.com/future/WTX%26",{cache:"no-store",signal:AbortSignal.timeout(5500),headers:{"User-Agent":"Mozilla/5.0 (compatible; AIStockLobster/1.0)","Accept":"text/html"}});
-  if(response.ok){
+ // Yahoo 台指期近一 WTX&：讀取公開 HTML 的「成交」及頁首「更新」時間。
+ // 原站可能快取或阻擋伺服器請求；不把舊資料冒充即時行情。
+ for(const pageUrl of ["https://tw.finance.yahoo.com/future/WTX%26","https://tw.stock.yahoo.com/quote/WTX%26","https://tw.stock.yahoo.com/future/WTX%26"]){
+  try{
+   const response=await fetch(pageUrl,{next:{revalidate:20},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept":"text/html,application/xhtml+xml","Accept-Language":"zh-TW,zh;q=0.9"}});
+   if(!response.ok)continue;
    const html=await response.text();
-   const text=html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ");
-   const rawPrice=text.match(/(?:成交|成交價|最新成交)\s*([0-9,]+(?:\.[0-9]+)?)/);
-   const rawDate=text.match(/(?:資料時間|更新時間|更新)\s*[:：|]?\s*(20\d{2})[\/.-](\d{1,2})[\/.-](\d{1,2})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-   if(rawPrice&&rawDate){
-    const price=Number(rawPrice[1].replace(/,/g,""));
-    const timestamp=new Date(Date.UTC(Number(rawDate[1]),Number(rawDate[2])-1,Number(rawDate[3]),Number(rawDate[4])-8,Number(rawDate[5]),Number(rawDate[6]??0)));
-    const age=Math.round((now.getTime()-timestamp.getTime())/1000);
-    if(price>0&&Number.isFinite(age)&&age>=-60&&age<=1800){
-     return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,contract:"近一",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁，可能延遲）",isRealtime:age<=30},{headers:{"Cache-Control":"no-store"}});
-    }
-   }
-  }
- }catch{}
+   const clean=html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi," ").replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
+   if(!clean.includes("台指期近一"))continue;
+   const header=clean.match(/(?:收盤|盤中|即時|更新)\\s*[|｜]?\\s*(20\\d{2})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})\\s*(\\d{1,2}):(\\d{2})(?:\\s*更新)?/);
+   const dated=header??clean.match(/(?:資料時間|更新時間)\\s*[:：]?\\s*(20\\d{2})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})\\s*(\\d{1,2}):(\\d{2})/);
+   const quoteArea=clean.split(/台指期近一(?:即時行情)?/).slice(1).join(" ");
+   const match=quoteArea.match(/(?:^|\\s)成交\\s*([0-9,]+(?:\\.[0-9]+)?)/)??clean.match(/(?:^|\\s)成交\\s*([0-9,]+(?:\\.[0-9]+)?)/);
+   if(!dated||!match)continue;
+   const price=Number(match[1].replace(/,/g,""));
+   const timestamp=new Date(Date.UTC(+dated[1],+dated[2]-1,+dated[3],+dated[4]-8,+dated[5]));
+   const age=Math.round((now.getTime()-timestamp.getTime())/1000);
+   if(!Number.isFinite(price)||price<=0||!Number.isFinite(age)||age< -90||age>3600)continue;
+   return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,contract:"近一",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁；非交易所授權即時源）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
+  }catch{}
+ }
  const feeds=[
   {name:"主要授權行情",url:process.env.TAIFEX_NIGHT_QUOTE_URL,key:process.env.TAIFEX_NIGHT_API_KEY},
   {name:"富途行情橋接",url:process.env.FUTU_NIGHT_QUOTE_URL,key:process.env.FUTU_NIGHT_API_KEY},
