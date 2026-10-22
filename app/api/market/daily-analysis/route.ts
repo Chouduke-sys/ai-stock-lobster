@@ -7,7 +7,7 @@ async function getQuote(label:string,symbol:string):Promise<Quote>{
  const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
   const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=5d";
-  const response=await fetch(url,{next:{revalidate:300},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
+  const response=await fetch(url,{next:{revalidate:15},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
   if(!response.ok)return empty;
   const body=await response.json() as ChartResponse;
   const result=body.chart?.result?.[0];
@@ -30,5 +30,5 @@ export async function GET(){
  const asia=jp.changePct===null||kr.changePct===null?"日韓股最新漲跌資料尚未齊全。":jp.changePct>0&&kr.changePct>0?"日韓股同步上漲，亞洲科技與風險性資產情緒偏正向。":jp.changePct<0&&kr.changePct<0?"日韓股同步下跌，需警惕亞洲資金風險偏好轉弱。":"日韓股走勢分歧，不能單憑單一市場判斷台股方向。";
  const currency=fx.changePct===null?"美元／新台幣匯價暫不可用，無法判定新台幣升貶。":fx.changePct>0?"美元／新台幣報價上升，代表新台幣相對美元走貶；出口商換匯可能受惠，但也須留意外資匯出壓力。":fx.changePct<0?"美元／新台幣報價下降，代表新台幣相對美元升值；有利進口成本，但出口商美元營收換算可能承壓。":"美元／新台幣匯率變動有限，仍須觀察外資流向。";
  const risk="觀察美國科技股及費半、日韓半導體族群、美元／新台幣方向與國際油價。盤中再以台股成交量、台積電及電子族群強弱確認，勿僅依單一指標追價。";
- return NextResponse.json({status:"ok",date:twDate,generatedAt:new Date().toISOString(),quotes:[us,semi,jp,kr,fx,oil],marketView,asia,currency,risk,method:"根據可取得的市場漲跌與匯率方向自動產生條件式分析；非投顧建議，並非新聞全文摘要。",source:"Yahoo Finance Chart（非官方）"},{headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
+ return NextResponse.json({status:"ok",date:twDate,generatedAt:new Date().toISOString(),quotes:[us,semi,jp,kr,fx,oil],marketView,asia,currency,risk,method:"根據可取得的市場漲跌與匯率方向自動產生條件式分析；非投顧建議，並非新聞全文摘要。",source:"Yahoo Finance Chart（非官方）"},{headers:{"Cache-Control":"public, s-maxage=15, stale-while-revalidate=15"}});
 }
