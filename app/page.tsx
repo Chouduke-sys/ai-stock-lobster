@@ -4,6 +4,7 @@ import lobsterLogo from "../ai_stock_lobster_logo.png";
 import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
+import { signIn, signOut } from "next-auth/react";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
@@ -505,9 +506,9 @@ useEffect(()=>{
       {showLogin && <section className="modal-card">
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
         <h2>AI股市龍蝦會員</h2>
-        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。</p><button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signout?callbackUrl=%2F";}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
-        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{window.location.href="/api/auth/signin/google?callbackUrl=%2F";}}>使用 Google 登入</button>}
-        {loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signin/apple?callbackUrl=%2F";}}>使用 Apple ID 登入</button>}
+        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
+        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}
+        {loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}
         {!loginProviders.google&&!loginProviders.apple&&<p>登入服務尚未完成設定，管理員需在 Vercel 設定 Google／Apple OAuth 金鑰。</p>}</>}
       </section>}
 
@@ -517,7 +518,7 @@ useEffect(()=>{
           <div className="morning-brief-grid morning-brief-preview-grid" aria-hidden="true">
             {["美股與期貨","外資與投信","融資融券","期貨與選擇權","匯率與利率","VIX 市場情緒","技術面與量能","重大政策與科技","今日盤前小總結"].map((title,i)=><article className="morning-brief-item morning-brief-preview-card" key={title}><h3>{String(i+1).padStart(2,"0")}　{title}</h3><div className="morning-brief-skeleton-line"/><div className="morning-brief-skeleton-line short"/><span className="morning-brief-skeleton-badge">會員專屬分析</span></article>)}
           </div>
-          <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{window.location.href="/api/auth/signin/google?callbackUrl=%2F";}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signin/apple?callbackUrl=%2F";}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
+          <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
         </div>}
         {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
         {member&&morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
