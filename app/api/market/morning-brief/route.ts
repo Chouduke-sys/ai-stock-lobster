@@ -38,16 +38,22 @@ export async function GET(){
  const flow=twse&&typeof twse==="object"?twse as {date?:string;data?:string[][];fields?:string[]}:null;
  const flowRows=Array.isArray(flow?.data)?flow!.data!.slice(0,8).map(row=>row.join("／")).filter(Boolean):[];
  const title=news.match(/<item>[\s\S]*?<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g,"").replace(/<[^>]*>/g,"").replace(/&amp;/g,"&")??null;
+ const mood=(score:number|null)=>score===null?"neutral":score>0?"bullish":score<0?"bearish":"neutral";
+ const scoreOf=(q:Q|undefined,invert=false)=>q?.changePct==null?null:Math.abs(q.changePct)<0.05?0:(q.changePct>0?1:-1)*(invert?-1:1);
+ const abroadScore=signals.length?positive>negative?1:negative>positive?-1:0:null;
+ const fxScore=scoreOf(fx,true);
+ const vixScore=vix?.value==null?null:vix.value>=30?-1:vix.value>=25?-1:vix.value<15?1:0;
+ const compact=(items:string[])=>items.join("；")+"。";
  const sections=[
-  {title:"海外股市與台指期盤前氣氛",body:"標普500期貨 "+pct(us)+"、那斯達克100期貨 "+pct(tech)+"、費城半導體 "+pct(semi)+"。"+stance+"。台指期夜盤若無授權有效報價，不以美股期貨冒充台指期。"},
-  {title:"外資、投信與法人籌碼",body:flowRows.length?"證交所最近可取得的三大法人彙總（"+(flow?.date??"日期未明")+"）："+flowRows.slice(0,4).join("；")+"。此為已公布資料，非當日盤前即時買賣。":"證交所法人彙總暫無可解析資料；不推估外資或投信買超。開盤後應觀察台積電、電子權值與期貨大額交易。"},
-  {title:"融資、融券與槓桿風險",body:"本次資料源尚未提供可核對的最新融資融券餘額及變化，因此不判定散戶加碼或減碼。若融資餘額創高、指數跌破均線，需提高風險控管。"},
-  {title:"期貨未平倉與選擇權籌碼",body:"尚未取得可核對的外資台指期淨未平倉、選擇權 Put/Call Ratio 及結算部位；不以傳聞口數代替官方數據。留意結算日、期現貨價差與跳空缺口。"},
-  {title:"新台幣、美元與利率",body:"美元／新台幣最近報價變動 "+pct(fx)+"，美元指數 "+pct(by("DX-Y.NYB"))+"，美國10年公債殖利率指標變動 "+pct(by("^TNX"))+"。匯率走貶可能加重外資匯出疑慮，仍須搭配實際資金流確認。"},
-  {title:"市場恐慌與波動風險",body:vix?.value!=null?"VIX 最新可取得報價 "+vix.value.toFixed(2)+"，變動 "+pct(vix)+"。VIX 是未來30天美股預期波動率，不能直接當作台股漲跌預測。":"VIX 報價暫無法核對，暫不判定恐慌程度。"},
-  {title:"技術面、成交量與關鍵觀察",body:"盤前觀察昨日高低點、5日／10日／20日均線、開盤前30分鐘量能與是否站穩開盤價。本站目前沒有可驗證的當日完整均線、台指期成交量與支撐壓力數字，因此不提供假精確點位。"},
-  {title:"政策、重要人士與科技產業",body:title?"近期可取得的相關新聞標題："+title+"。請至重要人士快訊核對來源與發布時間，勿將標題當成官方發言逐字稿。":"暫無可驗證的近期政策標題；關注川普關稅政策、聯準會利率訊號、台灣半導體與AI供應鏈消息。"},
-  {title:"盤前操作結論",body:stance+"。在匯率、法人籌碼與量能未同步確認前，維持中性觀察；若開盤量增且領漲族群擴散，再提高多方信心。高槓桿部位應先設定停損及資金上限。"}
+  {title:"美股與期貨",body:compact(["標普期 "+pct(us),"那指期 "+pct(tech),"費半 "+pct(semi)]),sentiment:mood(abroadScore),verdict:abroadScore===null?"待確認":abroadScore>0?"外圍偏多":abroadScore<0?"外圍偏空":"多空分歧"},
+  {title:"外資與投信",body:flowRows.length?"最新法人資料日期 "+(flow?.date??"待確認")+"；請核對淨買賣超數字。":"法人買賣超暫無可靠數字。",sentiment:"neutral",verdict:"籌碼待確認"},
+  {title:"融資融券",body:"最新融資增減尚未接入，無法判斷散戶槓桿變化。",sentiment:"neutral",verdict:"數據不足"},
+  {title:"期貨與選擇權",body:"外資期貨未平倉、Put/Call 比尚無有效數字。",sentiment:"neutral",verdict:"籌碼待確認"},
+  {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
+  {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
+  {title:"技術面與量能",body:"開盤先看能否站穩開盤價、量能是否放大及5日線位置。",sentiment:"neutral",verdict:"等開盤確認"},
+  {title:"重大政策與科技",body:title?"焦點新聞："+title.slice(0,85)+(title.length>85?"…":""):"關注聯準會、川普政策與AI供應鏈；暫無可核對重大標題。",sentiment:"neutral",verdict:"事件影響待確認"},
+  {title:"今日盤前小總結",body:stance+"。優先確認開盤量價、台幣與法人方向；不追高，槓桿部位嚴守風控。",sentiment:mood(abroadScore),verdict:abroadScore===null?"資訊不足":abroadScore>0?"偏多觀察":abroadScore<0?"偏空謹慎":"中性觀望"}
  ];
  return NextResponse.json({status:"ok",reportDate,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,source:"Yahoo Finance / TWSE / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
 }
