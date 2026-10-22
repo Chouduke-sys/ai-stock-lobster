@@ -103,6 +103,24 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  </div>;
 }
 
+function vixSentiment(v:number){
+ if(v<12)return {label:"極度平靜／偏樂觀",detail:"預期波動極低，風險偏好可能較強，但也要留意市場過度自滿。",color:"#43c6a4"};
+ if(v<15)return {label:"平靜／偏樂觀",detail:"市場預期波動偏低，整體情緒相對穩定。",color:"#7ed6a4"};
+ if(v<20)return {label:"中性／正常波動",detail:"市場處於一般波動區間，沒有明顯的恐慌訊號。",color:"#a9c866"};
+ if(v<25)return {label:"謹慎／輕度緊張",detail:"預期波動升高，投資人開始提高避險意識。",color:"#e9bd5a"};
+ if(v<30)return {label:"警戒／明顯緊張",detail:"市場對不確定性的擔憂上升，短線震盪風險較高。",color:"#f1a45c"};
+ if(v<40)return {label:"恐慌／高度避險",detail:"預期波動明顯偏高，市場避險需求通常較強。",color:"#ed7968"};
+ return {label:"極度恐慌／劇烈波動",detail:"市場預期劇烈波動，應注意流動性與槓桿風險。",color:"#e65d73"};
+}
+function UsFuturesChart({points}:{points:{time:string;value:number}[]}){
+ const valid=points.filter(p=>Number.isFinite(p.value)&&p.value>0);
+ if(valid.length<2)return <div className="us-futures-empty">等待美股期貨有效歷史報價</div>;
+ const min=Math.min(...valid.map(p=>p.value)),max=Math.max(...valid.map(p=>p.value)),pad=Math.max((max-min)*0.1,max*0.00015,1);
+ const lower=min-pad,upper=max+pad;
+ const coords=valid.map((p,i)=>((i/(valid.length-1))*100).toFixed(2)+","+((upper-p.value)/(upper-lower)*100).toFixed(2)).join(" ");
+ const up=valid[valid.length-1].value>=valid[0].value;
+ return <div className="us-futures-chart"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="美股期貨最近可取得的五分鐘走勢">{[0,25,50,75,100].map(y=><line key={y} x1="0" y1={y} x2="100" y2={y} stroke="#33455c" strokeWidth=".4" strokeDasharray="2 3" vectorEffect="non-scaling-stroke"/>)}<polyline points={coords} stroke={up?"#fb7969":"#42c4a5"} strokeWidth="2" fill="none" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/></svg><div className="us-futures-axis"><span>{formatPrice(upper)}</span><span>{formatPrice(lower)}</span></div></div>;
+}
 function MarketMiniTrend({values,label}:{values:number[];label:string}){
  const valid=values.filter(v=>typeof v==="number"&&Number.isFinite(v)&&v>0);
  if(valid.length<2)return <div className="market-mini-trend missing">近五日走勢待更新</div>;
@@ -120,6 +138,9 @@ export default function Home() {
   const [investor, setInvestor] = useState("all");
   const [vix,setVix]=useState<{value:number;change:number|null;quoteTime:string|null;source:string}|null>(null);
   const [vixError,setVixError]=useState("");
+  const [usFutures,setUsFutures]=useState<{status:string;name:string;symbol:string;price:number;change:number|null;quoteTime:string|null;points:{time:string;value:number}[];source:string}|null>(null);
+  const [usFuturesError,setUsFuturesError]=useState("");
+  const [clockTick,setClockTick]=useState(0);
   useEffect(()=>{
     const controller=new AbortController();
     async function load(){
@@ -127,6 +148,23 @@ export default function Home() {
       catch(e){if(!controller.signal.aborted)setVixError(e instanceof Error?e.message:"VIX 讀取失敗");}
     }
     void load();const timer=setInterval(()=>{void load();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+  useEffect(()=>{
+    const timer=setInterval(()=>setClockTick(v=>v+1),30000);
+    return ()=>clearInterval(timer);
+  },[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{
+        const response=await fetch("/api/market/us-futures",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"美股期貨暫無行情");
+        if(!controller.signal.aborted){setUsFutures(data);setUsFuturesError("");}
+      }catch(e){if(!controller.signal.aborted)setUsFuturesError(e instanceof Error?e.message:"美股期貨暫無行情");}
+    }
+    void load();const timer=setInterval(()=>{void load();},60000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
   const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null;trend5d:number[];trendDates:string[]}[]}|null>(null);
@@ -386,6 +424,8 @@ export default function Home() {
     setMessage("");
   }
 
+  const showTaiwanNight=isNightTradingNow();
+  const vixMood=vix?vixSentiment(vix.value):null;
   const currentIndexDay=parts(new Date().toISOString()).date;
   const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   return (
@@ -472,9 +512,11 @@ export default function Home() {
           </div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
           <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前取得 {indexChartPoints.length} 筆。優先載入當日分鐘歷史，再合併盤中有效取樣；行情可能延遲。</p>
-          <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
+          {showTaiwanNight?<><div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
-          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，縱軸為實際點數；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
+          <p className="footnote">台灣時間 15:00～次日 05:00（交易日），縱軸為台指期點數；目前累積 {nightPoints.length} 筆。{nightError||"台指期行情依供應商更新，可能延遲。"}</p>
+          {!nightPoints.length&&usFutures&&<div className="night-backup"><strong>台指期報價暫無資料 · 改顯示美股期貨參考</strong><div>{usFutures.name}：{formatPrice(usFutures.price)} 點</div><UsFuturesChart points={usFutures.points??[]}/><small>此為美股期貨，不是台指期。{usFutures.source}</small></div>}</>:<div className="night-backup"><strong>台指期夜盤尚未開盤 · 美股期貨行情</strong>
+          {usFutures?<><div className="us-futures-price">{usFutures.name}：{formatPrice(usFutures.price)} 點 {usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""}</div><UsFuturesChart points={usFutures.points??[]}/><p className="footnote">最近報價：{usFutures.quoteTime?new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"未提供"} · {usFutures.source} · 每分鐘查詢，非保證即時。美股期貨休市時顯示最近報價。</p></>:<p className="footnote">{usFuturesError||"正在讀取美股期貨行情"}；無可用報價時不會填入虛構數字。</p>}</div>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
         </div>
@@ -503,10 +545,10 @@ export default function Home() {
               <text x="33" y="180" fill="#a2b3c8" fontSize="11">10</text><text x="256" y="180" fill="#a2b3c8" fontSize="11">50+</text>
             </svg>
           </div>
-          <div className="vix-detail"><strong>{vix?(vix.value<15?"低波動":vix.value<20?"一般波動":vix.value<30?"市場緊張":vix.value<40?"高度恐慌":"極度恐慌"):"等待行情"}</strong>
+          <div className="vix-detail"><strong style={{color:vixMood?.color}}>{vixMood?.label??"等待行情"}</strong><p className="vix-conclusion">{vixMood?.detail??"尚未取得可驗證的 VIX 指數，暫不判斷市場情緒。"}</p>
             <p>{vix?"VIX 越高代表市場預期未來約 30 天的美股波動越大；高 VIX 不一定代表股市會下跌。":"尚無可驗證的 VIX 行情。"+(vixError?" "+vixError:"")}</p>
-            <p>參考分級：低於 15 低波動、15–20 一般、20–30 緊張、30–40 高度恐慌、40 以上極度恐慌。這是本站的解讀區間，非 CBOE 官方分級。</p>
-            <small>來源：{vix?.source??"Yahoo Finance / CBOE VIX"} · {vix?.quoteTime?"報價時間 "+new Date(vix.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"報價時間待確認"} · 每 5 分鐘查詢，可能延遲</small>
+            <p>參考分級：低於 12 極度平靜、12–15 平靜、15–20 中性、20–25 謹慎、25–30 警戒、30–40 恐慌、40 以上極度恐慌。這是本站的解讀區間，非 CBOE 官方分級。</p>
+            <small>來源：{vix?.source??"Yahoo Finance / CBOE VIX"} · {vix?.quoteTime?"報價時間 "+new Date(vix.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"報價時間待確認"} · 每 5 分鐘查詢，可能延遲；非逐秒即時</small>
           </div>
         </div>
       </section>
