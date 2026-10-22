@@ -203,3 +203,18 @@
 .morning-brief-item.morning-brief-bullish{border-left:3px solid #38bb87}
 .morning-brief-item.morning-brief-bearish{border-left:3px solid #ef6676}
 .morning-brief-item.morning-brief-neutral{border-left:3px solid #6e8099}
+
+/* Equal-width news / market columns, without large unused left gutter */
+@media(min-width:901px){
+ .hero.hero-balanced{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:stretch;padding:32px 0}
+ .hero.hero-balanced>.hero-copy,.hero.hero-balanced>.hero-visual{width:100%;min-width:0;max-width:none}
+ .hero.hero-balanced>.hero-copy{padding-top:0!important}
+ .hero.hero-balanced>.hero-visual{align-self:stretch}
+ .hero.hero-balanced .holdings-panel{margin-top:20px}
+}
+.volume-leaders-panel .holdings-fund-title{font-size:21px;font-weight:800}
+.volume-leaders-panel .holdings-row{grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:13px 0;font-size:16px}
+.volume-leaders-panel .holdings-name{font-size:16px;font-weight:700;white-space:normal;overflow-wrap:anywhere}
+.volume-leaders-panel .holdings-name small{font-size:14px}
+.volume-leaders-panel .holdings-row strong{font-size:17px;white-space:nowrap}
+@media(max-width:640px){.volume-leaders-panel .holdings-row{font-size:15px}.volume-leaders-panel .holdings-name{font-size:15px}.volume-leaders-panel .holdings-row strong{font-size:16px}}
