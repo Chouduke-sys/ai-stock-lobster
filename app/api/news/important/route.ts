@@ -17,12 +17,15 @@ export async function GET(){
    const res=await fetch(url,{next:{revalidate:180},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0"}});
    if(!res.ok)return [] as Item[];
    const xml=await res.text();
-   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,12).flatMap(m=>{
-    const title=tag(m[1],"title"),link=tag(m[1],"link"),pub=tag(m[1],"pubDate"),source=tag(m[1],"source");
-    if(!title||!/^https:\/\//.test(link))return [];
+   const items:Item[]=[];
+   const matches=Array.from(xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/g)).slice(0,12);
+   for(const match of matches){
+    const title=tag(match[1],"title"),link=tag(match[1],"link"),pub=tag(match[1],"pubDate"),source=tag(match[1],"source");
+    if(!title||!/^https:\\/\\//.test(link))continue;
     const date=new Date(pub);
-    return [{title,url:link,publishedAt:Number.isFinite(date.getTime())?date.toISOString():null,source:source||"Google 新聞 RSS",summary:null,imageUrl:null}];
-   });
+    items.push({title,url:link,publishedAt:Number.isFinite(date.getTime())?date.toISOString():null,source:source||"Google 新聞 RSS",summary:null,imageUrl:null});
+   }
+   return items;;
   }catch{return [] as Item[];}
  }));
  const seen=new Set<string>();
