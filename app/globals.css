@@ -236,3 +236,10 @@
 .morning-brief-preview-overlay h3{font-size:24px;color:#f6f8fc;margin:0}
 .morning-brief-preview-overlay p{font-size:15px;color:#d1deee;line-height:1.7;margin:0}
 @media(max-width:640px){.morning-brief-preview{min-height:490px}.morning-brief-preview-overlay h3{font-size:20px}.morning-brief-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Full-height index charts: preserve right-side point axis and avoid clipping text. */
+.sparkline:has(.index-points-chart){height:auto;min-height:0;overflow:visible;background:transparent;border-radius:0;margin:12px 0 16px}
+.sparkline .index-points-chart{width:100%;min-width:0}
+.index-points-main{grid-template-columns:minmax(0,1fr) minmax(78px,auto)}
+.index-points-y{min-width:78px;white-space:nowrap;overflow:visible}
+.index-points-title{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
