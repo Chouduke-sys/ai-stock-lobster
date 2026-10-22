@@ -177,9 +177,9 @@ export default function Home() {
         if(!controller.signal.aborted){setMorningBrief(data);setMorningBriefError("");}
       }catch(e){if(!controller.signal.aborted)setMorningBriefError(e instanceof Error?e.message:"盤前分析暫不可用");}
     }
-    void load();const timer=setInterval(()=>{void load();},60000);
+    if(!memberLoading&&member)void load();const timer=setInterval(()=>{if(member)void load();},60000);
     return ()=>{controller.abort();clearInterval(timer);};
-  },[]);
+  },[member,memberLoading]);
   useEffect(()=>{
     const controller=new AbortController();
     async function load(){
@@ -215,6 +215,9 @@ export default function Home() {
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
+  const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
+  const [memberLoading,setMemberLoading]=useState(true);
+  const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean}>({});
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
@@ -481,21 +484,24 @@ export default function Home() {
           <span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE · TAIWAN</small></span>
         </a>
         <nav className="nav-links"><a href="#rankings">法人排行</a><a href="#charts">個股走勢</a><a href="#global">全球資訊</a><a href="#membership">會員方案</a></nav>
-        <button className="btn btn-outline login-btn" onClick={() => setShowLogin(!showLogin)}><LockKeyhole size={16}/> 會員登入</button>
+        <button className="btn btn-outline login-btn" onClick={() => setShowLogin(!showLogin)}><LockKeyhole size={16}/> {member?"會員："+(member.name||member.email||"已登入"):"會員登入"}</button>
         <button className="icon-btn mobile-menu" aria-label="開啟登入面板" onClick={() => setShowLogin(!showLogin)}><Menu size={20}/></button>
       </header>
 
       {showLogin && <section className="modal-card">
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
-        <h2>會員登入</h2><p>此專案目前尚未串接真實會員驗證。</p>
-        <label>電子郵件<input type="email" placeholder="you@example.com" autoComplete="email"/></label>
-        <label>密碼<input type="password" placeholder="輸入密碼" autoComplete="current-password"/></label>
-        <button className="btn btn-primary" onClick={() => setMessage("登入功能尚未啟用：請先設定正式驗證服務。")}>登入</button>
+        <h2>AI股市龍蝦會員</h2>
+        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。</p><button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signout?callbackUrl=%2F";}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
+        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{window.location.href="/api/auth/signin/google?callbackUrl=%2F";}}>使用 Google 登入</button>}
+        {loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signin/apple?callbackUrl=%2F";}}>使用 Apple ID 登入</button>}
+        {!loginProviders.google&&!loginProviders.apple&&<p>登入服務尚未完成設定，管理員需在 Vercel 設定 Google／Apple OAuth 金鑰。</p>}</>}
       </section>}
 
       <section className="section morning-brief" aria-label="每日八點半台股盤前分析" style={{margin:"20px 0 26px"}}>
         <div className="section-heading"><div><div className="eyebrow">DAILY TAIWAN MARKET BRIEF · 08:30</div><h2>每日 08:30 台股盤前分析</h2><p>涵蓋美股期貨、台指期、法人買賣、融資融券、期貨籌碼、匯率、VIX、技術面、重大政策與操作情境。</p></div><span className="tag tag-amber">台灣時間 08:30 起更新</span></div>
-        {morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
+        {!memberLoading&&!member&&<div className="morning-brief-lock"><LockKeyhole size={34}/><h3>會員限定 · 解鎖完整盤前分析</h3><p>登入後查看九大盤前指標、利多利空評估與今日盤前小總結。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{window.location.href="/api/auth/signin/google?callbackUrl=%2F";}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{window.location.href="/api/auth/signin/apple?callbackUrl=%2F";}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>會員登入服務尚未設定完成，請稍後再試。</p>}</div></div>}
+        {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
+        {member&&morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
         <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
       <section className="hero hero-balanced">
@@ -687,4 +693,17 @@ export default function Home() {
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
-}
+}  useEffect(()=>{
+    let active=true;
+    async function loadMember(){
+      try{
+        const [sessionResponse,providersResponse]=await Promise.all([fetch("/api/auth/session",{cache:"no-store"}),fetch("/api/auth/providers",{cache:"no-store"})]);
+        const session=await sessionResponse.json();
+        const providers=providersResponse.ok?await providersResponse.json():{};
+        if(active){setMember(session?.user??null);setLoginProviders({google:Boolean(providers?.google),apple:Boolean(providers?.apple)});}
+      }catch{if(active)setMember(null);}
+      finally{if(active)setMemberLoading(false);}
+    }
+    void loadMember();return ()=>{active=false;};
+  },[]);
+
