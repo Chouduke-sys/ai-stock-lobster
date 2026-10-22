@@ -498,7 +498,7 @@ export default function Home() {
         {morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
         <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
-      <section className="hero">
+      <section className="hero hero-balanced">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
           <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 多來源重要新聞</div>
           <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
@@ -571,10 +571,10 @@ export default function Home() {
       <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
         <div className="section-heading"><div><div className="eyebrow">VOLUME & INSTITUTIONAL FLOW</div><h2>當日量能熱門股／法人積極買超</h2><p>以成交金額衡量當日市場關注度；以三大法人買超衡量機構買盤。大戶連續買進需要持股分級或連續多日資料，不能直接由法人單日買超推定。</p></div></div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
-          <div className="holdings-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
+          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
           {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
           {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
-          <div className="holdings-panel"><div className="holdings-fund-title">三大法人買超 Top 10</div><p className="holdings-date">資料日期：{aiFlow?.institutionalDate??"待確認"} · 買超股數，不等於大戶連買</p>
+          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">三大法人買超 Top 10</div><p className="holdings-date">資料日期：{aiFlow?.institutionalDate??"待確認"} · 買超股數，不等於大戶連買</p>
           {aiFlow?.buyers?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>+{(x.shares/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})} 張</strong></div>)}
           {!aiFlow?.buyers?.length&&<p className="footnote">{aiFlowError||"法人當日資料尚未公布或未取得。"}</p>}</div>
         </div>
