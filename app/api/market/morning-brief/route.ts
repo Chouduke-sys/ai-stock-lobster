@@ -33,7 +33,7 @@ async function yahooMargin():Promise<MarginData|null>{
   const html=await res.text();
   const plain=html.replace(new RegExp("<[^>]+>","g")," ").replace(new RegExp("&nbsp;|&#160;","g")," ").replace(/\s+/g," ");
   const pattern=new RegExp("(20[0-9]{2})/([0-9]{1,2})/([0-9]{1,2})\\\\s+([+-]?[0-9,]+(?:\\\\.[0-9]+)?)\\\\s+([0-9,]+(?:\\\\.[0-9]+)?)\\\\s+([+-]?[0-9,]+)\\\\s+([0-9,]+)\\\\s+([0-9.]+)%","g");
-  const matches=[...plain.matchAll(pattern)];
+  const matches:Array<RegExpExecArray>=[];let match:RegExpExecArray|null;while((match=pattern.exec(plain))!==null){matches.push(match);if(match[0].length===0)pattern.lastIndex++;}
   if(!matches.length)return null;
   const m=matches.sort((a,b)=>b[1].localeCompare(a[1])||Number(b[2])-Number(a[2])||Number(b[3])-Number(a[3]))[0];
   const number=(v:string)=>Number(v.replace(/,/g,""));
