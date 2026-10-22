@@ -193,3 +193,13 @@
 .morning-brief-item h3{margin:0 0 10px;font-size:16px;color:#f1c17f;line-height:1.5}
 .morning-brief-item p{margin:0;font-size:14px;color:#d4e0ee;line-height:1.9;overflow-wrap:anywhere}
 @media(max-width:640px){.morning-brief{padding:15px}.morning-brief-grid{grid-template-columns:minmax(0,1fr)}.morning-brief-item{padding:14px}}
+
+.morning-brief-item-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.morning-brief-item-heading h3{margin:0;flex:1;min-width:140px}
+.morning-brief-verdict{display:inline-flex;align-items:center;white-space:normal;text-align:center;font-size:12px;font-weight:800;border-radius:8px;padding:6px 10px;line-height:1.4}
+.morning-brief-verdict.bullish{color:#5be1ad;background:rgba(35,153,106,.16);border:1px solid rgba(91,225,173,.38)}
+.morning-brief-verdict.bearish{color:#ff828d;background:rgba(207,61,82,.16);border:1px solid rgba(255,130,141,.38)}
+.morning-brief-verdict.neutral{color:#c3cede;background:rgba(130,147,172,.14);border:1px solid rgba(130,147,172,.35)}
+.morning-brief-item.morning-brief-bullish{border-left:3px solid #38bb87}
+.morning-brief-item.morning-brief-bearish{border-left:3px solid #ef6676}
+.morning-brief-item.morning-brief-neutral{border-left:3px solid #6e8099}
