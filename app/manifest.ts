@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import lobsterIcon from "../ai_stock_lobster_icon.png";
 export default function manifest(): MetadataRoute.Manifest {
  return {
   name:"AI股市龍蝦｜台股與全球市場",
@@ -11,6 +12,6 @@ export default function manifest(): MetadataRoute.Manifest {
   theme_color:"#080f1d",
   lang:"zh-TW",
   orientation:"portrait-primary",
-  icons:[{src:"/icon",sizes:"any",type:"image/png",purpose:"any"},{src:"/apple-icon",sizes:"any",type:"image/png",purpose:"any"}]
+  icons:[{src:lobsterIcon.src,sizes:"any",type:"image/png",purpose:"any"},{src:lobsterIcon.src,sizes:"any",type:"image/png",purpose:"any"}]
  };
 }
