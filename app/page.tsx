@@ -104,6 +104,9 @@ export default function Home() {
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
   const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
+  const [stockNews,setStockNews]=useState<{title:string;url:string;source:string;publishedAt:string|null}[]>([]);
+  const [stockNewsLoading,setStockNewsLoading]=useState(false);
+  const [stockNewsError,setStockNewsError]=useState("");
   const [symbol, setSymbol] = useState("2330");
   const minuteHistory=useIntradayHistory(symbol);
   const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
@@ -186,6 +189,25 @@ export default function Home() {
     void loadFive();
     return ()=>controller.abort();
   },[market,investor,rankSide,fiveMode]);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function loadStockNews(){
+      setStockNewsLoading(true);setStockNewsError("");
+      try{
+        const params=new URLSearchParams({symbol});
+        if(stockData?.symbol===symbol&&stockData.name)params.set("name",stockData.name);
+        const response=await fetch("/api/stocks/news?"+params.toString(),{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"新聞讀取失敗");
+        if(!controller.signal.aborted)setStockNews(Array.isArray(data.news)?data.news:[]);
+      }catch(e){if(!controller.signal.aborted){setStockNewsError(e instanceof Error?e.message:"新聞讀取失敗");setStockNews([]);}}
+      finally{if(!controller.signal.aborted)setStockNewsLoading(false);}
+    }
+    void loadStockNews();
+    const timer=setInterval(()=>{void loadStockNews();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[symbol,stockData?.symbol,stockData?.name]);
 
   useEffect(()=>{try{const raw=JSON.parse(localStorage.getItem("lobster-stock-intraday-"+symbol)||"[]") as IntradayPoint[];const now=parts(new Date().toISOString()).date;setStockPoints(raw.filter(x=>x.date===now&&Number.isFinite(x.price)));}catch{setStockPoints([]);}},[symbol]);
 
@@ -467,7 +489,14 @@ export default function Home() {
             <p className="footnote">來源：{stockData.dataSource}；查詢時間：{new Date(stockData.lastUpdatedAt).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}（台灣時間）。{ageLabel(stockData.delaySeconds)}，每 5 秒查詢，不保證即時；最新成功查詢：{quoteRefreshAt ? new Date(quoteRefreshAt).toLocaleTimeString("zh-TW", {timeZone:"Asia/Taipei"}) : "尚未取得"}。{quoteError ? "最新更新失敗："+quoteError+"；仍顯示前次成功報價。" : ""}</p>
           </>
         ) : <div className="chart-placeholder"><BarChart3 size={30}/><strong>{loadingQuote ? "正在讀取證交所資料…" : quoteError || "尚無行情資料"}</strong><span>目前僅支援上市股票日行情，上櫃股票與歷史 K 線尚未接通。</span></div>}
-        <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={displayedStockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">來源：{minuteHistory.source || "本機報價取樣"}。優先載入當日可取得的分鐘歷史資料，並合併本機每 5 秒查詢的有效報價；來源可能延遲或缺漏。</p></div>
+        <div className="stock-research-layout">
+          <div className="history-panel"><h3>當日股價走勢圖</h3><IntradayChart points={displayedStockPoints} reference={stockData?.quote.close!=null&&stockData.quote.change!=null?stockData.quote.close-stockData.quote.change:null}/><p className="footnote">來源：{minuteHistory.source || "本機報價取樣"}。優先載入當日可取得的分鐘歷史資料，並合併本機每 5 秒查詢的有效報價；來源可能延遲或缺漏。</p></div>
+          <aside className="stock-news-panel" aria-label="個股最新新聞">
+            <div className="stock-news-heading"><h3>{stockData?.name||symbol} · 最新消息</h3><span>近 7 天 · 每 5 分鐘更新</span></div>
+            {stockNewsLoading&&!stockNews.length?<p className="stock-news-empty">正在搜尋最新個股新聞…</p>:stockNewsError?<p className="stock-news-empty">{stockNewsError}</p>:stockNews.length?<div className="stock-news-list">{stockNews.map((article,i)=><a key={article.url+i} className="stock-news-item" href={article.url} target="_blank" rel="noopener noreferrer"><strong>{article.title}</strong><span>{article.source} · {article.publishedAt?new Date(article.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"時間未提供"}</span></a>)}</div>:<p className="stock-news-empty">近 7 天未搜尋到相關新聞。</p>}
+            <p className="footnote">來源：Google 新聞 RSS；最多顯示 30 則，依發布時間排序。新聞可能延遲、重複或遺漏，並非網路全部報導。</p>
+          </aside>
+        </div>
         </div>
         {message && <div className="notice" role="status">{message}</div>}
       </section>
