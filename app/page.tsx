@@ -222,7 +222,7 @@ useEffect(()=>{
       finally{inFlight=false;}
     }
     void load();
-    const timer=setInterval(()=>{void load();},3000);
+    const timer=setInterval(()=>{void load();},15000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
   const [stockPoints,setStockPoints]=useState<IntradayPoint[]>([]);
