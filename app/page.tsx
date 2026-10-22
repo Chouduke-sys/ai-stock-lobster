@@ -253,6 +253,22 @@ useEffect(()=>{
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [indexHistory,setIndexHistory]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
+  const [nightHistory,setNightHistory]=useState<Point[]>([]);
+  const [nightHistorySource,setNightHistorySource]=useState("");
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function refreshNightHistory(){
+      try{
+        const res=await fetch("/api/market/taiex/night-history",{signal:controller.signal});
+        const data=await res.json();
+        if(res.ok&&data.status==="ok"&&!controller.signal.aborted){setNightHistory(data.points??[]);setNightHistorySource(data.source??"");}
+      }catch{}
+    }
+    void refreshNightHistory();
+    const timer=setInterval(()=>{void refreshNightHistory();},60000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+
   useEffect(()=>{
     const controller=new AbortController();
     async function refresh(){
@@ -490,6 +506,7 @@ useEffect(()=>{
   const showTaiwanNight=isNightTradingNow();
   const vixMood=vix?vixSentiment(vix.value):null;
   const currentIndexDay=parts(new Date().toISOString()).date;
+  const nightChartPoints=Array.from(new Map<string,Point>([...nightHistory,...nightPoints].filter(p=>p.session===nightSessionKey(new Date())).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   return (
     <main className="site-shell">
@@ -585,9 +602,9 @@ useEffect(()=>{
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
           <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前取得 {indexChartPoints.length} 筆。優先載入當日分鐘歷史，再合併盤中有效取樣；行情可能延遲。</p>
           {showTaiwanNight?<><div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
-          <div className="sparkline"><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
-          <p className="footnote">台灣時間 15:00～次日 05:00（交易日），縱軸為台指期點數；目前累積 {nightPoints.length} 筆。{nightError||"台指期行情依供應商更新，可能延遲。"}</p>
-          {!nightPoints.length&&usFutures&&<div className="night-backup"><strong>台指期報價暫無資料 · 改顯示美股期貨參考</strong><div>{usFutures.name}：{formatPrice(usFutures.price)} 點</div><UsFuturesChart points={usFutures.points??[]}/><small>此為美股期貨，不是台指期。{usFutures.source}</small></div>}</>:<div className="night-backup"><strong>台指期夜盤尚未開盤 · 美股期貨行情</strong>
+          <div className="sparkline"><HourChart points={nightChartPoints} base={nightChartPoints[0]?.value??null} session="night"/></div>
+          <p className="footnote">台灣時間 15:00～次日 05:00（交易日），縱軸為台指期點數；目前累積 {nightChartPoints.length} 筆。{nightHistorySource?nightHistorySource+"；":""}{nightError||"台指期行情依供應商更新，可能延遲。"}</p>
+          {!nightChartPoints.length&&usFutures&&<div className="night-backup"><strong>台指期報價暫無資料 · 改顯示美股期貨參考</strong><div>{usFutures.name}：{formatPrice(usFutures.price)} 點</div><UsFuturesChart points={usFutures.points??[]}/><small>此為美股期貨，不是台指期。{usFutures.source}</small></div>}</>:<div className="night-backup"><strong>台指期夜盤尚未開盤 · 美股期貨行情</strong>
           {usFutures?<><div className="us-futures-price">{usFutures.name}：{formatPrice(usFutures.price)} 點 {usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""}</div><UsFuturesChart points={usFutures.points??[]}/><p className="footnote">最近報價：{usFutures.quoteTime?new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"未提供"} · {usFutures.source} · 每分鐘查詢，非保證即時。美股期貨休市時顯示最近報價。</p></>:<p className="footnote">{usFuturesError||"正在讀取美股期貨行情"}；無可用報價時不會填入虛構數字。</p>}</div>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
