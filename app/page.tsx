@@ -144,6 +144,20 @@ export default function Home() {
   const [usFutures,setUsFutures]=useState<{status:string;name:string;symbol:string;price:number;change:number|null;quoteTime:string|null;points:{time:string;value:number}[];source:string}|null>(null);
   const [usFuturesError,setUsFuturesError]=useState("");
   const [clockTick,setClockTick]=useState(0);
+useEffect(()=>{
+    let active=true;
+    async function loadMember(){
+      try{
+        const [sessionResponse,providersResponse]=await Promise.all([fetch("/api/auth/session",{cache:"no-store"}),fetch("/api/auth/providers",{cache:"no-store"})]);
+        const session=await sessionResponse.json();
+        const providers=providersResponse.ok?await providersResponse.json():{};
+        if(active){setMember(session?.user??null);setLoginProviders({google:Boolean(providers?.google),apple:Boolean(providers?.apple)});}
+      }catch{if(active)setMember(null);}
+      finally{if(active)setMemberLoading(false);}
+    }
+    void loadMember();return ()=>{active=false;};
+  },[]);
+
   useEffect(()=>{
     const controller=new AbortController();
     async function load(){
@@ -698,17 +712,4 @@ export default function Home() {
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
   );
-}  useEffect(()=>{
-    let active=true;
-    async function loadMember(){
-      try{
-        const [sessionResponse,providersResponse]=await Promise.all([fetch("/api/auth/session",{cache:"no-store"}),fetch("/api/auth/providers",{cache:"no-store"})]);
-        const session=await sessionResponse.json();
-        const providers=providersResponse.ok?await providersResponse.json():{};
-        if(active){setMember(session?.user??null);setLoginProviders({google:Boolean(providers?.google),apple:Boolean(providers?.apple)});}
-      }catch{if(active)setMember(null);}
-      finally{if(active)setMemberLoading(false);}
-    }
-    void loadMember();return ()=>{active=false;};
-  },[]);
-
+}
