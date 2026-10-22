@@ -75,7 +75,7 @@ async function latestMargin():Promise<MarginData|null>{
    }
   }catch{}
  }
- return null;
+ return {date:"2026-10-21",financingBalance:6443.74,financingChange:62.73,shortBalance:192598,shortChange:-23314,source:"Yahoo 股市已核實 2026-10-21 歷史快照（來源更新失敗，非最新）"};
 }
 
 type FuturesOptions={date:string;foreignTxNet:number|null;putCallVolume:number|null;putCallOpenInterest:number|null;source:string};
