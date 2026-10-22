@@ -87,3 +87,32 @@
 .daily-market-quote span{font-size:12px;color:#a6b8ce}
 .daily-market-quote .market-up{color:#fb725b}
 .daily-market-quote .market-down{color:#59d7a1}
+
+/* Readable daily market briefing */
+.holdings-divider~.holdings-fund-title{font-size:22px;line-height:1.5;margin-top:22px}
+.holdings-divider~.holdings-fund-title span{font-size:13px;line-height:1.7}
+.holdings-divider~.holdings-note{font-size:15px;line-height:1.9;color:#d1dbea;margin-top:13px}
+.holdings-divider~.holdings-note b{color:#f2f6fc;font-size:16px}
+.holdings-divider~.holdings-note:last-child{font-size:12px;color:#a6b7cc}
+.daily-market-grid{gap:12px;margin:17px 0}
+.daily-market-quote{padding:14px}
+.daily-market-quote small{font-size:13px}
+.daily-market-quote strong{font-size:20px}
+.daily-market-quote span{font-size:14px}
+/* Side-by-side compact stock chart and fresh news */
+.stock-research-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);gap:18px;align-items:start;margin-top:18px}
+.stock-research-layout>.history-panel{min-width:0;margin:0}
+.stock-research-layout .candle-svg{width:100%;height:auto;display:block}
+.stock-news-panel{min-width:0;border:1px solid #2b3c52;border-radius:13px;background:#101b2c;padding:17px}
+.stock-news-heading{display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.stock-news-heading h3{font-size:17px;margin:0}
+.stock-news-heading span{font-size:11px;color:#91a4bd}
+.stock-news-list{max-height:425px;overflow-y:auto;overscroll-behavior:contain}
+.stock-news-item{display:block;padding:12px 0;border-top:1px solid #2a3950}
+.stock-news-item strong{display:block;font-size:14px;line-height:1.55;color:#e7eef9;font-weight:600}
+.stock-news-item:hover strong{color:#fb927f}
+.stock-news-item span{display:block;margin-top:6px;font-size:11px;color:#91a4bd}
+.stock-news-empty{font-size:13px;color:#9eafc4;line-height:1.7}
+.stock-news-panel .footnote{line-height:1.65}
+@media(max-width:800px){.stock-research-layout{grid-template-columns:1fr}.stock-news-list{max-height:380px}}
+@media(max-width:640px){.holdings-divider~.holdings-fund-title{font-size:19px}.holdings-divider~.holdings-note{font-size:14px}.daily-market-quote strong{font-size:18px}.stock-news-panel{padding:13px}}
