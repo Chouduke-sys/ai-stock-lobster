@@ -167,6 +167,31 @@ export default function Home() {
     void load();const timer=setInterval(()=>{void load();},60000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{
+        const response=await fetch("/api/market/morning-brief",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"盤前分析暫不可用");
+        if(!controller.signal.aborted){setMorningBrief(data);setMorningBriefError("");}
+      }catch(e){if(!controller.signal.aborted)setMorningBriefError(e instanceof Error?e.message:"盤前分析暫不可用");}
+    }
+    void load();const timer=setInterval(()=>{void load();},60000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{
+        const response=await fetch("/api/news/important",{signal:controller.signal});
+        const data=await response.json();
+        if(response.ok&&data.status==="ok"&&!controller.signal.aborted)setImportantNews(data.news??[]);
+      }catch{}
+    }
+    void load();const timer=setInterval(()=>{void load();},180000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
   const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null;trend5d:number[];trendDates:string[]}[]}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
@@ -188,6 +213,8 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
+  const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;sections:{title:string;body:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
+  const [morningBriefError,setMorningBriefError]=useState("");
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
@@ -466,11 +493,16 @@ export default function Home() {
         <button className="btn btn-primary" onClick={() => setMessage("登入功能尚未啟用：請先設定正式驗證服務。")}>登入</button>
       </section>}
 
+      <section className="section morning-brief" aria-label="每日八點半台股盤前分析" style={{margin:"20px 0 26px"}}>
+        <div className="section-heading"><div><div className="eyebrow">DAILY TAIWAN MARKET BRIEF · 08:30</div><h2>每日 08:30 台股盤前分析</h2><p>涵蓋美股期貨、台指期、法人買賣、融資融券、期貨籌碼、匯率、VIX、技術面、重大政策與操作情境。</p></div><span className="tag tag-amber">台灣時間 08:30 起更新</span></div>
+        {morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
+        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className="morning-brief-item"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
+      </section>
       <section className="hero">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
-          <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 富途牛牛</div>
+          <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 多來源重要新聞</div>
           <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
-          <p style={{margin:"0 0 12px",fontSize:13}}>富途牛牛新聞搜尋 · 每 5 分鐘重新查詢 · 標題點擊閱讀原文</p><div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}><button className="btn btn-secondary" onClick={()=>setNewsTab("all")} style={{opacity:newsTab==="all"?1:.65}}>全部財經快訊</button><button className="btn btn-secondary" onClick={()=>setNewsTab("important")} style={{opacity:newsTab==="important"?1:.65}}>重要人士發言／台灣科技金融 ({importantNews.length})</button></div>
+          <p style={{margin:"0 0 12px",fontSize:13}}>一般新聞：富途牛牛；重要人士及台灣科技金融：Google 新聞彙整多家媒體 · 點擊閱讀來源</p><div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}><button className="btn btn-secondary" onClick={()=>setNewsTab("all")} style={{opacity:newsTab==="all"?1:.65}}>全部財經快訊</button><button className="btn btn-secondary" onClick={()=>setNewsTab("important")} style={{opacity:newsTab==="important"?1:.65}}>重要人士發言／台灣科技金融 ({importantNews.length})</button></div>
           {(newsTab==="all"?news:importantNews).length>0 ? <div style={{display:"grid",gap:0,maxHeight:420,overflowY:"auto",paddingRight:6}}>
             {(newsTab==="all"?news:importantNews).slice(0,12).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
               {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:92,height:68,flexShrink:0,objectFit:"cover",borderRadius:8,background:"#1e293b"}} onError={e=>{e.currentTarget.style.display="none";}}/> : <div aria-hidden="true" style={{width:92,height:68,flexShrink:0,borderRadius:8,background:"#182437",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8"}}><Newspaper size={24}/></div>}
