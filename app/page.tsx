@@ -59,7 +59,7 @@ function isTaiexSessionNow():boolean{
 }
 function nightSessionKey(date:Date):string{
  const t=parts(date.toISOString());
- if(t.hour<5)return new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10);
+ if(t.hour<15)return new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10);
  return t.date;
 }
 function isNightTradingNow():boolean{
