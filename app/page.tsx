@@ -103,6 +103,17 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  </div>;
 }
 
+function MarketMiniTrend({values,label}:{values:number[];label:string}){
+ const valid=values.filter(v=>typeof v==="number"&&Number.isFinite(v)&&v>0);
+ if(valid.length<2)return <div className="market-mini-trend missing">近五日走勢待更新</div>;
+ const min=Math.min(...valid),max=Math.max(...valid),spread=Math.max(max-min,max*0.0001);
+ const path=valid.map((v,i)=>`${(i/(valid.length-1)*116+2).toFixed(1)},${(33-(v-min)/spread*26).toFixed(1)}`).join(" ");
+ const rising=valid[valid.length-1]>=valid[0],change=(valid[valid.length-1]/valid[0]-1)*100;
+ return <div className="market-mini-trend"><svg viewBox="0 0 120 40" role="img" aria-label={label+" 最近 "+valid.length+" 個交易日收盤趨勢"} preserveAspectRatio="none">
+  <line x1="0" y1="20" x2="120" y2="20" stroke="#32445a" strokeDasharray="2 4"/>
+  <polyline points={path} fill="none" stroke={rising?"#f57563":"#45bfa4"} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+ </svg><span className={rising?"market-up":"market-down"}>{rising?"+":""}{change.toFixed(2)}% · {valid.length}日</span></div>;
+}
 export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
@@ -118,7 +129,7 @@ export default function Home() {
     void load();const timer=setInterval(()=>{void load();},300000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
-  const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null}[]}|null>(null);
+  const [dailyAnalysis,setDailyAnalysis]=useState<{date:string;generatedAt:string;source:string;marketView:string;asia:string;currency:string;risk:string;quotes:{symbol:string;label:string;value:number|null;changePct:number|null;trend5d:number[];trendDates:string[]}[]}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
     async function load(){
@@ -456,7 +467,7 @@ export default function Home() {
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
-          <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span></div>)}</div>
+          <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span><MarketMiniTrend values={q.trend5d??[]} label={q.label}/></div>)}</div>
           <p className="holdings-note"><b>日韓股影響：</b>{dailyAnalysis?.asia??"等待資料"}</p>
           <p className="holdings-note"><b>台幣升貶影響：</b>{dailyAnalysis?.currency??"等待資料"}</p>
           <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
@@ -551,15 +562,6 @@ export default function Home() {
         </div>
         </div>
         {message && <div className="notice" role="status">{message}</div>}
-      </section>
-
-      <section className="section" id="global">
-        <div className="section-heading"><div><div className="eyebrow">GLOBAL INTELLIGENCE</div><h2>全球財經資訊</h2><p>全球指數、匯率、科技產業新聞與重要事件。</p></div><Globe2 size={26} className="heading-icon"/></div>
-        <div className="news-grid">
-          <article className="news-card"><span className="news-icon"><Globe2 size={19}/></span><div><strong>全球主要指數</strong><p>追蹤 S&P 500、NASDAQ、道瓊、日經與韓國 KOSPI。</p><small>全球行情 API 待設定</small></div></article>
-          <article className="news-card"><span className="news-icon"><Newspaper size={19}/></span><div><strong>AI 與半導體</strong><p>整理 AI 伺服器、晶片、供應鏈與科技巨頭動態。</p><small>新聞來源待設定</small></div></article>
-          <article className="news-card"><span className="news-icon"><Activity size={19}/></span><div><strong>匯率與大宗商品</strong><p>追蹤美元指數、台幣、黃金與原油等市場資訊。</p><small>行情來源待設定</small></div></article>
-        </div>
       </section>
 
       <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
