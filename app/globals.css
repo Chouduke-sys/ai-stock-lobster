@@ -116,3 +116,14 @@
 .stock-news-panel .footnote{line-height:1.65}
 @media(max-width:800px){.stock-research-layout{grid-template-columns:1fr}.stock-news-list{max-height:380px}}
 @media(max-width:640px){.holdings-divider~.holdings-fund-title{font-size:19px}.holdings-divider~.holdings-note{font-size:14px}.daily-market-quote strong{font-size:18px}.stock-news-panel{padding:13px}}
+
+/* Daily market analysis below index charts, full width within the index column */
+.market-analysis-below-index{margin-top:24px;padding-top:18px;border-top:1px solid #34445b;min-width:0}
+.market-analysis-below-index .holdings-divider{display:none}
+.market-analysis-below-index .holdings-fund-title{font-size:22px;line-height:1.45;margin-top:0}
+.market-analysis-below-index .holdings-fund-title span{font-size:13px;line-height:1.7}
+.market-analysis-below-index .holdings-note{font-size:15px;line-height:1.85;color:#d1dbea;margin:12px 0}
+.market-analysis-below-index .holdings-note b{font-size:16px;color:#fff}
+.market-analysis-below-index .holdings-note:last-child{font-size:12px;color:#9dafc5}
+.market-analysis-below-index .daily-market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:640px){.market-analysis-below-index .holdings-fund-title{font-size:19px}.market-analysis-below-index .holdings-note{font-size:14px}}
