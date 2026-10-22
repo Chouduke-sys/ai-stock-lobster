@@ -98,8 +98,8 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
    <div className="index-points-y">{labels.map((v,i)=><span key={i}>{formatPrice(v)}</span>)}</div>
   </div>
   <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
-  <div className="index-volume-title">成交量（股）</div>
-  <div className="index-volume-empty">目前行情 API 未提供可驗證的逐分鐘成交量，暫不繪製虛構量柱。上方另有證交所公布的總成交量。</div>
+  <div className="index-volume-title">{session==="night"?"成交量（口）":"成交量（股）"}</div>
+  <div className="index-volume-empty">{session==="night"?"目前夜盤來源未提供可驗證的逐分鐘成交量（口），暫不繪製虛構量柱。":"目前行情 API 未提供可驗證的逐分鐘成交量，暫不繪製虛構量柱。上方另有證交所公布的總成交量。"}</div>
   <p className="footnote">以當日已取得的最高／最低點數局部放大，讓小幅波動也清楚；縱軸非從零起算，視覺振幅不代表漲跌百分比。每分鐘有效報價取樣，非完整歷史 K 線。</p>
  </div>;
 }
@@ -585,7 +585,7 @@ useEffect(()=>{
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
           <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前取得 {indexChartPoints.length} 筆。優先載入當日分鐘歷史，再合併盤中有效取樣；行情可能延遲。</p>
           {showTaiwanNight?<><div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
-          <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
+          <div className="sparkline"><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
           <p className="footnote">台灣時間 15:00～次日 05:00（交易日），縱軸為台指期點數；目前累積 {nightPoints.length} 筆。{nightError||"台指期行情依供應商更新，可能延遲。"}</p>
           {!nightPoints.length&&usFutures&&<div className="night-backup"><strong>台指期報價暫無資料 · 改顯示美股期貨參考</strong><div>{usFutures.name}：{formatPrice(usFutures.price)} 點</div><UsFuturesChart points={usFutures.points??[]}/><small>此為美股期貨，不是台指期。{usFutures.source}</small></div>}</>:<div className="night-backup"><strong>台指期夜盤尚未開盤 · 美股期貨行情</strong>
           {usFutures?<><div className="us-futures-price">{usFutures.name}：{formatPrice(usFutures.price)} 點 {usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""}</div><UsFuturesChart points={usFutures.points??[]}/><p className="footnote">最近報價：{usFutures.quoteTime?new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"未提供"} · {usFutures.source} · 每分鐘查詢，非保證即時。美股期貨休市時顯示最近報價。</p></>:<p className="footnote">{usFuturesError||"正在讀取美股期貨行情"}；無可用報價時不會填入虛構數字。</p>}</div>}
