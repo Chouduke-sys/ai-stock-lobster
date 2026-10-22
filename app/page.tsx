@@ -50,7 +50,7 @@ function IntradayChart({points,reference}:{points:IntradayPoint[];reference:numb
  </svg><p className="footnote">{points.length?"最新取樣 "+points[points.length-1].time.slice(11)+" · "+formatPrice(points[points.length-1].price)+" 元":"尚無有效盤中報價"} · 固定 ±10% 漲跌幅；{reference?"以前收價為 0% 基準":"以前次有效取樣價為暫時基準"}</p></div>;
 }
 
-type Point={time:string;value:number;session:string};
+type Point={time:string;value:number;session:string;volume?:number|null};
 function parts(iso:string){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso));const v=(k:string)=>p.find(x=>x.type===k)?.value??"";return {date:v("year")+"-"+v("month")+"-"+v("day"),hour:Number(v("hour")),minute:Number(v("minute"))};}
 function isTaiexSessionNow():boolean{
  const now=parts(new Date().toISOString());
@@ -78,7 +78,7 @@ function readPoints(kind:"taiex"|"tx"):Point[]{
 function HourChart({points,base,session="day"}:{points:Point[];base:number|null;session?:"day"|"night"}){
  const start=session==="day"?540:900,duration=session==="day"?270:840;
  const ticks=session==="day"?["09:00","10:30","12:00","13:30"]:["15:00","19:00","23:00","01:00","05:00"];
- const minuteOf=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
+ const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
  const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{x:(minute-start)/duration*100,value:p.value,time:p.time}];});
  const values=plot.map(p=>p.value),lo=Math.min(...values),hi=Math.max(...values);
  const pad=values.length?Math.max((hi-lo)*0.10,hi*0.00015,3):100;
@@ -164,7 +164,21 @@ export default function Home() {
   const [night, setNight] = useState<NightResult|null>(null);
   const [nightError, setNightError] = useState("");
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
+  const [indexHistory,setIndexHistory]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function refresh(){
+      try{
+        const response=await fetch("/api/market/taiex/intraday",{signal:controller.signal});
+        const data=await response.json();
+        if(response.ok&&data.status==="ok"&&!controller.signal.aborted)setIndexHistory(data.points??[]);
+      }catch{}
+    }
+    void refresh();const timer=setInterval(()=>{void refresh();},60000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+
   useEffect(()=>{
     setDayPoints(readPoints("taiex").filter(p=>p.session===parts(new Date().toISOString()).date));setNightPoints(readPoints("tx").filter(p=>p.session===nightSessionKey(new Date())));
     try{const saved=JSON.parse(localStorage.getItem("lobster-last-night")||"null") as NightResult|null;if(saved?.price&&saved.quoteTime&&nightSessionKey(new Date(saved.quoteTime))===nightSessionKey(new Date()))setNight({...saved,isClosed:!isNightTradingNow()});}catch{}
@@ -372,6 +386,8 @@ export default function Home() {
     setMessage("");
   }
 
+  const currentIndexDay=parts(new Date().toISOString()).date;
+  const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   return (
     <main className="site-shell">
       <header className="topbar">
@@ -454,8 +470,8 @@ export default function Home() {
               {taiex?.changePercent != null ? "（" + (taiex.changePercent > 0 ? "+" : "") + formatPrice(taiex.changePercent) + "%）" : ""}
             </span>
           </div>
-          <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <div className="sparkline"><div className="spark-grid"></div><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
+          <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前取得 {indexChartPoints.length} 筆。優先載入當日分鐘歷史，再合併盤中有效取樣；行情可能延遲。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
           <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，縱軸為實際點數；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
