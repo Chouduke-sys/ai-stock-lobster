@@ -76,24 +76,30 @@ function readPoints(kind:"taiex"|"tx"):Point[]{
  try{const raw=JSON.parse(localStorage.getItem("lobster-minute-"+kind)||"[]") as Point[];return Array.isArray(raw)?raw.filter(p=>Number.isFinite(p.value)&&typeof p.time==="string"):[];}catch{return [];}
 }
 function HourChart({points,base,session="day"}:{points:Point[];base:number|null;session?:"day"|"night"}){
- const start=session==="day"?540:900;
- const duration=session==="day"?270:840;
+ const start=session==="day"?540:900,duration=session==="day"?270:840;
  const ticks=session==="day"?["09:00","10:30","12:00","13:30"]:["15:00","19:00","23:00","01:00","05:00"];
- const pct=(v:number)=>base&&base>0?(v-base)/base*100:0;
- const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let minute=Number(m[1])*60+Number(m[2]);if(session==="night"&&minute<900)minute+=1440;return minute;};
- const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{x:(minute-start)/duration*100,y:Math.max(0,Math.min(100,50-pct(p.value)*5))}];});
- const poly=plot.map(p=>p.x.toFixed(2)+","+p.y.toFixed(2)).join(" ");
- return <div className="axis-chart">
-   <span className="axis-y-title">漲跌（%）</span>
-   <div className="axis-y-labels"><span>+10%</span><span>+5%</span><span>0%</span><span>−5%</span><span>−10%</span></div>
-   <div className="axis-plot">
-     <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="固定正負百分之十漲跌幅與完整交易時段走勢圖" style={{display:"block",width:"100%",height:"100%"}}>
-       {[0,25,50,75,100].map(y=><line key={y} x1="0" x2="100" y1={y} y2={y} stroke={y===50?"#8492a6":"#334155"} strokeDasharray={y===50?"2 2":"1 3"} strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
-       {plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={plot[0].y} r="1.3" fill="#fb725b"/>:null}
-     </svg>
-     {!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}
-   </div>
-   <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
+ const minuteOf=(time:string)=>{const m=time.match(/(\\d{2}):(\\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
+ const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{x:(minute-start)/duration*100,value:p.value,time:p.time}];});
+ const values=plot.map(p=>p.value),lo=Math.min(...values),hi=Math.max(...values);
+ const pad=values.length?Math.max((hi-lo)*0.12,hi*0.0005,10):100;
+ const min=values.length?lo-pad:(base??0)-pad,max=values.length?hi+pad:(base??0)+pad;
+ const y=(v:number)=>(max-v)/(max-min)*100;
+ const poly=plot.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ");
+ const labels=Array.from({length:5},(_,i)=>max-(max-min)*i/4);
+ return <div className="index-points-chart">
+  <div className="index-points-title">指數點數 <strong>{plot.length?formatPrice(plot[plot.length-1].value):"—"}</strong></div>
+  <div className="index-points-main">
+   <div className="index-points-plot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="指數點數走勢圖，右側為實際指數點數" style={{display:"block",width:"100%",height:"100%"}}>
+    {labels.map((_,i)=><line key={i} x1="0" x2="100" y1={i*25} y2={i*25} stroke="#34455b" strokeDasharray="1 3" strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
+    {base!=null&&base>=min&&base<=max?<line x1="0" x2="100" y1={y(base)} y2={y(base)} stroke="#d9ad55" strokeDasharray="2 2" strokeWidth=".5" vectorEffect="non-scaling-stroke"/>:null}
+    {plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={y(plot[0].value)} r="1.4" fill="#fb725b"/>:null}
+   </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}</div>
+   <div className="index-points-y">{labels.map((v,i)=><span key={i}>{formatPrice(v)}</span>)}</div>
+  </div>
+  <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
+  <div className="index-volume-title">成交量（股）</div>
+  <div className="index-volume-empty">目前行情 API 未提供可驗證的逐分鐘成交量，暫不繪製虛構量柱。上方另有證交所公布的總成交量。</div>
+  <p className="footnote">數值軸自動縮放；每分鐘有效報價取樣，非完整歷史 K 線。</p>
  </div>;
 }
 
@@ -420,17 +426,17 @@ export default function Home() {
           </div>
           <p className="footnote">交易量與成交金額採證交所公布的上市市場每日統計；收盤後待官方資料更新才顯示當日總量。未更新前保留最近公布交易日與日期，不以盤中取樣冒充當日總量。</p>
           <div className="taiex-trend-heading">
-            <span>加權指數 · 日盤走勢圖（開盤每秒查詢）</span>
+            <span>加權指數 · 日盤點數走勢圖（開盤每秒查詢）</span>
             <span className={taiex?.change == null ? "taiex-live-change neutral" : taiex.change > 0 ? "taiex-live-change up" : taiex.change < 0 ? "taiex-live-change down" : "taiex-live-change neutral"}>
               目前漲跌 {taiex?.change == null ? "—" : (taiex.change > 0 ? "+" : "") + formatPrice(taiex.change) + " 點"}
               {taiex?.changePercent != null ? "（" + (taiex.changePercent > 0 ? "+" : "") + formatPrice(taiex.changePercent) + "%）" : ""}
             </span>
           </div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={dayPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，以前一交易日收盤為 0% 基準；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
+          <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前累積 {dayPoints.length} 筆。僅為本機取樣，不是完整官方即時分時歷史。</p>
           <div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（5 秒查詢）</div>
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
-          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，以本次記錄首筆價格為 0% 基準；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
+          <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，縱軸為實際點數；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
         </div>
