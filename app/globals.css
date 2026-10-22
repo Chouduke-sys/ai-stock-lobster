@@ -160,3 +160,13 @@
 .vix-detail p{font-size:15px;line-height:1.85;color:#c9d7e8;margin:10px 0}
 .vix-detail small{font-size:12px;color:#98acc4;line-height:1.8}
 @media(max-width:700px){.vix-panel{padding:18px 15px}.vix-content{grid-template-columns:1fr;gap:4px}.vix-detail strong{font-size:21px}}
+
+/* Index charts need their natural height; legacy .sparkline 150px clipped the bottom of the price line and labels. */
+.sparkline:has(.index-points-chart){height:auto;min-height:0;overflow:visible;background:transparent;border-radius:0;margin:14px 0 20px}
+.sparkline:has(.index-points-chart)>.spark-grid{display:none}
+.sparkline:has(.index-points-chart) .index-points-chart{position:relative;width:100%;min-width:0}
+.sparkline:has(.index-points-chart) .index-points-main{height:240px;min-height:240px}
+.sparkline:has(.index-points-chart) .index-points-plot{overflow:hidden}
+.sparkline:has(.index-points-chart) .index-points-plot svg{height:100%;width:100%}
+.sparkline:has(.index-points-chart) .index-points-y{height:100%;padding:0 0 2px}
+@media(max-width:640px){.sparkline:has(.index-points-chart) .index-points-main{height:200px;min-height:200px}}
