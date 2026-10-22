@@ -59,16 +59,70 @@ async function latestMargin():Promise<MarginData|null>{
  }
  return null;
 }
+
+type FuturesOptions={date:string;foreignTxNet:number|null;putCallVolume:number|null;putCallOpenInterest:number|null;source:string};
+function numValue(x:unknown):number|null{
+ if(typeof x==="number")return Number.isFinite(x)?x:null;
+ if(typeof x!=="string"||!x.trim()||x.trim()==="-")return null;
+ const n=Number(x.replace(/,/g,"").replace(/%/g,"").trim());
+ return Number.isFinite(n)?n:null;
+}
+function normalizedDate(x:unknown):string|null{
+ const m=String(x??"").match(/(20\\d{2})[\\/-](\\d{1,2})[\\/-](\\d{1,2})/);
+ return m?m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"):null;
+}
+async function taifexRows(path:string):Promise<Record<string,unknown>[]>{
+ try{
+  const res=await fetch("https://openapi.taifex.com.tw/v1/"+path,{next:{revalidate:900},signal:AbortSignal.timeout(7000),headers:{"Accept":"application/json"}});
+  if(!res.ok)return [];
+  const data=await res.json() as unknown;
+  return Array.isArray(data)?data.filter((row):row is Record<string,unknown>=>typeof row==="object"&&row!==null&&!Array.isArray(row)):[];
+ }catch{return [];}
+}
+function field(row:Record<string,unknown>,terms:string[]):unknown{
+ const key=Object.keys(row).find(k=>terms.every(t=>k.toLowerCase().includes(t.toLowerCase())));
+ return key===undefined?undefined:row[key];
+}
+async function latestFuturesOptions():Promise<FuturesOptions|null>{
+ const [ratios,institutions]=await Promise.all([
+  taifexRows("PutCallRatio"),
+  taifexRows("MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
+ ]);
+ const dateOf=(r:Record<string,unknown>)=>normalizedDate(field(r,["日期"])??field(r,["Date"]));
+ const valid=(r:Record<string,unknown>)=>Boolean(dateOf(r));
+ const latestRatio=ratios.filter(valid).sort((a,b)=>(dateOf(b)??"").localeCompare(dateOf(a)??""))[0];
+ const ratioDate=latestRatio?dateOf(latestRatio):null;
+ const getRatio=(r:Record<string,unknown>,type:"volume"|"oi")=>{
+  const entries=Object.entries(r);
+  const isRatio=(k:string)=>/比率|ratio/i.test(k);
+  const isOpen=(k:string)=>/未平倉|open/i.test(k);
+  const pair=entries.find(([k])=>isRatio(k)&&(type==="oi"?isOpen(k):!isOpen(k)));
+  return pair?numValue(pair[1]):null;
+ };
+ const volume=latestRatio?getRatio(latestRatio,"volume"):null;
+ const oi=latestRatio?getRatio(latestRatio,"oi"):null;
+ const foreignRows=institutions.filter(row=>{
+  const values=Object.values(row).map(x=>String(x??""));
+  return values.some(v=>/外資|Foreign/i.test(v))&&values.some(v=>/臺股期貨|台股期貨|臺指期貨|台指期貨|TX/i.test(v));
+ }).sort((a,b)=>(dateOf(b)??"").localeCompare(dateOf(a)??""));
+ const foreign=foreignRows.find(row=>field(row,["未平倉","淨額"])!==undefined||field(row,["Open","Net"])!==undefined);
+ const foreignDate=foreign?dateOf(foreign):null;
+ const net=foreign?numValue(field(foreign,["未平倉","淨額"])??field(foreign,["Open","Net"])):null;
+ if(!ratioDate&&(!foreignDate||net===null))return null;
+ const chosen=ratioDate&&foreignDate?(ratioDate>=foreignDate?ratioDate:foreignDate):(ratioDate??foreignDate)!;
+ return {date:chosen,foreignTxNet:net,putCallVolume:volume,putCallOpenInterest:oi,source:"臺灣期貨交易所 OpenAPI"};
+}
 export async function GET(request:Request){
  const cronAuthorized=Boolean(process.env.CRON_SECRET)&&request.headers.get("authorization")==="Bearer "+process.env.CRON_SECRET;
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
  const now=taipeiParts(),reportDate=now.minute>=510?now.date:new Date(Date.parse(now.date+"T00:00:00+08:00")-86400000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
- const [quotes,twse,news,margin]=await Promise.all([
+ const [quotes,twse,news,margin,futuresOptions]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
-  latestMargin()
+  latestMargin(),
+  latestFuturesOptions()
  ]);
  const by=(symbol:string)=>quotes.find(q=>q.symbol===symbol);
  const us=by("ES=F"),tech=by("NQ=F"),semi=by("^SOX"),fx=by("TWD=X"),vix=by("^VIX");
@@ -94,7 +148,7 @@ export async function GET(request:Request){
   {title:"美股與期貨",body:compact(["標普期 "+pct(us),"那指期 "+pct(tech),"費半 "+pct(semi)]),sentiment:mood(abroadScore),verdict:abroadScore===null?"待確認":abroadScore>0?"外圍偏多":abroadScore<0?"外圍偏空":"多空分歧"},
   {title:"外資與投信",body:foreign||trust?"最近公布 "+(flow?.date??"日期未提供")+"："+moneyLabel(foreign)+"；"+moneyLabel(trust)+"（新台幣，非當日盤前數據）。":"法人買賣超暫無可靠數字。",sentiment:mood(investorScore),verdict:investorScore===null?"籌碼待確認":investorScore>0?"法人合計偏買":investorScore<0?"法人合計偏賣":"法人買賣相抵"},
   {title:"融資融券",body:margin?"最近公布 "+margin.date+"（盤前沿用上一交易日，非今日盤中）：「融資餘額」"+margin.financingBalance?.toLocaleString("en-US")+"；「融券餘額」"+margin.shortBalance?.toLocaleString("en-US")+(margin.financingChange!==null?"；融資增減 "+(margin.financingChange!>=0?"+":"")+margin.financingChange?.toLocaleString("en-US"):"")+(margin.shortChange!==null?"；融券增減 "+(margin.shortChange!>=0?"+":"")+margin.shortChange?.toLocaleString("en-US"):"")+"。來源："+margin.source+"；數量單位依交易所表格。":"最新已公布交易日的資券統計暫時無法取得，請參考 Yahoo 股市資券餘額頁：https://tw.stock.yahoo.com/margin-balance",sentiment:margin?.financingChange==null?"neutral":margin.financingChange>0?"bullish":margin.financingChange<0?"bearish":"neutral",verdict:margin?"已更新 "+margin.date:"資料待更新"},
-  {title:"期貨與選擇權",body:"外資期貨未平倉、Put/Call 比尚無有效數字。",sentiment:"neutral",verdict:"籌碼待確認"},
+  {title:"期貨與選擇權",body:futuresOptions?["最近公布資料："+futuresOptions.date+"（非今日盤中）",futuresOptions.foreignTxNet!==null?"外資台指期未平倉淨口數："+futuresOptions.foreignTxNet.toLocaleString("en-US")+" 口":"外資台指期未平倉：尚未公布或無法核對",futuresOptions.putCallVolume!==null?"選擇權成交量 Put/Call Ratio："+futuresOptions.putCallVolume.toFixed(2)+"%":"成交量 P/C 比：暫未取得",futuresOptions.putCallOpenInterest!==null?"選擇權未平倉 Put/Call Ratio："+futuresOptions.putCallOpenInterest.toFixed(2)+"%":"未平倉 P/C 比：暫未取得","來源："+futuresOptions.source].join("；")+"。":"期交所最新資料暫時無法讀取，請參考 https://www.taifex.com.tw/cht/3/pcRatio；不以過期數據冒充當日數據。",sentiment:"neutral",verdict:futuresOptions?"期交所 "+futuresOptions.date:"待取得官方數據"},
   {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
   {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
   {title:"技術面與量能",body:"開盤先看能否站穩開盤價、量能是否放大及5日線位置。",sentiment:"neutral",verdict:"等開盤確認"},
