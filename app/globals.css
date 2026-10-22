@@ -243,3 +243,18 @@
 .index-points-main{grid-template-columns:minmax(0,1fr) minmax(78px,auto)}
 .index-points-y{min-width:78px;white-space:nowrap;overflow:visible}
 .index-points-title{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* Index charts: override the shared absolutely-positioned X axis that overlaps the footer. */
+.index-points-chart .axis-x-labels,
+.sparkline .index-points-chart .axis-x-labels{
+ position:static;left:auto;right:auto;bottom:auto;
+ display:flex;justify-content:space-between;align-items:center;
+ width:calc(100% - 94px);box-sizing:border-box;
+ height:28px;padding:5px 0 0;margin:0;
+ font-size:11px;line-height:18px;white-space:nowrap;
+}
+.index-points-chart .axis-x-labels span{position:static;white-space:nowrap;line-height:18px}
+.index-points-chart .index-volume-title{clear:both;margin-top:12px}
+.index-points-chart .index-volume-empty{position:relative;margin-top:8px}
+.index-points-chart>.footnote{position:static;display:block;margin-top:10px;line-height:1.6}
+@media(max-width:640px){.index-points-chart .axis-x-labels,.sparkline .index-points-chart .axis-x-labels{width:calc(100% - 80px);font-size:9px;height:26px}}
