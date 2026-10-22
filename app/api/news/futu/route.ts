@@ -59,7 +59,7 @@ export async function GET(){
   const endpoint=process.env.FUTU_NEWS_API_URL||"https://ai-news-search.futunn.com/news_search";
   const base=new URL(endpoint);
   if(base.protocol!=="https:"||base.hostname!=="ai-news-search.futunn.com")throw Error("Invalid Futu news endpoint");
-  const keywords=["美股","聯準會","AI","全球經濟"];
+  const keywords=["美股","聯準會","AI","全球經濟","川普","鮑爾","美聯儲","台積電","台灣金融"];
   const batches=await Promise.all(keywords.map(async keyword=>{
    try{
     const url=new URL(base);
@@ -75,9 +75,11 @@ export async function GET(){
   }));
   const seen=new Set<string>();
   const news=batches.flat().filter(n=>{if(seen.has(n.url))return false;seen.add(n.url);return true;})
-   .sort((a,b)=>(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,15);
+   .sort((a,b)=>(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,45);
   if(!news.length)throw Error("No verified Futu news");
-  return NextResponse.json({status:"ok",news,source:"富途牛牛新聞搜尋",fetchedAt:new Date().toISOString(),refreshSeconds:300});
+  const important=/川普|特朗普|Trump|鮑爾|Powell|聯準會|美聯儲|Fed\b|FOMC|央行總裁|總統發言|財政部長|黃仁勳|Jensen Huang|台積電|金管會|中央銀行|台灣央行|台灣科技|台灣金融|關稅|利率決策/i;
+  const importantNews=news.filter(n=>important.test(n.title+" "+(n.summary??""))).slice(0,20);
+  return NextResponse.json({status:"ok",news,importantNews,source:"富途牛牛新聞搜尋",fetchedAt:new Date().toISOString(),refreshSeconds:300});
  }catch{
   return NextResponse.json({status:"unavailable",error:"富途新聞來源目前沒有可用資料，請點擊富途新聞入口查看最新消息。",news:[],sourceUrl:"https://news.futunn.com/main"},{status:503});
  }
