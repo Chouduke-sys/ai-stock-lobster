@@ -224,3 +224,15 @@
 .morning-brief-lock p{font-size:15px;line-height:1.8;color:#c5d3e4;margin:0}
 .morning-brief-login-actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:8px}
 .morning-brief-login-actions button{min-height:44px}
+
+.morning-brief-preview{position:relative;min-height:440px;overflow:hidden;border-radius:14px}
+.morning-brief-preview-grid{filter:blur(6px);opacity:.45;pointer-events:none;user-select:none}
+.morning-brief-preview-card{min-height:120px}
+.morning-brief-preview-card h3{margin:0 0 16px}
+.morning-brief-skeleton-line{height:11px;width:94%;background:#667b95;border-radius:20px;margin:10px 0}
+.morning-brief-skeleton-line.short{width:65%}
+.morning-brief-skeleton-badge{display:inline-block;padding:6px 12px;background:#43566e;color:#d6e4f4;border-radius:8px;font-size:12px;margin-top:5px}
+.morning-brief-preview-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:22px;background:linear-gradient(180deg,rgba(9,18,31,.1),rgba(9,18,31,.85) 42%,rgba(9,18,31,.9) 60%,rgba(9,18,31,.2));gap:12px}
+.morning-brief-preview-overlay h3{font-size:24px;color:#f6f8fc;margin:0}
+.morning-brief-preview-overlay p{font-size:15px;color:#d1deee;line-height:1.7;margin:0}
+@media(max-width:640px){.morning-brief-preview{min-height:490px}.morning-brief-preview-overlay h3{font-size:20px}.morning-brief-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
