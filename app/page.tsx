@@ -133,6 +133,9 @@ function MarketMiniTrend({values,label}:{values:number[];label:string}){
  </svg><span className={rising?"market-up":"market-down"}>{rising?"+":""}{change.toFixed(2)}% · {valid.length}日</span></div>;
 }
 export default function Home() {
+  const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
+  const [memberLoading,setMemberLoading]=useState(true);
+  const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean}>({});
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
@@ -215,9 +218,6 @@ export default function Home() {
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
-  const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
-  const [memberLoading,setMemberLoading]=useState(true);
-  const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean}>({});
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
