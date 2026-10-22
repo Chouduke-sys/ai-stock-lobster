@@ -12,7 +12,7 @@ type HistoryRow = { date:string; open:number; high:number; low:number; close:num
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
 type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type CloseResult={status:string;date:string;value:number;change:number|null;tradeVolume:number|null;tradeValue:number|null;transactions:number|null;dataSource:string};
-type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string};
+type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;isClosed?:boolean};
 type StockResult = {
   status: string;
   symbol: string;
@@ -57,9 +57,18 @@ function isTaiexSessionNow():boolean{
  const day=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short"}).format(new Date());
  return day!=="Sat"&&day!=="Sun"&&now.hour*60+now.minute>=540&&now.hour*60+now.minute<=810;
 }
+function nightSessionKey(date:Date):string{
+ const t=parts(date.toISOString());
+ if(t.hour<5)return new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10);
+ return t.date;
+}
+function isNightTradingNow():boolean{
+ const now=new Date(),t=parts(now.toISOString()),day=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short"}).format(now);
+ return (["Mon","Tue","Wed","Thu","Fri"].includes(day)&&t.hour>=15)||(["Tue","Wed","Thu","Fri","Sat"].includes(day)&&t.hour<5);
+}
 function record(kind:"taiex"|"tx",iso:string,value:number):Point[]{
  const t=parts(iso),time=t.date+" "+String(t.hour).padStart(2,"0")+":"+String(t.minute).padStart(2,"0");
- const session=kind==="taiex"?t.date:t.hour<5?new Date(new Date(t.date+"T12:00:00+08:00").getTime()-86400000).toISOString().slice(0,10):t.date;
+ const session=kind==="taiex"?t.date:nightSessionKey(new Date(iso));
  const key="lobster-minute-"+kind;
  try{const prev=JSON.parse(localStorage.getItem(key)||"[]") as Point[];const list=prev.filter(p=>p.session===session&&p.time!==time&&Number.isFinite(p.value));list.push({time,value,session});list.sort((a,b)=>a.time.localeCompare(b.time));const limited=list.slice(-900);localStorage.setItem(key,JSON.stringify(limited));return limited;}catch{return [{time,value,session}];}
 }
@@ -72,7 +81,7 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const ticks=session==="day"?["09:00","10:30","12:00","13:30"]:["15:00","19:00","23:00","01:00","05:00"];
  const pct=(v:number)=>base&&base>0?(v-base)/base*100:0;
  const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let minute=Number(m[1])*60+Number(m[2]);if(session==="night"&&minute<900)minute+=1440;return minute;};
- const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration?[]:[{x:(minute-start)/duration*100,y:50-pct(p.value)*5}];});
+ const plot=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{x:(minute-start)/duration*100,y:Math.max(0,Math.min(100,50-pct(p.value)*5))}];});
  const poly=plot.map(p=>p.x.toFixed(2)+","+p.y.toFixed(2)).join(" ");
  return <div className="axis-chart">
    <span className="axis-y-title">漲跌（%）</span>
@@ -109,7 +118,7 @@ export default function Home() {
   const [stockNewsError,setStockNewsError]=useState("");
   const [symbol, setSymbol] = useState("2330");
   const minuteHistory=useIntradayHistory(symbol);
-  const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
+  const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].filter(p=>p.date===parts(new Date().toISOString()).date&&Number.isFinite(p.price)).map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
   const [newsError, setNewsError] = useState("");
@@ -129,7 +138,8 @@ export default function Home() {
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
   useEffect(()=>{
-    setDayPoints(readPoints("taiex"));setNightPoints(readPoints("tx"));
+    setDayPoints(readPoints("taiex").filter(p=>p.session===parts(new Date().toISOString()).date));setNightPoints(readPoints("tx").filter(p=>p.session===nightSessionKey(new Date())));
+    try{const saved=JSON.parse(localStorage.getItem("lobster-last-night")||"null") as NightResult|null;if(saved?.price&&saved.quoteTime&&nightSessionKey(new Date(saved.quoteTime))===nightSessionKey(new Date()))setNight({...saved,isClosed:!isNightTradingNow()});}catch{}
     try{
       const cached=JSON.parse(localStorage.getItem("lobster-last-taiex")||"null") as TaiexResult|null;
       if(cached?.status==="ok"&&cached.date===parts(new Date().toISOString()).date&&typeof cached.value==="number"){
@@ -295,9 +305,10 @@ export default function Home() {
         const response=await fetch("/api/market/taiex/night",{cache:"no-store",signal:controller.signal});
         const data=await response.json();
         if(!response.ok||data.status!=="ok")throw new Error(data.error||"夜盤行情暫不可用");
-        setNight(data);setNightError("");
+        setNight({...data,isClosed:false});setNightError("");
+        try{localStorage.setItem("lobster-last-night",JSON.stringify(data));}catch{}
         if(typeof data.price==="number"&&typeof data.quoteTime==="string")setNightPoints(record("tx",data.quoteTime,data.price));
-      }catch(e){if(!controller.signal.aborted){setNight(null);setNightError(e instanceof Error?e.message:"夜盤行情暫不可用");}}
+      }catch(e){if(!controller.signal.aborted){setNight(prev=>prev?{...prev,isClosed:!isNightTradingNow()}:null);setNightError(e instanceof Error?e.message:"夜盤行情暫不可用");}}
       finally{inFlight=false;}
     }
     void loadNight();
@@ -386,14 +397,6 @@ export default function Home() {
             <strong>{Number(weight).toFixed(2)}%</strong>
           </div>)}
           <a className="holdings-source" href="https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981a.tw&topc=" target="_blank" rel="noopener noreferrer">查看 MoneyDJ 持股來源 ↗</a>
-          <div className="holdings-divider" />
-          <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
-          <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
-          <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span></div>)}</div>
-          <p className="holdings-note"><b>日韓股影響：</b>{dailyAnalysis?.asia??"等待資料"}</p>
-          <p className="holdings-note"><b>台幣升貶影響：</b>{dailyAnalysis?.currency??"等待資料"}</p>
-          <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
-          <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
         </section>
         </div>
         <div className="hero-visual">
@@ -406,7 +409,7 @@ export default function Home() {
               <small>{closing ? `${closing.date} 收盤 · ${closing.dataSource}` : closingError || "讀取中"}</small>
             </div>
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
-              <small>臺股期貨 TX · 夜盤（不同於加權指數）</small>
+              <small>臺股期貨 TX · {night?.isClosed?"最近有效夜盤報價（非官方收盤價）":"夜盤"}（不同於加權指數）</small>
               <strong style={{display:"block",fontSize:24}}>{formatPrice(night?.price)}</strong>
               <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 5 秒查詢` : nightError || "讀取中"}</small>
             </div>
@@ -429,6 +432,15 @@ export default function Home() {
           <div className="sparkline"><div className="spark-grid"></div><HourChart points={nightPoints} base={nightPoints[0]?.value??null} session="night"/></div>
           <p className="footnote">夜盤 15:00～次日 05:00，按分鐘記錄報價，以本次記錄首筆價格為 0% 基準；目前累積 {nightPoints.length} 筆。需授權行情來源，未設定時不顯示虛構價格。{nightError}</p>
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
+          <div className="market-analysis-below-index">          <div className="holdings-divider" />
+          <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
+          <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
+          <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span></div>)}</div>
+          <p className="holdings-note"><b>日韓股影響：</b>{dailyAnalysis?.asia??"等待資料"}</p>
+          <p className="holdings-note"><b>台幣升貶影響：</b>{dailyAnalysis?.currency??"等待資料"}</p>
+          <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
+          <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
+</div>
         </div>
       </section>
 
