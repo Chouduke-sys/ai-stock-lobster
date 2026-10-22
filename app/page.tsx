@@ -187,6 +187,10 @@ export default function Home() {
   const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].filter(p=>p.date===parts(new Date().toISOString()).date&&Number.isFinite(p.price)).map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const [search, setSearch] = useState("");
   const [news, setNews] = useState<NewsRow[]>([]);
+  const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
+  const [newsTab,setNewsTab]=useState<"all"|"important">("all");
+  const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
+  const [aiFlowError,setAiFlowError]=useState("");
   const [newsError, setNewsError] = useState("");
   const [newsFetchedAt, setNewsFetchedAt] = useState<string|null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -405,12 +409,26 @@ export default function Home() {
         const response=await fetch("/api/news/futu",{signal:controller.signal});
         const data=await response.json();
         if(!response.ok||data.status!=="ok"||!Array.isArray(data.news))throw new Error(data.error||"新聞讀取失敗");
-        setNews(data.news);setNewsFetchedAt(new Date().toISOString());setNewsError("");
+        setNews(data.news);setImportantNews(data.importantNews??[]);setNewsFetchedAt(new Date().toISOString());setNewsError("");
       }catch(e){if(!controller.signal.aborted){setNewsError(e instanceof Error?e.message:"新聞讀取失敗");setNews([]);}}
       finally{inFlight=false;}
     }
     void loadNews();
     const timer=setInterval(()=>{void loadNews();},300000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[]);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){
+      try{
+        const response=await fetch("/api/market/ai-flow",{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"AI 族群資料暫不可用");
+        if(!controller.signal.aborted){setAiFlow(data);setAiFlowError("");}
+      }catch(e){if(!controller.signal.aborted)setAiFlowError(e instanceof Error?e.message:"AI 族群資料暫不可用");}
+    }
+    void load();const timer=setInterval(()=>{void load();},300000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
 
@@ -452,9 +470,9 @@ export default function Home() {
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
           <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 富途牛牛</div>
           <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
-          <p style={{margin:"0 0 12px",fontSize:13}}>富途牛牛新聞搜尋 · 每 5 分鐘重新查詢 · 標題點擊閱讀原文</p>
-          {news.length>0 ? <div style={{display:"grid",gap:0,maxHeight:420,overflowY:"auto",paddingRight:6}}>
-            {news.slice(0,10).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
+          <p style={{margin:"0 0 12px",fontSize:13}}>富途牛牛新聞搜尋 · 每 5 分鐘重新查詢 · 標題點擊閱讀原文</p><div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}><button className="btn btn-secondary" onClick={()=>setNewsTab("all")} style={{opacity:newsTab==="all"?1:.65}}>全部財經快訊</button><button className="btn btn-secondary" onClick={()=>setNewsTab("important")} style={{opacity:newsTab==="important"?1:.65}}>重要人士發言／台灣科技金融 ({importantNews.length})</button></div>
+          {(newsTab==="all"?news:importantNews).length>0 ? <div style={{display:"grid",gap:0,maxHeight:420,overflowY:"auto",paddingRight:6}}>
+            {(newsTab==="all"?news:importantNews).slice(0,12).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
               {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:92,height:68,flexShrink:0,objectFit:"cover",borderRadius:8,background:"#1e293b"}} onError={e=>{e.currentTarget.style.display="none";}}/> : <div aria-hidden="true" style={{width:92,height:68,flexShrink:0,borderRadius:8,background:"#182437",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8"}}><Newspaper size={24}/></div>}
               <div style={{minWidth:0,flex:1}}>
                 <div style={{fontSize:17,fontWeight:650,lineHeight:1.6}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
@@ -462,25 +480,21 @@ export default function Home() {
                 <small style={{color:"#94a3b8",display:"block",marginTop:7,fontSize:13}}>{item.source} · {item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"發布時間未提供"}</small>
               </div>
             </a>)}
-          </div> : <div style={{padding:"22px 0",fontSize:14,color:"#94a3b8"}}>{newsError||"正在載入富途牛牛財經新聞…"}</div>}
+          </div> : <div style={{padding:"22px 0",fontSize:14,color:"#94a3b8"}}>{newsError||(newsTab==="important"?"目前沒有符合分類條件的重要新聞，請稍後更新。":"正在載入富途牛牛財經新聞…")}</div>}
           <div style={{marginTop:14,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
             <a href="https://news.futunn.com/main" target="_blank" rel="noopener noreferrer" style={{color:"#fb725b",fontSize:14}}>前往富途牛牛查看最新新聞 ↗</a>
             <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
           </div>
-        <section className="holdings-panel" aria-label="台灣知名操盤人公開持倉">
-          <div className="holdings-heading"><span>台灣知名操盤人持倉追蹤</span><small>公開揭露資料 · 非即時個人帳戶</small></div>
-          <div className="holdings-fund-title">瑤池金母 陳釧瑤 <span>00981A 主動統一台股增長</span></div>
-          <p className="holdings-date">資料日期：2026/10/20 · 持股權重占基金淨值</p>
-          {[
-            ["2330","台積電",11.30],["2383","台光電",7.93],["2454","聯發科",7.91],
-            ["3017","奇鋐",7.82],["3037","欣興",7.63],["3653","健策",6.19],
-            ["2345","智邦",4.57],["2327","國巨",4.56],["6223","旺矽",4.55],["2308","台達電",4.51]
-          ].map(([symbol,name,weight])=><div className="holdings-row" key={String(symbol)}>
-            <span className="holdings-name">{name} <small>{symbol}</small></span>
-            <div className="holdings-bar"><i style={{width:String(Number(weight)/12*100)+"%"}} /></div>
-            <strong>{Number(weight).toFixed(2)}%</strong>
+        <section className="holdings-panel" aria-label="AI熱門概念股產業資金熱度">
+          <div className="holdings-heading"><span>AI 熱門概念股 · 產業資金熱度</span><small>CCL／PCB／先進封裝上下游</small></div>
+          <div className="holdings-fund-title">今日 AI 供應鏈成交熱度 <span>{aiFlow?.asOf??"讀取中"} · 上市盤後資料</span></div>
+          <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+aiFlow.groups[0].name+"（"+(aiFlow.groups[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
+          {aiFlow?.groups?.slice(0,10).map(g=><div className="holdings-row" key={g.name}>
+            <span className="holdings-name">{g.name}<small> {g.chain}</small></span>
+            <div className="holdings-bar"><i style={{width:(g.turnover/Math.max(aiFlow.groups[0].turnover,1)*100).toFixed(1)+"%"}}/></div>
+            <strong>{(g.turnover/1e8).toFixed(1)}億</strong>
           </div>)}
-          <a className="holdings-source" href="https://www.moneydj.com/etf/x/basic/basic0007.xdjhtm?etfid=00981a.tw&topc=" target="_blank" rel="noopener noreferrer">查看 MoneyDJ 持股來源 ↗</a>
+          <p className="footnote">分類採本站 AI 供應鏈觀察清單；不同族群可能共用成分股。僅比較各群成分股成交金額，不可視為資金淨流入排名。</p>
         </section>
         </div>
         <div className="hero-visual">
@@ -522,6 +536,18 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
+        <div className="section-heading"><div><div className="eyebrow">VOLUME & INSTITUTIONAL FLOW</div><h2>當日量能熱門股／法人積極買超</h2><p>以成交金額衡量當日市場關注度；以三大法人買超衡量機構買盤。大戶連續買進需要持股分級或連續多日資料，不能直接由法人單日買超推定。</p></div></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
+          <div className="holdings-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
+          {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
+          {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
+          <div className="holdings-panel"><div className="holdings-fund-title">三大法人買超 Top 10</div><p className="holdings-date">資料日期：{aiFlow?.institutionalDate??"待確認"} · 買超股數，不等於大戶連買</p>
+          {aiFlow?.buyers?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>+{(x.shares/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})} 張</strong></div>)}
+          {!aiFlow?.buyers?.length&&<p className="footnote">{aiFlowError||"法人當日資料尚未公布或未取得。"}</p>}</div>
+        </div>
+        <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。真正的「大戶持續狂買」須另外接入集保股權分散表、券商分點或多日法人紀錄。</p>
+      </section>
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
