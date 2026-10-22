@@ -19,9 +19,9 @@ export async function GET(){
   const response=await fetch("https://tw.stock.yahoo.com/future/WTX%26",{cache:"no-store",signal:AbortSignal.timeout(5500),headers:{"User-Agent":"Mozilla/5.0 (compatible; AIStockLobster/1.0)","Accept":"text/html"}});
   if(response.ok){
    const html=await response.text();
-   const text=html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi," ").replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
-   const rawPrice=text.match(/成交\\s*([\\d,]+(?:\\.\\d+)?)/);
-   const rawDate=text.match(/(?:資料時間|更新)\\s*[:：|]?\\s*(20\\d{2})[\\/.-](\\d{1,2})[\\/.-](\\d{1,2})\\s*(\\d{1,2}):(\\d{2})(?::(\\d{2}))?/);
+   const text=html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ");
+   const rawPrice=text.match(/(?:成交|成交價|最新成交)\s*([0-9,]+(?:\.[0-9]+)?)/);
+   const rawDate=text.match(/(?:資料時間|更新時間|更新)\s*[:：|]?\s*(20\d{2})[\/.-](\d{1,2})[\/.-](\d{1,2})\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/);
    if(rawPrice&&rawDate){
     const price=Number(rawPrice[1].replace(/,/g,""));
     const timestamp=new Date(Date.UTC(Number(rawDate[1]),Number(rawDate[2])-1,Number(rawDate[3]),Number(rawDate[4])-8,Number(rawDate[5]),Number(rawDate[6]??0)));
