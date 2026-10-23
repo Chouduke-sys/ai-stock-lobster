@@ -1,4 +1,4 @@
-export type PolicySignal={title:string;sector:string;impact:"bullish"|"bearish"|"neutral";reason:string;url:string;publishedAt:string};
+export type PolicySignal={title:string;sector:string;impact:"bullish"|"bearish";reason:string;url:string;publishedAt:string};
 const themes=[
  {query:"聯準會 Fed 利率 CPI PCE 鮑爾",sector:"金融／科技估值",positive:/降息|通膨降溫|低於預期|鴿派|寬鬆|暫緩升息/,negative:/升息|通膨升溫|高於預期|鷹派|緊縮|延後降息/,reasonUp:"資金成本與估值壓力可能下降",reasonDown:"利率與估值壓力可能上升"},
  {query:"美國 關稅 晶片 出口管制 台灣",sector:"半導體／出口供應鏈",positive:/豁免|取消關稅|降低關稅|放寬|解除限制|達成協議/,negative:/加徵關稅|提高關稅|擴大禁令|出口限制|制裁|禁售/,reasonUp:"貿易或出口限制可能緩和",reasonDown:"出口與供應鏈成本風險可能升高"},
