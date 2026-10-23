@@ -87,16 +87,21 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const y=(v:number)=>(max-v)/(max-min)*100;
  const poly=plot.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ");
  const labels=Array.from({length:5},(_,i)=>max-(max-min)*i/4);
+ const precise=(v:number)=>v.toLocaleString("zh-TW",{minimumFractionDigits:2,maximumFractionDigits:2});
+ const last=plot.length?plot[plot.length-1]:null;
  return <div className="index-points-chart">
-  <div className="index-points-title">實際點數 · 局部放大波動 <strong>{plot.length?formatPrice(plot[plot.length-1].value):"—"}</strong></div>
+  <div className="index-points-title">實際點數 · 局部放大波動 <strong>{last?precise(last.value):"—"}</strong></div>
   <div className="index-points-main">
    <div className="index-points-plot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="指數點數走勢圖，右側為實際指數點數" style={{display:"block",width:"100%",height:"100%"}}>
     {labels.map((_,i)=><line key={i} x1="0" x2="100" y1={i*25} y2={i*25} stroke="#34455b" strokeDasharray="1 3" strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
     {base!=null&&base>=min&&base<=max?<line x1="0" x2="100" y1={y(base)} y2={y(base)} stroke="#d9ad55" strokeDasharray="2 2" strokeWidth=".5" vectorEffect="non-scaling-stroke"/>:null}
+    {last&&plot.length>1?<line x1="0" x2="100" y1={y(last.value)} y2={y(last.value)} stroke="#7fa5c6" strokeDasharray="1 2" strokeWidth=".3" vectorEffect="non-scaling-stroke"/>:null}
     {plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={y(plot[0].value)} r="1.4" fill="#fb725b"/>:null}
+    {last&&plot.length>1?<circle cx={last.x} cy={y(last.value)} r="1.1" fill="#fb725b" stroke="#fff" strokeWidth=".25"/>:null}
    </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}</div>
-   <div className="index-points-y">{labels.map((v,i)=><span key={i}>{formatPrice(v)}</span>)}</div>
+   <div className="index-points-y">{labels.map((v,i)=><span key={i}>{precise(v)}</span>)}</div>
   </div>
+  <p className="footnote" style={{margin:"5px 0 0"}}>{last?"最後取樣 "+last.time.replace("T"," ")+" · "+precise(last.value)+" 點":"等待有效行情"} · 縱軸保留小數兩位，僅顯示來源實際提供的精度</p>
   <div className="axis-x-labels">{ticks.map(t=><span key={t}>{t}</span>)}</div>
   <div className="index-volume-title">{session==="night"?"成交量（口）":"成交量（股）"}</div>
   <div className="index-volume-empty">{session==="night"?"目前夜盤來源未提供可驗證的逐分鐘成交量（口），暫不繪製虛構量柱。":"目前行情 API 未提供可驗證的逐分鐘成交量，暫不繪製虛構量柱。上方另有證交所公布的總成交量。"}</div>
