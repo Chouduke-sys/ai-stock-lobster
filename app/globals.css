@@ -408,3 +408,20 @@
  .sector-rotation-list{grid-template-columns:minmax(0,1fr)}
  .sector-rotation-member{margin-top:16px}
 }
+
+
+/* Sector turnover momentum colors: red / orange / yellow / green */
+.sector-rotation-legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.sector-rotation-legend span,.rotation-status{font-size:11px;font-weight:750;padding:5px 9px;border-radius:8px;white-space:nowrap}
+.sector-rotation-legend .rotation-fast-in,.rotation-status.rotation-fast-in{color:#ffc7c7;background:#7f1d1d;border:1px solid #e05252}
+.sector-rotation-legend .rotation-slow-in,.rotation-status.rotation-slow-in{color:#ffdbac;background:#78350f;border:1px solid #ed9236}
+.sector-rotation-legend .rotation-slow-out,.rotation-status.rotation-slow-out{color:#fff0a1;background:#6a4e06;border:1px solid #d9b62e}
+.sector-rotation-legend .rotation-fast-out,.rotation-status.rotation-fast-out{color:#baf5cb;background:#14532d;border:1px solid #36a86a}
+.sector-rotation-legend .rotation-unknown,.rotation-status.rotation-unknown{color:#d1d5db;background:#374151;border:1px solid #64748b}
+.sector-rotation-row.rotation-fast-in{border-left:5px solid #ef4444}
+.sector-rotation-row.rotation-slow-in{border-left:5px solid #f59e0b}
+.sector-rotation-row.rotation-slow-out{border-left:5px solid #eab308}
+.sector-rotation-row.rotation-fast-out{border-left:5px solid #22c55e}
+.sector-rotation-row.rotation-unknown{border-left:5px solid #64748b}
+.sector-rotation-row .rotation-status{align-self:flex-end}
+@media(max-width:640px){.sector-rotation-legend{gap:6px}.sector-rotation-legend span{font-size:10px;padding:5px 7px}}
