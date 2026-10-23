@@ -435,3 +435,5 @@
 .sector-rotation-row.rotation-unknown{background:#374151!important;border:1px solid #64748b!important;border-left:5px solid #94a3b8!important}
 .sector-rotation-row>div strong{color:#fff!important}
 .sector-rotation-row>div small{color:#e5e7eb!important}
+
+.morning-brief-summary .morning-brief-allocation{display:block;font-size:12px;font-weight:400;line-height:1.5;opacity:.78;margin-top:4px}
