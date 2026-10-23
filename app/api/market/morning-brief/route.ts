@@ -1,6 +1,7 @@
 import {getServerSession} from "next-auth";
 import {authOptions} from "../../../../lib/auth";
 import {NextResponse} from "next/server";
+import {getPolicySignals} from "../../../../lib/policy-news-analysis";
 import {extractHtmlTables,findTableByHeaders,parseMarketNumber} from "../../../../lib/market-table-extractor";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -213,13 +214,14 @@ export async function GET(request:Request){
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
  const now=taipeiParts(),reportDate=now.date,referenceDate=priorTaiwanTradingDay(new Date());
- const [quotes,twse,news,margin,futuresOptions,wantgooRatio]=await Promise.all([
+ const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+referenceDate.replace(/-/g,"")+"&response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
   latestMargin(),
   latestFuturesOptions(),
-  wantgooPutCall()
+  wantgooPutCall(),
+  getPolicySignals()
  ]);
  const validatedMargin=margin?.date===referenceDate?margin:null;
  const marginBorrow=validatedMargin&&"borrowBalance" in validatedMargin?validatedMargin as HiStockMargin:null;
@@ -272,11 +274,11 @@ export async function GET(request:Request){
   {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
   {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
   {title:"技術面與量能",body:"開盤先看能否站穩開盤價、量能是否放大及5日線位置。",sentiment:"neutral",verdict:"等開盤確認"},
-  {title:"重大政策與科技",body:title?"焦點新聞："+title.slice(0,85)+(title.length>85?"…":""):"關注聯準會、川普政策與AI供應鏈；暫無可核對重大標題。",sentiment:"neutral",verdict:"事件影響待確認"},
+  {title:"重大政策與科技",body:policySignals.items.length?policySignals.items.map((item,i)=>(i+1)+"．"+item.title+"｜影響："+item.sector+"｜"+(item.impact==="bullish"?"偏利多":"偏利空")+"："+item.reason+"。").join(" ")+(policySignals.score===0?" 綜合結論：利多利空交錯，短線偏中性。":policySignals.score!==null&&policySignals.score>0?" 綜合結論：政策與科技消息偏利多，仍須留意實際財報與市場反應。":" 綜合結論：政策與科技消息偏利空，注意相關族群風險。"):"近48小時未找到可由標題確認方向的重大政策或科技事件，暫不推論利多利空。",sentiment:mood(policySignals.score),verdict:policySignals.score===null?"事件待確認":policySignals.score>0?"消息偏利多":policySignals.score<0?"消息偏利空":"消息多空分歧"},
   {title:"今日盤前小總結",body:stance+"。"+allocationAdvice+" 優先確認開盤量價、台幣與法人方向；不追高，槓桿部位嚴守風控。",sentiment:mood(abroadScore),verdict:abroadScore===null?"資訊不足":abroadScore>0?"偏多觀察":abroadScore<0?"偏空謹慎":"中性觀望"}
  ];
  const missing=[!validatedMargin?"融資融券":null,validatedFutures?.foreignTxNet==null?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
  const dataComplete=missing.length===0;
  if(!dataComplete){const summary=sections.find(x=>x.title==="今日盤前小總結");if(summary){summary.body="資料尚未齊全（"+missing.join("、")+"），暫不提供確定性多空結論或股票倉位百分比建議。請先核對基準日 "+referenceDate+" 的完整籌碼；現階段保守觀望。";summary.verdict="資料未齊，保守觀望";summary.sentiment="neutral";}}
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
