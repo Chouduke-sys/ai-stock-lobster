@@ -747,6 +747,10 @@ useEffect(()=>{
       </section>
 
 
+      <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
+        {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
+      </section>
+
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業成交資金集中與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
         <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
@@ -763,10 +767,6 @@ useEffect(()=>{
           {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
         </div>
         <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
-      </section>
-
-      <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
-        {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
       <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
