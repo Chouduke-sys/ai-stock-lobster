@@ -571,12 +571,12 @@ useEffect(()=>{
           <div className="holdings-fund-title">今日 AI 供應鏈成交熱度 <span>{aiFlow?.asOf??"讀取中"} · 上市盤後資料</span></div>
           <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+aiFlow.groups[0].name+"（"+(aiFlow.groups[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
           {aiFlow?.groups?.slice(0,10).map(g=><div className="holdings-row" key={g.name}>
-            <span className="holdings-name">{g.name}<small> {g.chain}</small></span>
+            <span className="holdings-name">{g.name}<small> {g.chain}</small><small className="sector-companies">代表公司：{g.stocks.map(stock=>stock.name+"（"+stock.symbol+"）").join("、")||"尚無成分股資料"}</small></span>
             <div className="holdings-bar"><i style={{width:(g.turnover/Math.max(aiFlow.groups[0].turnover,1)*100).toFixed(1)+"%"}}/></div>
             <strong>{(g.turnover/1e8).toFixed(1)}億</strong>
           </div>)}
           <p className="footnote">分類採本站 AI 供應鏈觀察清單；不同族群可能共用成分股。僅比較各群成分股成交金額，不可視為資金淨流入排名。</p>
-          <p className="footnote">產業代表公司請以各族群實際成分股清單為準；尚未串接完整對照資料前，不會自行指定公司。</p>
+          <p className="footnote">代表公司來自本站產業觀察清單及證交所股票名稱，每組顯示成交金額較高的最多五家公司；並非產業完整名單。</p>
         </section>
         </div>
         <div className="hero-visual">
