@@ -58,13 +58,14 @@ async function histockMargin():Promise<HiStockMargin|null>{
   const dateIndex=idx(/日期/),financeIndex=idx(/融資餘額/),financeChangeIndex=idx(/融資增加/),shortIndex=idx(/融券餘額/),shortChangeIndex=idx(/融券增加/);
   const pageYear=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Taipei",year:"numeric"}).slice(0,4);
   const year=Number(pageYear);
+  const taipeiMonth=Number(new Date().toLocaleDateString("en-US",{timeZone:"Asia/Taipei",month:"numeric"}));
   const parsed=table.rows.flatMap(row=>{
    const dateValue=row[dateIndex]??"";
    const m=dateValue.match(/^(?:(20\d{2})[\/-])?(\d{1,2})[\/-](\d{1,2})$/);
    if(!m)return [];
    const month=Number(m[2]),day=Number(m[3]);
    if(month<1||month>12||day<1||day>31)return [];
-   const resolvedYear=m[1]?Number(m[1]):month>new Date().getUTCMonth()+2?year-1:year;
+   const resolvedYear=m[1]?Number(m[1]):month>taipeiMonth+1?year-1:year;
    const date=resolvedYear+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0");
    const financingBalance=parseMarketNumber(row[financeIndex]??"");
    const financingChange=parseMarketNumber(row[financeChangeIndex]??"");
