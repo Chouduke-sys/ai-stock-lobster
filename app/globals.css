@@ -258,3 +258,6 @@
 .index-points-chart .index-volume-empty{position:relative;margin-top:8px}
 .index-points-chart>.footnote{position:static;display:block;margin-top:10px;line-height:1.6}
 @media(max-width:640px){.index-points-chart .axis-x-labels,.sparkline .index-points-chart .axis-x-labels{width:calc(100% - 80px);font-size:9px;height:26px}}
+
+@supports (padding-top: env(safe-area-inset-top)) {.site-shell{padding-top:env(safe-area-inset-top,0px)}}
+@media(max-width:640px){.topbar{min-height:76px;height:auto;gap:10px}.topbar .mobile-menu{display:inline-flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-width:48px;border-radius:12px;touch-action:manipulation;position:relative;z-index:6}.global-news-expanded{max-height:360px!important;min-height:0!important;overflow-y:auto;-webkit-overflow-scrolling:touch}}
