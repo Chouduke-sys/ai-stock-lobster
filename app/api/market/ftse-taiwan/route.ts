@@ -19,8 +19,8 @@ export async function GET() {
     const changePercent = Number(match[6]);
     const quoteTime = new Date(match[1] + "T" + match[2] + ":00+08:00");
     const ageMinutes = (Date.now() - quoteTime.getTime()) / 60000;
-    if (![price, change, changePercent, ageMinutes].every(Number.isFinite) || price <= 0 || ageMinutes < -20 || ageMinutes > 1440 || Math.abs(changePercent) > 30 || Math.abs(changePercent - change / (price - change) * 100) > 0.25) throw new Error("富台指報價資料不一致或已過期");
-    return NextResponse.json({status:"ok",price,change,changePercent,quoteTime:quoteTime.toISOString(),delayMinutes:Number(match[3]),source:"玩股網 STWN&（延遲報價）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
+    if (![price, change, changePercent, ageMinutes].every(Number.isFinite) || price <= 0 || ageMinutes < -20 || ageMinutes > 10080 || Math.abs(changePercent) > 30 || Math.abs(changePercent - change / (price - change) * 100) > 0.25) throw new Error("富台指報價資料不一致或已過期");
+    return NextResponse.json({status:"ok",price,change,changePercent,quoteTime:quoteTime.toISOString(),delayMinutes:Number(match[3]),source:"玩股網 STWN&（延遲報價）",isRealtime:false,isStale:ageMinutes>60},{headers:{"Cache-Control":"no-store"}});
   } catch(e) {
     return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"富台指報價暫無資料"},{status:503,headers:{"Cache-Control":"no-store"}});
   }
