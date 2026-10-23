@@ -425,3 +425,13 @@
 .sector-rotation-row.rotation-unknown{border-left:5px solid #64748b}
 .sector-rotation-row .rotation-status{align-self:flex-end}
 @media(max-width:640px){.sector-rotation-legend{gap:6px}.sector-rotation-legend span{font-size:10px;padding:5px 7px}}
+
+
+/* Fill the entire sector momentum card, not only its left border. */
+.sector-rotation-row.rotation-fast-in{background:#6f2028!important;border:1px solid #e05252!important;border-left:5px solid #ef4444!important}
+.sector-rotation-row.rotation-slow-in{background:#724013!important;border:1px solid #e99535!important;border-left:5px solid #f59e0b!important}
+.sector-rotation-row.rotation-slow-out{background:#66530d!important;border:1px solid #d7b831!important;border-left:5px solid #eab308!important}
+.sector-rotation-row.rotation-fast-out{background:#164c33!important;border:1px solid #39a66b!important;border-left:5px solid #22c55e!important}
+.sector-rotation-row.rotation-unknown{background:#374151!important;border:1px solid #64748b!important;border-left:5px solid #94a3b8!important}
+.sector-rotation-row>div strong{color:#fff!important}
+.sector-rotation-row>div small{color:#e5e7eb!important}
