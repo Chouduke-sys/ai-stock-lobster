@@ -228,8 +228,8 @@ export async function GET(request:Request){
   {title:"重大政策與科技",body:title?"焦點新聞："+title.slice(0,85)+(title.length>85?"…":""):"關注聯準會、川普政策與AI供應鏈；暫無可核對重大標題。",sentiment:"neutral",verdict:"事件影響待確認"},
   {title:"今日盤前小總結",body:stance+"。"+allocationAdvice+" 優先確認開盤量價、台幣與法人方向；不追高，槓桿部位嚴守風控。",sentiment:mood(abroadScore),verdict:abroadScore===null?"資訊不足":abroadScore>0?"偏多觀察":abroadScore<0?"偏空謹慎":"中性觀望"}
  ];
- const missing=[!validatedMargin?"融資融券":null,!validatedFutures?.foreignTxNet?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
+ const missing=[!validatedMargin?"融資融券":null,validatedFutures?.foreignTxNet==null?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
  const dataComplete=missing.length===0;
- if(!dataComplete){const summary=sections.find(x=>x.title==="今日盤前小總結");if(summary){summary.body="資料尚未齊全（"+missing.join("、")+"），暫不提供完整九大板塊的確定性多空結論或積極倉位建議。其餘訊號僅供參考；"+summary.body;summary.verdict="資料未齊，保守觀望";summary.sentiment="neutral";}}
+ if(!dataComplete){const summary=sections.find(x=>x.title==="今日盤前小總結");if(summary){summary.body="資料尚未齊全（"+missing.join("、")+"），暫不提供確定性多空結論或股票倉位百分比建議。請先核對基準日 "+referenceDate+" 的完整籌碼；現階段保守觀望。";summary.verdict="資料未齊，保守觀望";summary.sentiment="neutral";}}
  return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
