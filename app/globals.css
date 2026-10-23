@@ -261,3 +261,41 @@
 
 @supports (padding-top: env(safe-area-inset-top)) {.site-shell{padding-top:env(safe-area-inset-top,0px)}}
 @media(max-width:640px){.topbar{min-height:76px;height:auto;gap:10px}.topbar .mobile-menu{display:inline-flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;height:48px;min-width:48px;border-radius:12px;touch-action:manipulation;position:relative;z-index:6}.global-news-expanded{max-height:360px!important;min-height:0!important;overflow-y:auto;-webkit-overflow-scrolling:touch}}
+
+
+/* Mobile app-style fixed tab bar: desktop layout remains unchanged. */
+.mobile-bottom-nav{display:none}
+@media(max-width:640px){
+ .site-shell{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+ .mobile-bottom-nav{position:fixed;z-index:100;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;padding:8px max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));background:#101e30;border-top:1px solid #34465d;box-shadow:0 -8px 25px rgba(0,0,0,.22)}
+ .mobile-bottom-nav button{appearance:none;border:0;background:transparent;color:#a8b7cb;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;min-height:52px;padding:5px 0;font-size:11px;font-weight:700;white-space:nowrap;touch-action:manipulation}
+ .mobile-bottom-nav button.active{color:#ff9566}
+ .mobile-bottom-nav button:focus-visible{outline:2px solid #ff9566;outline-offset:-3px;border-radius:9px}
+ .site-shell[data-mobile-tab] > .morning-brief,
+ .site-shell[data-mobile-tab] > .hero,
+ .site-shell[data-mobile-tab] > .volume-leaders-panel,
+ .site-shell[data-mobile-tab] > .vix-panel,
+ .site-shell[data-mobile-tab] > .stats-grid,
+ .site-shell[data-mobile-tab] > #rankings,
+ .site-shell[data-mobile-tab] > #five-day-institutional,
+ .site-shell[data-mobile-tab] > #charts,
+ .site-shell[data-mobile-tab] > .membership,
+ .site-shell[data-mobile-tab] > footer{display:none!important}
+ .site-shell[data-mobile-tab="home"] > .morning-brief,
+ .site-shell[data-mobile-tab="home"] > .hero,
+ .site-shell[data-mobile-tab="home"] > .vix-panel,
+ .site-shell[data-mobile-tab="home"] > .stats-grid,
+ .site-shell[data-mobile-tab="sectors"] > .hero,
+ .site-shell[data-mobile-tab="sectors"] > .volume-leaders-panel,
+ .site-shell[data-mobile-tab="flows"] > #rankings,
+ .site-shell[data-mobile-tab="flows"] > #five-day-institutional,
+ .site-shell[data-mobile-tab="charts"] > #charts,
+ .site-shell[data-mobile-tab="account"] > .membership{display:block!important}
+ .site-shell[data-mobile-tab="home"] > .hero .holdings-panel{display:none!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-visual{display:none!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy > :not(.holdings-panel){display:none!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy .holdings-panel{display:block!important;margin-top:0}
+ .site-shell[data-mobile-tab="sectors"] > .hero{display:block!important;padding:0}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy{display:block!important;padding:0!important}
+ .site-shell[data-mobile-tab="home"] > .hero{display:grid!important}
+}
