@@ -279,6 +279,25 @@ export async function GET(request:Request){
  ];
  const missing=[!validatedMargin?"融資融券":null,validatedFutures?.foreignTxNet==null?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
  const dataComplete=missing.length===0;
- if(!dataComplete){const summary=sections.find(x=>x.title==="今日盤前小總結");if(summary){summary.body="資料尚未齊全（"+missing.join("、")+"），暫不提供確定性多空結論或股票倉位百分比建議。請先核對基準日 "+referenceDate+" 的完整籌碼；現階段保守觀望。";summary.verdict="資料未齊，保守觀望";summary.sentiment="neutral";}}
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ const firstEight=sections.slice(0,8);
+ const bullishCount=firstEight.filter(item=>item.sentiment==="bullish").length;
+ const bearishCount=firstEight.filter(item=>item.sentiment==="bearish").length;
+ const neutralCount=firstEight.length-bullishCount-bearishCount;
+ const overallDirection=bullishCount>bearishCount?"bullish":bearishCount>bullishCount?"bearish":"neutral";
+ const overallLabel=overallDirection==="bullish"?"利多":overallDirection==="bearish"?"利空":"多空中性";
+ const overallAllocation=overallDirection==="bullish"
+  ?bullishCount-bearishCount>=3?{low:65,high:80}:{low:50,high:65}
+  :overallDirection==="bearish"
+  ?bearishCount-bullishCount>=3?{low:20,high:35}:{low:30,high:45}
+  :{low:40,high:55};
+ const coverage=bullishCount+bearishCount;
+ const confidenceNote=coverage<3?"目前具方向性的板塊較少，建議採區間下緣並等待更多訊號確認。":"仍需留意開盤後量價是否支持盤前判斷。";
+ const overallStance="前八大板塊綜合評估："+overallLabel+"（利多 "+bullishCount+"、利空 "+bearishCount+"、中性或待確認 "+neutralCount+"）。建議股票總倉位 "+overallAllocation.low+"%～"+overallAllocation.high+"%。";
+ const summary=sections.find(item=>item.title==="今日盤前小總結");
+ if(summary){
+  summary.body="綜合結論："+overallLabel+"。前八板塊利多 "+bullishCount+" 項、利空 "+bearishCount+" 項、中性或待確認 "+neutralCount+" 項。建議股票總倉位 "+overallAllocation.low+"%～"+overallAllocation.high+"%，保留現金 "+(100-overallAllocation.high)+"%～"+(100-overallAllocation.low)+"%。"+confidenceNote+" 倉位以帳戶淨資產為基準，融資持股市值亦計入總曝險。";
+  summary.sentiment=overallDirection;
+  summary.verdict=overallLabel;
+ }
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,quotes,sections,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
