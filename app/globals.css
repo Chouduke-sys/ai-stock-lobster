@@ -392,3 +392,19 @@
    border-radius:12px!important;
  }
 }
+
+
+/* Member industry turnover and rotation insights */
+.sector-rotation-member{margin-top:22px}
+.sector-rotation-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:10px;margin-top:16px}
+.sector-rotation-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid #34445c;background:#142338;border-radius:12px;padding:14px}
+.sector-rotation-row>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.sector-rotation-row>div:last-child{text-align:right;flex-shrink:0}
+.sector-rotation-row strong{font-size:14px}
+.sector-rotation-row small{font-size:11px;color:#9caec7;line-height:1.5}
+@media(max-width:640px){
+ .site-shell[data-mobile-tab] > .sector-rotation-member{display:none!important}
+ .site-shell[data-mobile-tab="account"] > .sector-rotation-member{display:block!important}
+ .sector-rotation-list{grid-template-columns:minmax(0,1fr)}
+ .sector-rotation-member{margin-top:16px}
+}
