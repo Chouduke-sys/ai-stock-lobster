@@ -264,6 +264,22 @@ useEffect(()=>{
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
+  const [leaderNews,setLeaderNews]=useState<{symbol:string;name:string;title:string;url:string;publishedAt:string|null;source:string}[]>([]);
+  const [leaderNewsError,setLeaderNewsError]=useState("");
+  const leaderKey=aiFlow?.volumeLeaders?.slice(0,10).map(x=>x.symbol+":"+x.name).join(",")??"";
+  useEffect(()=>{
+    if(!leaderKey){setLeaderNews([]);return;}
+    const controller=new AbortController();
+    const load=async()=>{try{
+      const response=await fetch("/api/market/volume-leader-news?stocks="+encodeURIComponent(leaderKey),{signal:controller.signal});
+      const data=await response.json();
+      if(!response.ok||data.status!=="ok")throw new Error(data.error||"新聞資料暫不可用");
+      if(!controller.signal.aborted){setLeaderNews(data.items??[]);setLeaderNewsError("");}
+    }catch(e){if(!controller.signal.aborted)setLeaderNewsError(e instanceof Error?e.message:"新聞資料暫不可用");}};
+    void load();const timer=setInterval(()=>void load(),600000);
+    return()=>{controller.abort();clearInterval(timer);};
+  },[leaderKey]);
+
   const [sectorHistory,setSectorHistory]=useState<{date:string;groups:{name:string;turnover:number}[]}[]>([]);
   useEffect(()=>{
     try{const saved=JSON.parse(localStorage.getItem("lobster-sector-turnover-history-v1")||"[]") as {date:string;groups:{name:string;turnover:number}[]}[];if(Array.isArray(saved))setSectorHistory(saved.slice(-25));}catch{}
@@ -698,16 +714,21 @@ useEffect(()=>{
       </section>
 
       <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
-        <div className="section-heading"><div><div className="eyebrow">VOLUME & INSTITUTIONAL FLOW</div><h2>當日量能熱門股／法人積極買超</h2><p>以成交金額衡量當日市場關注度；以三大法人買超衡量機構買盤。大戶連續買進需要持股分級或連續多日資料，不能直接由法人單日買超推定。</p></div></div>
+        <div className="section-heading"><div><div className="eyebrow">VOLUME & COMPANY NEWS</div><h2>當日成交金額熱門股／公司最新新聞</h2><p>左側依上市個股成交金額排名；右側對應各公司的最新新聞，方便追蹤量能與題材。</p></div></div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
           <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
           {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
           {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
-          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">三大法人買超 Top 10</div><p className="holdings-date">資料日期：{aiFlow?.institutionalDate??"待確認"} · 買超股數，不等於大戶連買</p>
-          {aiFlow?.buyers?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>+{(x.shares/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})} 張</strong></div>)}
-          {!aiFlow?.buyers?.length&&<p className="footnote">{aiFlowError||"法人當日資料尚未公布或未取得。"}</p>}</div>
+          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">成交金額 Top 10 公司最新新聞</div><p className="holdings-date">依左側成交金額排名對應 · 近七天新聞 · 每十分鐘檢查</p>
+          {aiFlow?.volumeLeaders?.slice(0,10).map((stock,i)=>{const article=leaderNews.find(n=>n.symbol===stock.symbol);return <div className="holdings-row" key={stock.symbol} style={{alignItems:"flex-start",gap:12}}>
+            <span className="holdings-name" style={{minWidth:85,flexShrink:0}}>{i+1}. {stock.name} <small>{stock.symbol}</small></span>
+            <span style={{flex:1,minWidth:0,textAlign:"left",fontSize:13,lineHeight:1.5}}>{article?<a href={article.url} target="_blank" rel="noopener noreferrer" style={{color:"inherit",textDecoration:"underline",textUnderlineOffset:3}}>{article.title}</a>:<span style={{opacity:.65}}>近七天尚無可取得新聞</span>}{article?.publishedAt&&<small style={{display:"block",opacity:.65}}>{new Date(article.publishedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} · {article.source}</small>}</span>
+          </div>;})}
+          {!aiFlow?.volumeLeaders?.length&&<p className="footnote">{aiFlowError||"成交金額排行載入中…"}</p>}
+          {leaderNewsError&&<p className="footnote">新聞來源暫不可用：{leaderNewsError}</p>}
+          </div>
         </div>
-        <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。真正的「大戶持續狂買」須另外接入集保股權分散表、券商分點或多日法人紀錄。</p>
+        <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。新聞來源：Google 新聞 RSS，搜尋結果不代表公司官方公告，請點閱原文確認。</p>
       </section>
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="mobile-us-futures-summary"><strong>美股期貨參考</strong><p>{usFutures?usFutures.name+"："+formatPrice(usFutures.price)+" 點"+(usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""):"目前無可用的美股期貨報價"}</p><small>{usFutures?.quoteTime?"資料時間："+new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"資料時間待確認"} · 期貨行情可能延遲</small></div>
