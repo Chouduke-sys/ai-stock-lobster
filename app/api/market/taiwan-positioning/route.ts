@@ -10,8 +10,8 @@ function parseTable(html:string, heading:string):Row[]{
   const section=html.slice(headingAt,headingAt+16000);
   const table=section.match(/<table\b[^>]*>[\s\S]*?<\/table>/i)?.[0];
   if(!table)return [];
-  return [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(m=>{
-    const cells=[...m[1].matchAll(/<(?:td|th)\b[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)].map(c=>decode(c[1]));
+  return Array.from(table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)).map(m=>{
+    const cells=Array.from(m[1].matchAll(/<(?:td|th)\b[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)).map(c=>decode(c[1]));
     return {label:cells[0]||"",values:cells.slice(1)};
   }).filter(r=>r.label&&r.values.length>0).slice(0,12);
 }
