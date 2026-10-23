@@ -140,6 +140,21 @@ export default function Home() {
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
+  const [ftse,setFtse]=useState<{price:number;change:number;changePercent:number;quoteTime:string;delayMinutes:number;source:string}|null>(null);
+  const [ftseError,setFtseError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    async function load(){
+      try{
+        const response=await fetch("/api/market/ftse-taiwan",{cache:"no-store"});
+        const data=await response.json();
+        if(!response.ok||data.status!=="ok")throw new Error(data.error||"報價暫不可用");
+        if(active){setFtse(data);setFtseError("");}
+      }catch(e){if(active){setFtse(null);setFtseError(e instanceof Error?e.message:"報價暫不可用");}}
+    }
+    void load();const timer=setInterval(()=>{void load();},60000);
+    return ()=>{active=false;clearInterval(timer);};
+  },[]);
   const [vix,setVix]=useState<{value:number;change:number|null;quoteTime:string|null;source:string}|null>(null);
   const [vixError,setVixError]=useState("");
   const [usFutures,setUsFutures]=useState<{status:string;name:string;symbol:string;price:number;change:number|null;quoteTime:string|null;points:{time:string;value:number}[];source:string}|null>(null);
@@ -631,6 +646,18 @@ useEffect(()=>{
               <strong style={{display:"block",fontSize:24}}>{formatPrice(night?.price)}</strong>
               <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 5 秒查詢` : nightError || "讀取中"}</small>
             </div>
+          </div>
+          <div style={{border:"1px solid #64748b55",borderRadius:12,padding:14,margin:"0 0 14px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",marginBottom:12}}>
+              <strong style={{fontSize:17}}>富台指換算台指參考點數</strong>
+              <small style={{color:"#94a3b8"}}>海外市場方向參考 · 非開盤預測</small>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:10}}>
+              <div><small>富台指 · 玩股網</small><strong style={{display:"block",fontSize:23}}>{formatPrice(ftse?.price)}</strong><small style={{color:ftse?.changePercent!=null?(ftse.changePercent>=0?"#fb7969":"#42c4a5"):undefined}}>{ftse?(ftse.changePercent>=0?"+":"")+ftse.changePercent.toFixed(2)+"%":"暫無有效報價"}</small></div>
+              <div><small>推估台指參考點位</small><strong style={{display:"block",fontSize:23}}>{ftse&&closing?.value!=null?formatPrice(closing.value*(1+ftse.changePercent/100)):"—"}</strong><small>{ftse&&closing?.value!=null?"以加權指數前收盤 × 富台指漲跌幅":"等待富台指及加權指數收盤資料"}</small></div>
+              <div><small>推估台指變動</small><strong style={{display:"block",fontSize:23,color:ftse?.changePercent!=null?(ftse.changePercent>=0?"#fb7969":"#42c4a5"):undefined}}>{ftse&&closing?.value!=null?(ftse.changePercent>=0?"+":"")+formatPrice(closing.value*ftse.changePercent/100)+" 點":"—"}</strong><small>{ftse&&night?.price&&closing?.value!=null?"與台指期夜盤差 "+formatPrice(night.price-closing.value*(1+ftse.changePercent/100))+" 點":"夜盤差距待有效報價"}</small></div>
+            </div>
+            <p className="footnote" style={{margin:"10px 0 0"}}>{ftse?"玩股網 STWN& · 報價 "+new Date(ftse.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · 網站標示延遲 "+ftse.delayMinutes+" 分鐘":ftseError||"正在讀取富台指"}。以同漲跌幅估算，不是精準換算；富台指與加權指數成分、基差不同，休市及報價延遲時請勿當作即時開盤價。</p>
           </div>
           <div className="market-volume-card">
             <div><small>上市市場 · 最近公布交易量</small><strong>{closing?.tradeVolume!=null?(closing.tradeVolume/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})+" 張":"—"}</strong><small>{closing?closing.date+" · 全市場成交股數換算（1 張＝1,000 股）":closingError||"讀取中"}</small></div>
