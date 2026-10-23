@@ -752,7 +752,8 @@ useEffect(()=>{
       </section>
 
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
-        <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業成交資金集中與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
+        <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
+        {memberLoading ? <p className="footnote">正在確認會員登入狀態…</p> : !member ? <div className="morning-brief-preview-overlay" style={{position:"relative",inset:"auto",minHeight:220}}><LockKeyhole size={30}/><h3>會員解鎖產業資金輪動追蹤</h3><p>登入會員後即可查看各產業成交熱度、資金集中與退燒變化。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<button className="btn btn-primary" onClick={()=>setShowLogin(true)}>會員登入／查看登入方式</button>}</div></div> : <>
         <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
         <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
         <p className="footnote">試行判讀門檻：相較前一筆不同交易日快照，成交金額增加達 20% 為快速集中、增加 0% 至未滿 20% 為緩慢增加；減少未滿 20% 為緩慢減少、減少達 20% 為快速減少。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
@@ -771,6 +772,7 @@ useEffect(()=>{
           {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
         </div>
         <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
+        </>}
       </section>
 
       <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
