@@ -1,6 +1,7 @@
 import {getServerSession} from "next-auth";
 import {authOptions} from "../../../../lib/auth";
 import {NextResponse} from "next/server";
+import {extractHtmlTables,findTableByHeaders,parseMarketNumber} from "../../../../lib/market-table-extractor";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 type Q={label:string;symbol:string;value:number|null;changePct:number|null;time:string|null};
@@ -50,14 +51,32 @@ async function histockMargin():Promise<HiStockMargin|null>{
   const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:600},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
-  const plain=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/gi," ").replace(/\s+/g," ");
-  const dateMatch=plain.match(/(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})/);
-  if(!dateMatch)return null;
-  const date=dateMatch[1]+"-"+dateMatch[2].padStart(2,"0")+"-"+dateMatch[3].padStart(2,"0");
-  const parseRow=(label:string)=>{const pattern=new RegExp(label+"\\s+([\\d,]+(?:\\.\\d+)?)\\s*(億|張)?\\s*([+-]\\s*[\\d,]+(?:\\.\\d+)?)\\s*(億|張)?");const m=plain.match(pattern);if(!m)return null;return {balance:Number(m[1].replace(/,/g,"")),change:Number(m[3].replace(/[,\s]/g,"")),unit:m[2]??m[4]??""};};
-  const financing=parseRow("融資"),short=parseRow("融券"),borrow=parseRow("借券賣出");
-  if(!financing||!short||!Number.isFinite(financing.balance)||!Number.isFinite(short.balance))return null;
-  return {date,financingBalance:financing.balance,financingChange:financing.change,shortBalance:short.balance,shortChange:short.change,borrowBalance:borrow?.balance??null,borrowChange:borrow?.change??null,source:"HiStock 融資融券餘額（"+date+"；融資億元、融券及借券張）"};
+  const tables=extractHtmlTables(html);
+  const table=findTableByHeaders(tables,[/日期/,/融資餘額/,/融資增加/,/融券餘額/,/融券增加/]);
+  if(!table)return null;
+  const idx=(pattern:RegExp)=>table.headers.findIndex(h=>pattern.test(h));
+  const dateIndex=idx(/日期/),financeIndex=idx(/融資餘額/),financeChangeIndex=idx(/融資增加/),shortIndex=idx(/融券餘額/),shortChangeIndex=idx(/融券增加/);
+  const pageYear=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Taipei",year:"numeric"}).slice(0,4);
+  const year=Number(pageYear);
+  const parsed=table.rows.flatMap(row=>{
+   const dateValue=row[dateIndex]??"";
+   const m=dateValue.match(/^(?:(20\d{2})[\/-])?(\d{1,2})[\/-](\d{1,2})$/);
+   if(!m)return [];
+   const month=Number(m[2]),day=Number(m[3]);
+   if(month<1||month>12||day<1||day>31)return [];
+   const resolvedYear=m[1]?Number(m[1]):month>new Date().getUTCMonth()+2?year-1:year;
+   const date=resolvedYear+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+   const financingBalance=parseMarketNumber(row[financeIndex]??"");
+   const financingChange=parseMarketNumber(row[financeChangeIndex]??"");
+   const shortBalance=parseMarketNumber(row[shortIndex]??"");
+   const shortChange=parseMarketNumber(row[shortChangeIndex]??"");
+   if(financingBalance===null||financingChange===null||shortBalance===null||shortChange===null)return [];
+   if(financingBalance<0||shortBalance<0)return [];
+   return [{date,financingBalance,financingChange,shortBalance,shortChange}];
+  }).sort((x,y)=>y.date.localeCompare(x.date));
+  const latest=parsed[0];
+  if(!latest)return null;
+  return {...latest,borrowBalance:null,borrowChange:null,source:"HiStock 上市融資融券近三十日行情（融資億元；融券張）"};
  }catch{return null;}
 }
 async function latestMargin():Promise<MarginData|null>{
