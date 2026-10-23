@@ -754,14 +754,18 @@ useEffect(()=>{
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業成交資金集中與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
         <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
+        <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
+        <p className="footnote">試行判讀門檻：相較前一筆不同交易日快照，成交金額增加達 20% 為快速集中、增加 0% 至未滿 20% 為緩慢增加；減少未滿 20% 為緩慢減少、減少達 20% 為快速減少。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
         <div className="sector-rotation-list">
           {aiFlow?.groups?.map((g,i)=>{
             const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
             const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
             const change=prior&&prior>0?(g.turnover/prior-1)*100:null;
-            return <article className="sector-rotation-row" key={g.name}>
+            const rotationClass=change==null?"rotation-unknown":change>=20?"rotation-fast-in":change>0?"rotation-slow-in":change<=-20?"rotation-fast-out":"rotation-slow-out";
+            const rotationLabel=change==null?"資料不足":change>=20?"資金快速集中":change>0?"資金緩慢流入":change<=-20?"資金快速流出":"資金緩慢流出";
+            return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
               <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
-              <div><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small className={change==null?"":change>0?"market-up":change<0?"market-down":""}>{change==null?"歷史資料累積中":(change>0?"+":"")+change.toFixed(1)+"%（較 "+older?.date+"）"}</small></div>
+              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{change==null?"歷史資料累積中":(change>0?"+":"")+change.toFixed(1)+"%（較 "+older?.date+"）"}</small></div>
             </article>;
           })}
           {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
