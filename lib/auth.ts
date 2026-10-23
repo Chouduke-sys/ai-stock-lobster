@@ -10,7 +10,7 @@ if(process.env.APPLE_CLIENT_ID&&process.env.APPLE_CLIENT_SECRET){
 }
 export const authOptions:NextAuthOptions={
  providers,
- session:{strategy:"jwt",maxAge:30*24*60*60},
+ session:{strategy:"jwt",maxAge:7*24*60*60},
  secret:process.env.NEXTAUTH_SECRET,
  pages:{signIn:"/"},
  callbacks:{
