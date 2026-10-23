@@ -581,8 +581,8 @@ useEffect(()=>{
             <a href="https://news.futunn.com/main" target="_blank" rel="noopener noreferrer" style={{color:"#fb725b",fontSize:14}}>前往富途牛牛查看最新新聞 ↗</a>
             <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
           </div>
-        <section className="holdings-panel" aria-label="AI熱門概念股-資金集中產業排行榜">
-          <div className="holdings-heading"><span>AI熱門概念股-資金集中產業排行榜</span><small>CCL／PCB／先進封裝上下游</small></div>
+        <section className="holdings-panel" aria-label="AI熱門產業概念股-資金成交熱度">
+          <div className="holdings-heading"><span>AI熱門產業概念股-資金成交熱度</span><small>CCL／PCB／先進封裝上下游</small></div>
           <div className="holdings-fund-title">今日 AI 供應鏈成交熱度 <span>{aiFlow?.asOf??"讀取中"} · 上市盤後資料</span></div>
           <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+aiFlow.groups[0].name+"（"+(aiFlow.groups[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
           {aiFlow?.groups?.slice(0,10).map(g=><div className="holdings-row" key={g.name}>
