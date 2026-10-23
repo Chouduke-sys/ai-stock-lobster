@@ -562,6 +562,29 @@ useEffect(()=>{
         {member&&morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
         <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
+      <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
+        <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
+        {member ? <>
+        <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
+        <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
+        <p className="footnote">試行判讀門檻：相較前一筆不同交易日快照，成交金額增加達 20% 為快速集中、增加 0% 至未滿 20% 為緩慢增加；減少未滿 20% 為緩慢減少、減少達 20% 為快速減少。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
+        <div className="sector-rotation-list">
+          {aiFlow?.groups?.map((g,i)=>{
+            const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
+            const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
+            const change=prior&&prior>0?(g.turnover/prior-1)*100:null;
+            const rotationClass=change==null?"rotation-unknown":change>=20?"rotation-fast-in":change>0?"rotation-slow-in":change<=-20?"rotation-fast-out":"rotation-slow-out";
+            const rotationLabel=change==null?"資料不足":change>=20?"資金快速集中":change>0?"資金緩慢流入":change<=-20?"資金快速流出":"資金緩慢流出";
+            return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
+              <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
+              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{change==null?"歷史資料累積中":(change>0?"+":"")+change.toFixed(1)+"%（較 "+older?.date+"）"}</small></div>
+            </article>;
+          })}
+          {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
+        </div>
+        <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
+        </> : <p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後與每日 08:30 台股盤前分析一同解鎖，無需再次登入。</p>}
+      </section>
       <section className="hero hero-balanced">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
           <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 多來源重要新聞</div>
@@ -751,29 +774,7 @@ useEffect(()=>{
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
 
-      <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
-        <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
-        {memberLoading ? <p className="footnote">正在確認會員登入狀態…</p> : !member ? <div className="morning-brief-preview-overlay" style={{position:"relative",inset:"auto",minHeight:220}}><LockKeyhole size={30}/><h3>會員解鎖產業資金輪動追蹤</h3><p>登入會員後即可查看各產業成交熱度、資金集中與退燒變化。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<button className="btn btn-primary" onClick={()=>setShowLogin(true)}>會員登入／查看登入方式</button>}</div></div> : <>
-        <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
-        <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
-        <p className="footnote">試行判讀門檻：相較前一筆不同交易日快照，成交金額增加達 20% 為快速集中、增加 0% 至未滿 20% 為緩慢增加；減少未滿 20% 為緩慢減少、減少達 20% 為快速減少。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
-        <div className="sector-rotation-list">
-          {aiFlow?.groups?.map((g,i)=>{
-            const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
-            const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
-            const change=prior&&prior>0?(g.turnover/prior-1)*100:null;
-            const rotationClass=change==null?"rotation-unknown":change>=20?"rotation-fast-in":change>0?"rotation-slow-in":change<=-20?"rotation-fast-out":"rotation-slow-out";
-            const rotationLabel=change==null?"資料不足":change>=20?"資金快速集中":change>0?"資金緩慢流入":change<=-20?"資金快速流出":"資金緩慢流出";
-            return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
-              <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
-              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{change==null?"歷史資料累積中":(change>0?"+":"")+change.toFixed(1)+"%（較 "+older?.date+"）"}</small></div>
-            </article>;
-          })}
-          {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
-        </div>
-        <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
-        </>}
-      </section>
+
 
       <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
         {([{id:"news",label:"新聞",icon:NewsIcon},{id:"market",label:"今日台股",icon:TrendingUp},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"index",label:"加權指數",icon:BarChart3},{id:"flows",label:"法人籌碼",icon:Users},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
