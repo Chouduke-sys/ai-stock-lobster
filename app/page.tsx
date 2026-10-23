@@ -418,7 +418,7 @@ useEffect(()=>{
         try{localStorage.setItem("lobster-last-taiex",JSON.stringify(result));}catch{}
         if(typeof result.value==="number"&&typeof result.quoteTime==="string"){const t=parts(result.quoteTime);if((t.hour>=9&&t.hour<13)||(t.hour===13&&t.minute<=30))setDayPoints(record("taiex",result.quoteTime,result.value));}
       } catch (error) {
-        if (!controller.signal.aborted) { setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
+        if (!controller.signal.aborted) { setTaiex(null);setTaiexError(error instanceof Error ? error.message : "加權指數查詢失敗"); }
       } finally {
         inFlight = false;
         if (!controller.signal.aborted) setLoadingTaiex(false);
