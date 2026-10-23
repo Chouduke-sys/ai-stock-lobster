@@ -43,7 +43,25 @@ async function yahooMargin():Promise<MarginData|null>{
   return {date,financingBalance,financingChange,shortBalance,shortChange,source:"Yahoo 股市（上市；融資億元／融券張）"};
  }catch{return null;}
 }
+
+type HiStockMargin=MarginData & {borrowBalance:number|null;borrowChange:number|null};
+async function histockMargin():Promise<HiStockMargin|null>{
+ try{
+  const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:600},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
+  if(!res.ok)return null;
+  const html=await res.text();
+  const plain=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/gi," ").replace(/\s+/g," ");
+  const dateMatch=plain.match(/(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(!dateMatch)return null;
+  const date=dateMatch[1]+"-"+dateMatch[2].padStart(2,"0")+"-"+dateMatch[3].padStart(2,"0");
+  const parseRow=(label:string)=>{const pattern=new RegExp(label+"\\s+([\\d,]+(?:\\.\\d+)?)\\s*(億|張)?\\s*([+-]\\s*[\\d,]+(?:\\.\\d+)?)\\s*(億|張)?");const m=plain.match(pattern);if(!m)return null;return {balance:Number(m[1].replace(/,/g,"")),change:Number(m[3].replace(/[,\s]/g,"")),unit:m[2]??m[4]??""};};
+  const financing=parseRow("融資"),short=parseRow("融券"),borrow=parseRow("借券賣出");
+  if(!financing||!short||!Number.isFinite(financing.balance)||!Number.isFinite(short.balance))return null;
+  return {date,financingBalance:financing.balance,financingChange:financing.change,shortBalance:short.balance,shortChange:short.change,borrowBalance:borrow?.balance??null,borrowChange:borrow?.change??null,source:"HiStock 融資融券餘額（"+date+"；融資億元、融券及借券張）"};
+ }catch{return null;}
+}
 async function latestMargin():Promise<MarginData|null>{
+ const histock=await histockMargin();if(histock)return histock;
  const yahoo=await yahooMargin();if(yahoo)return yahoo;
  const today=new Date();
  const taipei=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(today);
@@ -184,6 +202,7 @@ export async function GET(request:Request){
   wantgooPutCall()
  ]);
  const validatedMargin=margin?.date===referenceDate?margin:null;
+ const marginBorrow=validatedMargin&&"borrowBalance" in validatedMargin?validatedMargin as HiStockMargin:null;
  const validatedFutures=futuresOptions?.date===referenceDate?futuresOptions:null;
  const validatedWantgoo=wantgooRatio?.date===referenceDate?wantgooRatio:null;
  const by=(symbol:string)=>quotes.find(q=>q.symbol===symbol);
