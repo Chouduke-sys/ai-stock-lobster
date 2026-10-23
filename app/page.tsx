@@ -147,6 +147,10 @@ export default function Home() {
   const [investor, setInvestor] = useState("all");
   const [ftse,setFtse]=useState<{price:number;change:number;changePercent:number;quoteTime:string|null;delayMinutes:number|null;source:string;isStale?:boolean}|null>(null);
   const [ftseError,setFtseError]=useState("");
+  const [positioning,setPositioning]=useState<{status:string;institutional:{label:string;values:string[]}[];margin:{label:string;values:string[]}[];futures:{label:string;values:string[]}[];retrievedAt:string}|null>(null);
+  const [positioningError,setPositioningError]=useState("");
+  useEffect(()=>{let active=true;const load=async()=>{try{const res=await fetch("/api/market/taiwan-positioning",{cache:"no-store"});const data=await res.json();if(!res.ok||data.status!=="ok")throw new Error(data.error||"資料暫不可用");if(active){setPositioning(data);setPositioningError("");}}catch(e){if(active)setPositioningError(e instanceof Error?e.message:"資料暫不可用");}};void load();const timer=setInterval(()=>void load(),300000);return()=>{active=false;clearInterval(timer);};},[]);
+
   useEffect(()=>{
     let active=true;
     async function load(){
@@ -665,6 +669,18 @@ useEffect(()=>{
             </div>
             <p className="footnote" style={{margin:"10px 0 0"}}>{ftse?ftse.source+" · "+(ftse.quoteTime?"報價 "+new Date(ftse.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"來源未提供可驗證報價時間")+" · 非即時報價":ftseError||"正在讀取富台指"}。以同漲跌幅估算，不是精準換算；富台指與加權指數成分、基差不同，休市及報價延遲時請勿當作即時開盤價。</p>
           </div>
+          <section style={{border:"1px solid #64748b55",borderRadius:12,padding:14,margin:"0 0 14px"}}>
+            <strong style={{fontSize:18}}>台股籌碼追蹤｜三大法人・融資融券・期貨未平倉</strong>
+            <p className="footnote">來源：<a href="https://histock.tw/台股大盤" target="_blank" rel="noopener noreferrer">HiStock 台股大盤</a>。以下僅顯示來源可驗證的公開數據，未取得時不使用示範值。</p>
+            {positioningError&&<p className="footnote" role="status">目前無法取得籌碼表格：{positioningError}。可點選來源查看最新資料。</p>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,290px),1fr))",gap:12,marginTop:12}}>
+              {([["三大法人買賣超","institutional"],["融資融券餘額","margin"],["台股期貨未平倉量","futures"]] as const).map(([label,key])=><div key={key} style={{minWidth:0,border:"1px solid #64748b44",borderRadius:10,padding:10}}>
+                <strong>{label}</strong>
+                {positioning?.[key]?.length?<div style={{overflowX:"auto",marginTop:10}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,whiteSpace:"nowrap"}}><tbody>{positioning[key].map((row,i)=><tr key={i}><th scope="row" style={{textAlign:"left",padding:"7px 5px",borderBottom:"1px solid #64748b33"}}>{row.label}</th>{row.values.map((v,j)=><td key={j} style={{textAlign:"right",padding:"7px 5px",borderBottom:"1px solid #64748b33",color:/^-/.test(v)?"#42c4a5":/^\+/.test(v)?"#fb7969":undefined}}>{v}</td>)}</tr>)}</tbody></table></div>:<p className="footnote">尚無可驗證的表格數據</p>}
+              </div>)}
+            </div>
+            <p className="footnote">資料更新：{positioning?.retrievedAt?new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"等待來源回應"}（系統擷取時間，非交易所報價時間）。手機版表格可左右滑動。</p>
+          </section>
           <div className="market-volume-card">
             <div><small>上市市場 · 最近公布交易量</small><strong>{closing?.tradeVolume!=null?(closing.tradeVolume/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})+" 張":"—"}</strong><small>{closing?closing.date+" · 全市場成交股數換算（1 張＝1,000 股）":closingError||"讀取中"}</small></div>
             <div><small>上市市場 · 成交金額</small><strong>{closing?.tradeValue!=null?(closing.tradeValue/100000000).toLocaleString("zh-TW",{maximumFractionDigits:2})+" 億元":"—"}</strong><small>{closing?closing.date+" · TWSE FMTQIK 官方盤後統計":"盤後資料尚未取得"}</small></div>
