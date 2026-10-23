@@ -2,6 +2,7 @@ import {getServerSession} from "next-auth";
 import {authOptions} from "../../../../lib/auth";
 import {NextResponse} from "next/server";
 import {getPolicySignals} from "../../../../lib/policy-news-analysis";
+import {backtestedAllocation} from "../../../../lib/backtested-allocation";
 import {extractHtmlTables,findTableByHeaders,parseMarketNumber} from "../../../../lib/market-table-extractor";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -214,14 +215,15 @@ export async function GET(request:Request){
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
  const now=taipeiParts(),reportDate=now.date,referenceDate=priorTaiwanTradingDay(new Date());
- const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals]=await Promise.all([
+ const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals,allocationModel]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+referenceDate.replace(/-/g,"")+"&response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
   latestMargin(),
   latestFuturesOptions(),
   wantgooPutCall(),
-  getPolicySignals()
+  getPolicySignals(),
+  backtestedAllocation()
  ]);
  const validatedMargin=margin?.date===referenceDate?margin:null;
  const marginBorrow=validatedMargin&&"borrowBalance" in validatedMargin?validatedMargin as HiStockMargin:null;
@@ -285,19 +287,15 @@ export async function GET(request:Request){
  const neutralCount=firstEight.length-bullishCount-bearishCount;
  const overallDirection=bullishCount>bearishCount?"bullish":bearishCount>bullishCount?"bearish":"neutral";
  const overallLabel=overallDirection==="bullish"?"利多":overallDirection==="bearish"?"利空":"多空中性";
- const overallAllocation=overallDirection==="bullish"
-  ?bullishCount-bearishCount>=3?{low:65,high:80}:{low:50,high:65}
-  :overallDirection==="bearish"
-  ?bearishCount-bullishCount>=3?{low:20,high:35}:{low:30,high:45}
-  :{low:40,high:55};
- const coverage=bullishCount+bearishCount;
- const confidenceNote=coverage<3?"目前具方向性的板塊較少，建議採區間下緣並等待更多訊號確認。":"仍需留意開盤後量價是否支持盤前判斷。";
- const overallStance="前八大板塊綜合評估："+overallLabel+"（利多 "+bullishCount+"、利空 "+bearishCount+"、中性或待確認 "+neutralCount+"）。建議股票總倉位 "+overallAllocation.low+"%～"+overallAllocation.high+"%。";
+ const modelAvailable=allocationModel.allocation!==null;
+ const allocationText=modelAvailable?allocationModel.allocation+"%":"歷史回測資料暫不可用";
+ const confidenceNote=modelAvailable?"模型採滾動樣本外測試；歷史表現不保證未來，並非針對個人風險的最佳解。":"歷史行情尚未取得，暫不顯示未經回測的倉位百分比。";
+ const overallStance="前八大板塊綜合評估："+overallLabel+"（利多 "+bullishCount+"、利空 "+bearishCount+"、中性或待確認 "+neutralCount+"）。回測模型建議股票總倉位："+allocationText+"。";
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
-  summary.body="綜合結論："+overallLabel+"。前八板塊利多 "+bullishCount+" 項、利空 "+bearishCount+" 項、中性或待確認 "+neutralCount+" 項。建議股票總倉位 "+overallAllocation.low+"%～"+overallAllocation.high+"%，保留現金 "+(100-overallAllocation.high)+"%～"+(100-overallAllocation.low)+"%。"+confidenceNote+" 倉位以帳戶淨資產為基準，融資持股市值亦計入總曝險。";
+  summary.body="綜合結論："+overallLabel+"。前八板塊利多 "+bullishCount+" 項、利空 "+bearishCount+" 項、中性或待確認 "+neutralCount+" 項。歷史回測模型建議股票總倉位："+allocationText+"。"+(modelAvailable?"樣本外測試 "+allocationModel.testDays+" 個交易日，年化報酬 "+allocationModel.annualReturn?.toFixed(1)+"%，最大回撤 "+allocationModel.maxDrawdown?.toFixed(1)+"%，同期大盤年化 "+allocationModel.benchmarkAnnualReturn?.toFixed(1)+"%。":"")+confidenceNote+" 模型只使用台股加權指數歷史價格，尚未納入前八板塊的歷史訊號；融資曝險與個人風險另須控管。";
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,quotes,sections,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
