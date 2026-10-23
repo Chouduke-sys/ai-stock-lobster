@@ -357,3 +357,15 @@
  .site-shell[data-mobile-tab="news"] .global-news-expanded{max-height:360px!important;overflow-y:auto!important;overscroll-behavior:contain}
  .site-shell[data-mobile-tab="sectors"] .holdings-name{min-width:0;overflow-wrap:anywhere}
 }
+
+
+/* iPhone news uses page scrolling; leave the fixed tab bar compact. */
+@media(max-width:640px){
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons{display:flex!important;gap:12px!important;row-gap:12px!important;margin:16px 0 18px!important;align-items:stretch}
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons .btn{margin:0!important;min-height:44px;flex:1 1 145px;padding:10px 12px!important;white-space:normal;text-align:center;line-height:1.4}
+ .site-shell[data-mobile-tab="news"] .global-news-expanded{max-height:none!important;min-height:0!important;height:auto!important;overflow:visible!important;overscroll-behavior:auto!important;-webkit-overflow-scrolling:auto!important;padding-right:0!important}
+ .mobile-bottom-nav{padding-top:4px!important;padding-bottom:calc(2px + env(safe-area-inset-bottom,0px))!important;min-height:0!important}
+ .mobile-bottom-nav button{min-height:43px!important;padding:2px 0!important;gap:2px!important}
+ .mobile-bottom-nav button svg{width:18px;height:18px}
+ .site-shell{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))!important}
+}
