@@ -720,9 +720,10 @@ useEffect(()=>{
           {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
           {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
           <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">成交金額 Top 10 公司最新新聞</div><p className="holdings-date">依左側成交金額排名對應 · 近七天新聞 · 每十分鐘檢查</p>
-          {aiFlow?.volumeLeaders?.slice(0,10).map((stock,i)=>{const article=leaderNews.find(n=>n.symbol===stock.symbol);return <div className="holdings-row" key={stock.symbol} style={{alignItems:"flex-start",gap:12}}>
-            <span className="holdings-name" style={{minWidth:85,flexShrink:0}}>{i+1}. {stock.name} <small>{stock.symbol}</small></span>
-            <span style={{flex:1,minWidth:0,textAlign:"left",fontSize:13,lineHeight:1.5}}>{article?<a href={article.url} target="_blank" rel="noopener noreferrer" style={{color:"inherit",textDecoration:"underline",textUnderlineOffset:3}}>{article.title}</a>:<span style={{opacity:.65}}>近七天尚無可取得新聞</span>}{article?.publishedAt&&<small style={{display:"block",opacity:.65}}>{new Date(article.publishedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} · {article.source}</small>}</span>
+          {aiFlow?.volumeLeaders?.slice(0,10).map((stock,i)=>{const article=leaderNews.find(n=>n.symbol===stock.symbol);return <div key={stock.symbol} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr)",gap:5,padding:"13px 0",borderBottom:"1px solid #64748b33",minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:700,lineHeight:1.5,overflowWrap:"anywhere"}}>{i+1}. {stock.name} <span style={{fontSize:12,opacity:.7}}>{stock.symbol}</span></div>
+            <div style={{minWidth:0,fontSize:13,lineHeight:1.65,overflowWrap:"anywhere",wordBreak:"break-word"}}>{article?<a href={article.url} target="_blank" rel="noopener noreferrer" style={{color:"inherit",textDecoration:"underline",textUnderlineOffset:3,display:"block",whiteSpace:"normal",overflowWrap:"anywhere"}}>{article.title}</a>:<span style={{opacity:.65}}>近七天尚無可取得新聞</span>}</div>
+            {article?.publishedAt&&<div style={{fontSize:11,opacity:.65,lineHeight:1.5}}>{new Date(article.publishedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} · {article.source}</div>}
           </div>;})}
           {!aiFlow?.volumeLeaders?.length&&<p className="footnote">{aiFlowError||"成交金額排行載入中…"}</p>}
           {leaderNewsError&&<p className="footnote">新聞來源暫不可用：{leaderNewsError}</p>}
