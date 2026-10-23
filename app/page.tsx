@@ -5,7 +5,7 @@ import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound, Newspaper as NewsIcon } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
@@ -507,7 +507,7 @@ useEffect(()=>{
     setMessage("");
   }
 
-  const [mobileTab,setMobileTab]=useState<"home"|"sectors"|"flows"|"charts"|"account">("home");
+  const [mobileTab,setMobileTab]=useState<"news"|"market"|"sectors"|"index"|"flows"|"charts"|"account">("news");
   const selectMobileTab=(tab:typeof mobileTab)=>{setMobileTab(tab);window.scrollTo({top:0,behavior:"instant"});};
   const showTaiwanNight=isNightTradingNow();
   const vixMood=vix?vixSentiment(vix.value):null;
@@ -576,6 +576,7 @@ useEffect(()=>{
             <strong>{(g.turnover/1e8).toFixed(1)}億</strong>
           </div>)}
           <p className="footnote">分類採本站 AI 供應鏈觀察清單；不同族群可能共用成分股。僅比較各群成分股成交金額，不可視為資金淨流入排名。</p>
+          <p className="footnote">產業代表公司請以各族群實際成分股清單為準；尚未串接完整對照資料前，不會自行指定公司。</p>
         </section>
         </div>
         <div className="hero-visual">
