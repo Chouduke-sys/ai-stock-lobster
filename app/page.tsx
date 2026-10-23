@@ -284,6 +284,7 @@ useEffect(()=>{
   const [closingError, setClosingError] = useState("");
   const [night, setNight] = useState<NightResult|null>(null);
   const [nightError, setNightError] = useState("");
+  const [trendRange,setTrendRange]=useState<"live"|"1d"|"2d"|"3d">("live");
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [indexHistory,setIndexHistory]=useState<Point[]>([]);
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
@@ -664,20 +665,24 @@ useEffect(()=>{
             <div><small>上市市場 · 成交金額</small><strong>{closing?.tradeValue!=null?(closing.tradeValue/100000000).toLocaleString("zh-TW",{maximumFractionDigits:2})+" 億元":"—"}</strong><small>{closing?closing.date+" · TWSE FMTQIK 官方盤後統計":"盤後資料尚未取得"}</small></div>
           </div>
           <p className="footnote">交易量與成交金額採證交所公布的上市市場每日統計；收盤後待官方資料更新才顯示當日總量。未更新前保留最近公布交易日與日期，不以盤中取樣冒充當日總量。</p>
-          <div className="taiex-trend-heading">
-            <span>加權指數 · 日盤點數走勢圖（開盤每秒查詢）</span>
-            <span className={taiex?.change == null ? "taiex-live-change neutral" : taiex.change > 0 ? "taiex-live-change up" : taiex.change < 0 ? "taiex-live-change down" : "taiex-live-change neutral"}>
-              目前漲跌 {taiex?.change == null ? "—" : (taiex.change > 0 ? "+" : "") + formatPrice(taiex.change) + " 點"}
-              {taiex?.changePercent != null ? "（" + (taiex.changePercent > 0 ? "+" : "") + formatPrice(taiex.changePercent) + "%）" : ""}
-            </span>
+          <div className="taiex-trend-heading" style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+            <strong>台股指數趨勢</strong>
+            <div role="group" aria-label="走勢圖時間範圍" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {([["live","即時"],["1d","當日"],["2d","二日"],["3d","三日"]] as const).map(([value,label])=><button key={value} type="button" onClick={()=>setTrendRange(value)} aria-pressed={trendRange===value} className={trendRange===value?"btn btn-primary":"btn btn-secondary"} style={{padding:"6px 11px",fontSize:12}}>{label}</button>)}
+            </div>
           </div>
-          <div className="sparkline"><div className="spark-grid"></div><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
-          <p className="footnote">日盤 09:00～13:30，縱軸為實際指數點數；開盤每秒查詢，按分鐘保留最新有效報價；目前取得 {indexChartPoints.length} 筆。優先載入當日分鐘歷史，再合併盤中有效取樣；行情可能延遲。</p>
-          {showTaiwanNight?<><div style={{fontWeight:700,fontSize:13,marginTop:12}}>台指期 TX 夜盤走勢圖（每秒查詢）</div>
-          <div className="sparkline"><HourChart points={nightChartPoints} base={nightChartPoints[0]?.value??null} session="night"/></div>
-          <p className="footnote">台灣時間 15:00～次日 05:00（交易日），縱軸為台指期點數；目前累積 {nightChartPoints.length} 筆。{nightHistorySource?nightHistorySource+"；":""}{nightError||"台指期行情依供應商更新，可能延遲。"}</p>
-          {!nightChartPoints.length&&usFutures&&<div className="night-backup"><strong>台指期報價暫無資料 · 改顯示美股期貨參考</strong><div>{usFutures.name}：{formatPrice(usFutures.price)} 點</div><UsFuturesChart points={usFutures.points??[]}/><small>此為美股期貨，不是台指期。{usFutures.source}</small></div>}</>:<div className="night-backup"><strong>台指期夜盤尚未開盤 · 美股期貨行情</strong>
-          {usFutures?<><div className="us-futures-price">{usFutures.name}：{formatPrice(usFutures.price)} 點 {usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""}</div><UsFuturesChart points={usFutures.points??[]}/><p className="footnote">最近報價：{usFutures.quoteTime?new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"未提供"} · {usFutures.source} · 每分鐘查詢，非保證即時。美股期貨休市時顯示最近報價。</p></>:<p className="footnote">{usFuturesError||"正在讀取美股期貨行情"}；無可用報價時不會填入虛構數字。</p>}</div>}
+          {trendRange==="live"||trendRange==="1d"?<>
+            <div className="sparkline"><div className="spark-grid"/><HourChart points={indexChartPoints} base={taiex?.value!=null&&taiex.change!=null?taiex.value-taiex.change:closing?.date!==taiex?.date?closing?.value??null:null}/></div>
+            <p className="footnote">{indexChartPoints.length?"最近更新："+indexChartPoints[indexChartPoints.length-1].time.replace("T"," ")+" · "+formatPrice(indexChartPoints[indexChartPoints.length-1].value)+" 點":"目前尚無有效當日走勢資料"} · {trendRange==="live"?"交易時段自動更新，收盤後保留最後有效資料":"當日有效分鐘走勢"} · 資料可能延遲</p>
+          </>:<div style={{padding:"20px 12px",border:"1px solid #64748b55",borderRadius:12}}>
+            <strong>{trendRange==="2d"?"最近二日":"最近三日"}走勢</strong>
+            <p className="footnote">目前行情來源只提供當日分鐘資料，尚未串接跨交易日歷史分鐘資料；不以單日資料假裝二日或三日走勢。</p>
+            <p className="footnote">可先切回「即時」或「當日」查看最後有效行情。</p>
+          </div>}
+          {showTaiwanNight&&<details style={{marginTop:12}}><summary style={{cursor:"pointer",fontWeight:700}}>台指期夜盤走勢（展開查看）</summary>
+            <div className="sparkline"><HourChart points={nightChartPoints} base={nightChartPoints[0]?.value??null} session="night"/></div>
+            <p className="footnote">{nightChartPoints.length?"最近更新："+nightChartPoints[nightChartPoints.length-1].time.replace("T"," ")+" · "+formatPrice(nightChartPoints[nightChartPoints.length-1].value)+" 點":"尚無有效夜盤走勢資料"} · 收盤後保留最後有效資料 · {nightHistorySource||nightError||"行情可能延遲"}</p>
+          </details>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
         </div>
