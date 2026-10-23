@@ -5,7 +5,7 @@ import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home, Layers3, Users, UserRound } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
@@ -734,7 +734,7 @@ useEffect(()=>{
       </section>
 
       <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
-        {([{id:"home",label:"首頁",icon:Home},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"flows",label:"法人籌碼",icon:Users},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
+        {([{id:"home",label:"首頁",icon:HomeIcon},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"flows",label:"法人籌碼",icon:Users},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
       </nav>
 
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
