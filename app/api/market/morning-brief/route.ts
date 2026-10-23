@@ -156,11 +156,21 @@ function futuresVerdict(foreign:number|null,volume:number|null,oi:number|null):{
  if(score>=2)return {sentiment:"bullish",verdict:"期權籌碼偏多，仍需確認開盤量價",reason:"期貨與選擇權訊號偏正向"};
  return {sentiment:"neutral",verdict:"期權訊號分歧，建議中性觀望",reason:"期貨與選擇權訊號尚未形成一致方向"};
 }
+function priorTaiwanTradingDay(now:Date):string{
+ const local=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
+ let date=new Date(local+"T12:00:00+08:00");
+ for(let i=0;i<7;i++){
+  date=new Date(date.getTime()-86400000);
+  const weekday=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short"}).format(date);
+  if(weekday!=="Sat"&&weekday!=="Sun")return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
+ }
+ return local;
+}
 export async function GET(request:Request){
  const cronAuthorized=Boolean(process.env.CRON_SECRET)&&request.headers.get("authorization")==="Bearer "+process.env.CRON_SECRET;
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
- const now=taipeiParts(),reportDate=now.minute>=510?now.date:new Date(Date.parse(now.date+"T00:00:00+08:00")-86400000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
+ const now=taipeiParts(),reportDate=now.date,referenceDate=priorTaiwanTradingDay(new Date());
  const [quotes,twse,news,margin,futuresOptions,wantgooRatio]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
@@ -169,6 +179,9 @@ export async function GET(request:Request){
   latestFuturesOptions(),
   wantgooPutCall()
  ]);
+ const validatedMargin=margin?.date===referenceDate?margin:null;
+ const validatedFutures=futuresOptions?.date===referenceDate?futuresOptions:null;
+ const validatedWantgoo=wantgooRatio?.date===referenceDate?wantgooRatio:null;
  const by=(symbol:string)=>quotes.find(q=>q.symbol===symbol);
  const us=by("ES=F"),tech=by("NQ=F"),semi=by("^SOX"),fx=by("TWD=X"),vix=by("^VIX");
  const pct=(q:Q|undefined)=>q?.changePct==null?"資料待確認":(q.changePct>=0?"+":"")+q.changePct.toFixed(2)+"%";
@@ -179,8 +192,8 @@ export async function GET(request:Request){
  const flowRows=Array.isArray(flow?.data)?flow!.data!.slice(0,8).map(row=>row.join("／")).filter(Boolean):[];
  const parseMoney=(value:string)=>{const n=Number(value.replace(/,/g,"").replace(/\\s/g,""));return Number.isFinite(n)?n:null;};
  const investorRows=(flow?.data??[]).flatMap(row=>{const label=String(row[0]??"");if(!/外資|投信|自營商/.test(label))return [];const value=parseMoney(String(row[row.length-1]??""));return value===null?[]:[{label,value}];});
- const foreign=investorRows.find(row=>/外資/.test(row.label)),trust=investorRows.find(row=>/投信/.test(row.label));
- const investorScore=foreign&&trust?(foreign.value+trust.value>0?1:foreign.value+trust.value<0?-1:0):null;
+ const foreign=flow?.date===referenceDate?investorRows.find(row=>/外資/.test(row.label)):undefined,trust=flow?.date===referenceDate?investorRows.find(row=>/投信/.test(row.label)):undefined;
+ const investorScore=foreign&&trust&&flow?.date===referenceDate?(foreign.value+trust.value>0?1:foreign.value+trust.value<0?-1:0):null;
  const moneyLabel=(row:{label:string;value:number}|undefined)=>row?row.label+" "+(row.value>=0?"+":"")+(row.value/1e8).toFixed(1)+"億":"未取得";
  const title=news.match(/<item>[\s\S]*?<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g,"").replace(/<[^>]*>/g,"").replace(/&amp;/g,"&")??null;
  const mood=(score:number|null)=>score===null?"neutral":score>0?"bullish":score<0?"bearish":"neutral";
@@ -199,21 +212,24 @@ export async function GET(request:Request){
   :riskScore<=-1?{low:30,high:50,reason:"市場風險偏高，避免過度曝險"}
   :{low:40,high:60,reason:"多空訊號混合，維持中性配置"};
  const allocationAdvice="今日建議股票總倉位 "+allocation.low+"%～"+allocation.high+"%，保留現金 "+(100-allocation.high)+"%～"+(100-allocation.low)+"%；"+allocation.reason+"。倉位以帳戶淨資產計算，含融資部位的股票市值也須計入；盤前屬情境建議，開盤後依量價及風險調整，不是保證報酬。";
- const optionRatio=wantgooRatio&&(!futuresOptions||wantgooRatio.date>=futuresOptions.date)?wantgooRatio:null;
- const optionVolume=optionRatio?.volume??futuresOptions?.putCallVolume??null;
- const optionOi=optionRatio?.oi??futuresOptions?.putCallOpenInterest??null;
- const futuresSignal=futuresVerdict(futuresOptions?.foreignTxNet??null,optionVolume,optionOi);
- const optionDate=optionRatio?.date??futuresOptions?.date??null;
+ const optionRatio=validatedWantgoo;
+ const optionVolume=optionRatio?.volume??validatedFutures?.putCallVolume??null;
+ const optionOi=optionRatio?.oi??validatedFutures?.putCallOpenInterest??null;
+ const futuresSignal=futuresVerdict(validatedFutures?.foreignTxNet??null,optionVolume,optionOi);
+ const optionDate=optionRatio?.date??validatedFutures?.date??null;
  const sections=[
   {title:"美股與期貨",body:compact(["標普期 "+pct(us),"那指期 "+pct(tech),"費半 "+pct(semi)]),sentiment:mood(abroadScore),verdict:abroadScore===null?"待確認":abroadScore>0?"外圍偏多":abroadScore<0?"外圍偏空":"多空分歧"},
   {title:"外資與投信",body:foreign||trust?"最近公布 "+(flow?.date??"日期未提供")+"："+moneyLabel(foreign)+"；"+moneyLabel(trust)+"（新台幣，非當日盤前數據）。":"法人買賣超暫無可靠數字。",sentiment:mood(investorScore),verdict:investorScore===null?"籌碼待確認":investorScore>0?"法人合計偏買":investorScore<0?"法人合計偏賣":"法人買賣相抵"},
-  {title:"融資融券",body:margin?"最近公布 "+margin.date+"（盤前沿用上一交易日，非今日盤中）：「融資餘額」"+margin.financingBalance?.toLocaleString("en-US")+"；「融券餘額」"+margin.shortBalance?.toLocaleString("en-US")+(margin.financingChange!==null?"；融資增減 "+(margin.financingChange!>=0?"+":"")+margin.financingChange?.toLocaleString("en-US"):"")+(margin.shortChange!==null?"；融券增減 "+(margin.shortChange!>=0?"+":"")+margin.shortChange?.toLocaleString("en-US"):"")+"。來源："+margin.source+"；融資單位億元、融券單位張。":"最新已公布交易日的資券統計暫時無法取得，請參考 Yahoo 股市資券餘額頁：https://tw.stock.yahoo.com/margin-balance",sentiment:margin?.financingChange==null?"neutral":margin.financingChange>0?"bullish":margin.financingChange<0?"bearish":"neutral",verdict:margin?"已更新 "+margin.date:"資料待更新"},
-  {title:"期貨與選擇權",body:"結論："+futuresSignal.verdict+"。"+futuresSignal.reason+"。"+(futuresOptions?.foreignTxNet!=null?"外資台指期未平倉淨口數 "+futuresOptions.foreignTxNet.toLocaleString("en-US")+" 口（"+futuresOptions.date+"）；":"外資台指期淨口數待核對；")+(optionVolume!==null?"選擇權成交量 P/C 比 "+optionVolume.toFixed(2)+"%；":"成交量 P/C 比待取得；")+(optionOi!==null?"選擇權未平倉 P/C 比 "+optionOi.toFixed(2)+"%；":"未平倉 P/C 比待取得；")+"選擇權資料日 "+(optionDate??"未取得")+"；來源："+(optionRatio?.source??futuresOptions?.source??"暫無可核對來源")+"。盤前參考最近公布交易日，非今日即時數據。",sentiment:futuresSignal.sentiment,verdict:futuresSignal.verdict},
+  {title:"融資融券",body:validatedMargin?"最近公布 "+validatedMargin.date+"（盤前沿用上一交易日，非今日盤中）：「融資餘額」"+validatedMargin.financingBalance?.toLocaleString("en-US")+"；「融券餘額」"+validatedMargin.shortBalance?.toLocaleString("en-US")+(validatedMargin.financingChange!==null?"；融資增減 "+(validatedMargin.financingChange!>=0?"+":"")+validatedMargin.financingChange?.toLocaleString("en-US"):"")+(validatedMargin.shortChange!==null?"；融券增減 "+(validatedMargin.shortChange!>=0?"+":"")+validatedMargin.shortChange?.toLocaleString("en-US"):"")+"。來源："+validatedMargin.source+"；融資單位億元、融券單位張。":"基準日 "+referenceDate+" 的資券統計未驗證成功，禁止混用其他日期；請參考 Yahoo 股市資券餘額頁：https://tw.stock.yahoo.com/margin-balance",sentiment:validatedMargin?.financingChange==null?"neutral":validatedMargin.financingChange>0?"bullish":validatedMargin.financingChange<0?"bearish":"neutral",verdict:validatedMargin?"已更新 "+validatedMargin.date:"資料待更新"},
+  {title:"期貨與選擇權",body:"結論："+futuresSignal.verdict+"。"+futuresSignal.reason+"。"+(validatedFutures?.foreignTxNet!=null?"外資台指期未平倉淨口數 "+validatedFutures.foreignTxNet.toLocaleString("en-US")+" 口（"+validatedFutures.date+"）；":"外資台指期淨口數待核對；")+(optionVolume!==null?"選擇權成交量 P/C 比 "+optionVolume.toFixed(2)+"%；":"成交量 P/C 比待取得；")+(optionOi!==null?"選擇權未平倉 P/C 比 "+optionOi.toFixed(2)+"%；":"未平倉 P/C 比待取得；")+"選擇權資料日 "+(optionDate??"未取得")+"；來源："+(optionRatio?.source??validatedFutures?.source??"暫無可核對來源")+"。盤前參考最近公布交易日，非今日即時數據。",sentiment:futuresSignal.sentiment,verdict:futuresSignal.verdict},
   {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
   {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
   {title:"技術面與量能",body:"開盤先看能否站穩開盤價、量能是否放大及5日線位置。",sentiment:"neutral",verdict:"等開盤確認"},
   {title:"重大政策與科技",body:title?"焦點新聞："+title.slice(0,85)+(title.length>85?"…":""):"關注聯準會、川普政策與AI供應鏈；暫無可核對重大標題。",sentiment:"neutral",verdict:"事件影響待確認"},
   {title:"今日盤前小總結",body:stance+"。"+allocationAdvice+" 優先確認開盤量價、台幣與法人方向；不追高，槓桿部位嚴守風控。",sentiment:mood(abroadScore),verdict:abroadScore===null?"資訊不足":abroadScore>0?"偏多觀察":abroadScore<0?"偏空謹慎":"中性觀望"}
  ];
- return NextResponse.json({status:"ok",reportDate,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,source:"Yahoo Finance / TWSE / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ const missing=[!validatedMargin?"融資融券":null,!validatedFutures?.foreignTxNet?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
+ const dataComplete=missing.length===0;
+ if(!dataComplete){const summary=sections.find(x=>x.title==="今日盤前小總結");if(summary){summary.body="資料尚未齊全（"+missing.join("、")+"），暫不提供完整九大板塊的確定性多空結論或積極倉位建議。其餘訊號僅供參考；"+summary.body;summary.verdict="資料未齊，保守觀望";summary.sentiment="neutral";}}
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance,quotes,sections,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
