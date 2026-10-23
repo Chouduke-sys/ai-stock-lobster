@@ -346,3 +346,14 @@
  .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"] .section-heading p{font-size:13px}
  .site-shell[data-mobile-tab="market"] > .market-analysis-wide{margin-top:16px}
 }
+
+
+.mobile-us-futures-summary{display:none}
+@media(max-width:640px){
+ .site-shell[data-mobile-tab="market"] .mobile-us-futures-summary{display:block;margin:14px 0;padding:14px;border:1px solid #42516a;border-radius:12px;background:#16263b}
+ .mobile-us-futures-summary p{margin:8px 0;font-size:20px;font-weight:700}
+ .mobile-us-futures-summary small{color:#a7b6cb}
+ .site-shell[data-mobile-tab="news"] > .hero .hero-copy{min-width:0}
+ .site-shell[data-mobile-tab="news"] .global-news-expanded{max-height:360px!important;overflow-y:auto!important;overscroll-behavior:contain}
+ .site-shell[data-mobile-tab="sectors"] .holdings-name{min-width:0;overflow-wrap:anywhere}
+}
