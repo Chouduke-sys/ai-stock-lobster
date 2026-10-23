@@ -5,7 +5,7 @@ import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home, Layers3, Users, UserRound } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
@@ -507,13 +507,15 @@ useEffect(()=>{
     setMessage("");
   }
 
+  const [mobileTab,setMobileTab]=useState<"home"|"sectors"|"flows"|"charts"|"account">("home");
+  const selectMobileTab=(tab:typeof mobileTab)=>{setMobileTab(tab);window.scrollTo({top:0,behavior:"instant"});};
   const showTaiwanNight=isNightTradingNow();
   const vixMood=vix?vixSentiment(vix.value):null;
   const currentIndexDay=parts(new Date().toISOString()).date;
   const nightChartPoints=Array.from(new Map<string,Point>([...nightHistory,...nightPoints].filter(p=>p.session===nightSessionKey(new Date())).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   return (
-    <main className="site-shell">
+    <main className="site-shell" data-mobile-tab={mobileTab}>
       <header className="topbar">
         <a className="brand" href="#" aria-label="AI股市龍蝦首頁">
           <span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span>
@@ -730,6 +732,10 @@ useEffect(()=>{
       <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
         {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
       </section>
+
+      <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
+        {([{id:"home",label:"首頁",icon:Home},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"flows",label:"法人籌碼",icon:Users},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
+      </nav>
 
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
     </main>
