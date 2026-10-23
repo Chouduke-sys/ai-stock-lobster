@@ -299,3 +299,43 @@
  .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy{display:block!important;padding:0!important}
  .site-shell[data-mobile-tab="home"] > .hero{display:grid!important}
 }
+
+
+/* Seven dedicated mobile tabs: isolate each requested content category. */
+@media(max-width:640px){
+ .mobile-bottom-nav{grid-template-columns:repeat(7,minmax(0,1fr));padding-left:3px;padding-right:3px}
+ .mobile-bottom-nav button{font-size:9px;letter-spacing:-.35px;gap:4px;min-width:0}
+ .mobile-bottom-nav button svg{width:19px;height:19px}
+ .site-shell[data-mobile-tab] > .hero,
+ .site-shell[data-mobile-tab] > .morning-brief,
+ .site-shell[data-mobile-tab] > .market-analysis-wide,
+ .site-shell[data-mobile-tab] > .institutional-side-by-side,
+ .site-shell[data-mobile-tab] > section[aria-label="當日爆量與法人買超排行榜"],
+ .site-shell[data-mobile-tab] > .vix-panel,
+ .site-shell[data-mobile-tab] > .stats-grid,
+ .site-shell[data-mobile-tab] > #charts,
+ .site-shell[data-mobile-tab] > .membership{display:none!important}
+ .site-shell[data-mobile-tab="news"] > .hero,
+ .site-shell[data-mobile-tab="sectors"] > .hero,
+ .site-shell[data-mobile-tab="index"] > .hero{display:block!important;padding:0}
+ .site-shell[data-mobile-tab="news"] > .hero .hero-copy{display:block!important;padding:0!important}
+ .site-shell[data-mobile-tab="news"] > .hero .hero-copy .holdings-panel,
+ .site-shell[data-mobile-tab="news"] > .hero .hero-visual{display:none!important}
+ .site-shell[data-mobile-tab="news"] > .hero .hero-copy > :not(.holdings-panel){display:revert!important}
+ .site-shell[data-mobile-tab="market"] > .market-analysis-wide,
+ .site-shell[data-mobile-tab="market"] > .vix-panel{display:block!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy{display:block!important;padding:0!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy > :not(.holdings-panel),
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-visual{display:none!important}
+ .site-shell[data-mobile-tab="sectors"] > .hero .hero-copy .holdings-panel{display:block!important;margin-top:0}
+ .site-shell[data-mobile-tab="index"] > .hero .hero-copy{display:none!important}
+ .site-shell[data-mobile-tab="index"] > .hero .hero-visual{display:block!important}
+ .site-shell[data-mobile-tab="flows"] > .institutional-side-by-side,
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"]{display:block!important}
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"] .holdings-panel:nth-child(2){display:none!important}
+ .site-shell[data-mobile-tab="flows"] > .institutional-side-by-side{grid-template-columns:minmax(0,1fr)!important}
+ .site-shell[data-mobile-tab="charts"] > #charts{display:block!important}
+ .site-shell[data-mobile-tab="account"] > .morning-brief,
+ .site-shell[data-mobile-tab="account"] > .membership{display:block!important}
+ .site-shell[data-mobile-tab="account"] > .morning-brief{margin-top:16px!important}
+}
