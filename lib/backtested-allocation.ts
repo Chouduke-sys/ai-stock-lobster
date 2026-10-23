@@ -64,6 +64,6 @@ export async function backtestedAllocation():Promise<Backtest>{
   previousWeight=w;peak=Math.max(peak,equity);maxDrawdown=Math.max(maxDrawdown,1-equity/peak);
  }
  const testDays=bars.length-first,chosen=select(bars,bars.length);
- const allocation=Math.round(weight(bars,bars.length-1,chosen)*100);
- return {allocation,date:bars[bars.length-1].date,sampleDays:bars.length,testDays,annualReturn:(Math.pow(equity,252/testDays)-1)*100,maxDrawdown:maxDrawdown*100,benchmarkAnnualReturn:(Math.pow(bench,252/testDays)-1)*100,reason:"以過去約504交易日訓練動能參數，最近約252交易日逐月重新訓練做樣本外驗證；現有建議由最新已知收盤價及歷史訓練參數決定。",model:"台灣加權指數20／60／120日動能，持股0%～100%候選水位；成本假設每次100%換手0.1%，未含融資利息與稅費。"};
+ const allocation=Math.min(90,Math.max(0,Math.round(weight(bars,bars.length-1,chosen)*100)));
+ return {allocation,date:bars[bars.length-1].date,sampleDays:bars.length,testDays,annualReturn:(Math.pow(equity,252/testDays)-1)*100,maxDrawdown:maxDrawdown*100,benchmarkAnnualReturn:(Math.pow(bench,252/testDays)-1)*100,reason:"以過去約504交易日訓練動能參數，最近約252交易日逐月重新訓練做樣本外驗證；現有建議由最新已知收盤價及歷史訓練參數決定。",model:"台灣加權指數20／60／120日動能，持股0%～100%候選水位，對外建議上限90%；成本假設每次100%換手0.1%，未含融資利息與稅費。"};
 }
