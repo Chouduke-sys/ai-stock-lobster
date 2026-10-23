@@ -240,6 +240,21 @@ useEffect(()=>{
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
+  const [sectorHistory,setSectorHistory]=useState<{date:string;groups:{name:string;turnover:number}[]}[]>([]);
+  useEffect(()=>{
+    try{const saved=JSON.parse(localStorage.getItem("lobster-sector-turnover-history-v1")||"[]") as {date:string;groups:{name:string;turnover:number}[]}[];if(Array.isArray(saved))setSectorHistory(saved.slice(-25));}catch{}
+  },[]);
+  useEffect(()=>{
+    if(!aiFlow?.groups?.length)return;
+    const date=aiFlow.asOf;
+    if(!/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(date))return;
+    setSectorHistory(previous=>{
+      const snapshot={date,groups:aiFlow.groups.map(g=>({name:g.name,turnover:g.turnover}))};
+      const next=[...previous.filter(x=>x.date!==date),snapshot].sort((a,b)=>a.date.localeCompare(b.date)).slice(-25);
+      try{localStorage.setItem("lobster-sector-turnover-history-v1",JSON.stringify(next));}catch{}
+      return next;
+    });
+  },[aiFlow]);
   const [newsError, setNewsError] = useState("");
   const [newsFetchedAt, setNewsFetchedAt] = useState<string|null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -729,6 +744,25 @@ useEffect(()=>{
         </div>
         </div>
         {message && <div className="notice" role="status">{message}</div>}
+      </section>
+
+
+      <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
+        <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業成交資金集中與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
+        <p className="footnote">目前為試行版：使用證交所最新盤後成交金額與本裝置累積的每日快照。成交金額並非資金淨流入；資料僅儲存在目前瀏覽器，換裝置或清除網站資料會重新累積。尚未具備跨裝置的完整 5／20 日歷史資料，因此不會直接宣稱資金已從某產業轉往另一產業。</p>
+        <div className="sector-rotation-list">
+          {aiFlow?.groups?.map((g,i)=>{
+            const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
+            const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
+            const change=prior&&prior>0?(g.turnover/prior-1)*100:null;
+            return <article className="sector-rotation-row" key={g.name}>
+              <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
+              <div><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small className={change==null?"":change>0?"market-up":change<0?"market-down":""}>{change==null?"歷史資料累積中":(change>0?"+":"")+change.toFixed(1)+"%（較 "+older?.date+"）"}</small></div>
+            </article>;
+          })}
+          {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
+        </div>
+        <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
       </section>
 
       <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
