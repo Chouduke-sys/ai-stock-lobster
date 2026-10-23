@@ -390,3 +390,33 @@
    border-radius:12px!important;
  }
 }
+
+
+/* News filters: two distinct rows on mobile, with a physical spacer. */
+.mobile-news-button-spacer{display:none}
+@media(max-width:640px){
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons{
+   display:flex!important;
+   flex-direction:column!important;
+   flex-wrap:nowrap!important;
+   align-items:flex-start!important;
+   justify-content:flex-start!important;
+   gap:0!important;
+   margin:18px 0 22px!important;
+ }
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons > .mobile-news-button-spacer{
+   display:block!important;
+   flex:0 0 18px!important;
+   width:100%!important;
+   height:18px!important;
+ }
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons > button{
+   display:inline-flex!important;
+   flex:0 0 auto!important;
+   align-self:flex-start!important;
+   width:auto!important;
+   max-width:100%!important;
+   min-height:44px!important;
+   margin:0!important;
+ }
+}
