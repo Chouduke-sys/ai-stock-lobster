@@ -8,9 +8,9 @@ export function htmlText(html:string):string{
 }
 export function extractHtmlTables(html:string):ExtractedTable[]{
  const tables:ExtractedTable[]=[];
- for(const match of html.matchAll(/<table\b[^>]*>[\s\S]*?<\/table>/gi)){
+ for(const match of Array.from(html.matchAll(/<table\b[^>]*>[\s\S]*?<\/table>/gi))){
   const body=match[0],rows:string[][]=[],headerRows:string[][]=[];
-  for(const row of body.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)){
+  for(const row of Array.from(body.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))){
    const cells=Array.from(row[1].matchAll(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/gi),m=>({header:m[1].toLowerCase()==="th",text:htmlText(m[2])}));
    if(!cells.length)continue;
    if(cells.every(c=>c.header))headerRows.push(cells.map(c=>c.text));
