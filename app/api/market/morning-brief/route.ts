@@ -328,7 +328,7 @@ export async function GET(request:Request){
    :overallDirection==="bullish"
    ?"整體而言，盤前多方訊號占優，但仍需觀察開盤量價能否延續，避免追高，採分批布局。"
    :"整體而言，多空訊號仍有分歧，建議維持中性水位，等待量能與資金方向更明確後再調整。";
-  summary.body=narrative.slice(0,5).join(" ")+" "+conclusion+" "+(recommendedAllocation===null?"目前回測資料不足，暫不提供具體倉位。":"風險調整後參考股票總倉位約 "+allocationText+"，最高不超過90%；融資部位須另行控管。");
+  summary.body=narrative.slice(0,5).join(" ")+" "+conclusion;
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
