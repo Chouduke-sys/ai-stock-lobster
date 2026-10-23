@@ -135,8 +135,8 @@ async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;sou
   const res=await fetch("https://www.wantgoo.com/option/put-call-ratio",{next:{revalidate:900},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
-  const plain=html.replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
-  const re=/(20\\d{2})[\\/-](\\d{1,2})[\\/-](\\d{1,2})\\s+([\\d,]+)\\s+([\\d,]+)\\s+([\\d.]+)\\s+([\\d,]+)\\s+([\\d,]+)\\s+([\\d.]+)/g;
+  const plain=html.replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ");
+  const re=/(20\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\s+([\d,]+)\s+([\d,]+)\s+([\d.]+)\s+([\d,]+)\s+([\d,]+)\s+([\d.]+)/g;
   let m:RegExpExecArray|null;let latest:{date:string;volume:number;oi:number;source:string}|null=null;
   while((m=re.exec(plain))!==null){
    const date=m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"),volume=Number(m[6]),oi=Number(m[9]);
