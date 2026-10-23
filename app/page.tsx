@@ -631,6 +631,7 @@ useEffect(()=>{
         <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。真正的「大戶持續狂買」須另外接入集保股權分散表、券商分點或多日法人紀錄。</p>
       </section>
           <div className="market-analysis-wide">          <div className="holdings-divider" />
+          <div className="mobile-us-futures-summary"><strong>美股期貨參考</strong><p>{usFutures?usFutures.name+"："+formatPrice(usFutures.price)+" 點"+(usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""):"目前無可用的美股期貨報價"}</p><small>{usFutures?.quoteTime?"資料時間："+new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"資料時間待確認"} · 期貨行情可能延遲</small></div>
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
           <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span><MarketMiniTrend values={q.trend5d??[]} label={q.label}/></div>)}</div>
