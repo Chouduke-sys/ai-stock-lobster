@@ -74,7 +74,8 @@ export async function GET(){
    const currentAmount=current?g.stocks.reduce((sum,code)=>sum+(current.values.get(code)??0),0):null;
    const priorAverage=previous.length>=3?previous.reduce((sum,d)=>sum+g.stocks.reduce((v,code)=>v+(d.values.get(code)??0),0),0)/previous.length:null;
    const weeklyChange=currentAmount!==null&&priorAverage!==null&&priorAverage>0?(currentAmount/priorAverage-1)*100:null;
-   return {...g,turnover,weeklyChange,historyDays:previous.length,historyDate:current?.date??null,stocks:stocks.sort((a,b)=>b.value-a.value).slice(0,5)};}).filter(g=>g.turnover>0).sort((a,b)=>b.turnover-a.turnover);
+   const weeklyDelta=currentAmount!==null&&priorAverage!==null?currentAmount-priorAverage:null;
+   return {...g,turnover,weeklyChange,weeklyDelta,historyDays:previous.length,historyDate:current?.date??null,stocks:stocks.sort((a,b)=>b.value-a.value).slice(0,5)};}).filter(g=>g.turnover>0).sort((a,b)=>(b.weeklyDelta??-Infinity)-(a.weeklyDelta??-Infinity)||b.turnover-a.turnover);
   const volumeLeaders=rows.filter(r=>r.volume>0&&r.close>0).sort((a,b)=>b.value-a.value).slice(0,15);
   let instDate:string|null=null;const buyers:{symbol:string;name:string;shares:number;volume:number;value:number}[]=[];
   if(instRes.ok){
