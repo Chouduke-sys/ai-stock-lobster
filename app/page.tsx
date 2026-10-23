@@ -584,6 +584,17 @@ useEffect(()=>{
           <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
         </div>}
         {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
+        {member&&positioning&&<div className="morning-brief-item" style={{marginBottom:14}}>
+          <h3>最新籌碼原始資料｜三大法人・融資融券・期貨未平倉</h3>
+          <p className="footnote">輔助下方盤前判讀，原始資料來自 <a href="https://histock.tw/台股大盤" target="_blank" rel="noopener noreferrer">HiStock 台股大盤</a>。實際分析以資料日期、單位與前一交易日可核實數字為準。</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,270px),1fr))",gap:12}}>
+            {([["三大法人買賣超","institutional"],["融資融券餘額","margin"],["台股期貨未平倉量","futures"]] as const).map(([label,key])=><div key={key} style={{minWidth:0}}>
+              <strong>{label}</strong>
+              {positioning[key].length?<div style={{overflowX:"auto"}}><table style={{width:"100%",fontSize:12,whiteSpace:"nowrap"}}><tbody>{positioning[key].map((row,i)=><tr key={i}><th scope="row" style={{textAlign:"left",padding:6}}>{row.label}</th>{row.values.map((v,j)=><td key={j} style={{textAlign:"right",padding:6}}>{v}</td>)}</tr>)}</tbody></table></div>:<p className="footnote">尚未取得可核實數據</p>}
+            </div>)}
+          </div>
+          <p className="footnote">資料擷取時間：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}。擷取時間不代表交易資料日期。</p>
+        </div>}
         {member&&morningBrief?<><div className="morning-brief-summary"><strong>{morningBrief.stance}</strong><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
         <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
@@ -669,18 +680,6 @@ useEffect(()=>{
             </div>
             <p className="footnote" style={{margin:"10px 0 0"}}>{ftse?ftse.source+" · "+(ftse.quoteTime?"報價 "+new Date(ftse.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"來源未提供可驗證報價時間")+" · 非即時報價":ftseError||"正在讀取富台指"}。以同漲跌幅估算，不是精準換算；富台指與加權指數成分、基差不同，休市及報價延遲時請勿當作即時開盤價。</p>
           </div>
-          <section style={{border:"1px solid #64748b55",borderRadius:12,padding:14,margin:"0 0 14px"}}>
-            <strong style={{fontSize:18}}>台股籌碼追蹤｜三大法人・融資融券・期貨未平倉</strong>
-            <p className="footnote">來源：<a href="https://histock.tw/台股大盤" target="_blank" rel="noopener noreferrer">HiStock 台股大盤</a>。以下僅顯示來源可驗證的公開數據，未取得時不使用示範值。</p>
-            {positioningError&&<p className="footnote" role="status">目前無法取得籌碼表格：{positioningError}。可點選來源查看最新資料。</p>}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,290px),1fr))",gap:12,marginTop:12}}>
-              {([["三大法人買賣超","institutional"],["融資融券餘額","margin"],["台股期貨未平倉量","futures"]] as const).map(([label,key])=><div key={key} style={{minWidth:0,border:"1px solid #64748b44",borderRadius:10,padding:10}}>
-                <strong>{label}</strong>
-                {positioning?.[key]?.length?<div style={{overflowX:"auto",marginTop:10}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12,whiteSpace:"nowrap"}}><tbody>{positioning[key].map((row,i)=><tr key={i}><th scope="row" style={{textAlign:"left",padding:"7px 5px",borderBottom:"1px solid #64748b33"}}>{row.label}</th>{row.values.map((v,j)=><td key={j} style={{textAlign:"right",padding:"7px 5px",borderBottom:"1px solid #64748b33",color:/^-/.test(v)?"#42c4a5":/^\+/.test(v)?"#fb7969":undefined}}>{v}</td>)}</tr>)}</tbody></table></div>:<p className="footnote">尚無可驗證的表格數據</p>}
-              </div>)}
-            </div>
-            <p className="footnote">資料更新：{positioning?.retrievedAt?new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"等待來源回應"}（系統擷取時間，非交易所報價時間）。手機版表格可左右滑動。</p>
-          </section>
           <div className="market-volume-card">
             <div><small>上市市場 · 最近公布交易量</small><strong>{closing?.tradeVolume!=null?(closing.tradeVolume/1000).toLocaleString("zh-TW",{maximumFractionDigits:0})+" 張":"—"}</strong><small>{closing?closing.date+" · 全市場成交股數換算（1 張＝1,000 股）":closingError||"讀取中"}</small></div>
             <div><small>上市市場 · 成交金額</small><strong>{closing?.tradeValue!=null?(closing.tradeValue/100000000).toLocaleString("zh-TW",{maximumFractionDigits:2})+" 億元":"—"}</strong><small>{closing?closing.date+" · TWSE FMTQIK 官方盤後統計":"盤後資料尚未取得"}</small></div>
