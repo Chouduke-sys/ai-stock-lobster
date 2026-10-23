@@ -130,17 +130,44 @@ async function latestFuturesOptions():Promise<FuturesOptions|null>{
  const chosen=ratioDate&&foreignDate?(ratioDate>=foreignDate?ratioDate:foreignDate):(ratioDate??foreignDate)!;
  return {date:chosen,foreignTxNet:net,putCallVolume:volume,putCallOpenInterest:oi,source:"臺灣期貨交易所 OpenAPI"};
 }
+async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;source:string}|null>{
+ try{
+  const res=await fetch("https://www.wantgoo.com/option/put-call-ratio",{next:{revalidate:900},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
+  if(!res.ok)return null;
+  const html=await res.text();
+  const plain=html.replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\\s+/g," ");
+  const re=/(20\\d{2})[\\/-](\\d{1,2})[\\/-](\\d{1,2})\\s+([\\d,]+)\\s+([\\d,]+)\\s+([\\d.]+)\\s+([\\d,]+)\\s+([\\d,]+)\\s+([\\d.]+)/g;
+  let m:RegExpExecArray|null;let latest:{date:string;volume:number;oi:number;source:string}|null=null;
+  while((m=re.exec(plain))!==null){
+   const date=m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0"),volume=Number(m[6]),oi=Number(m[9]);
+   if(Number.isFinite(volume)&&Number.isFinite(oi)&&volume>=0&&volume<=500&&oi>=0&&oi<=500&&(!latest||date>latest.date))latest={date,volume,oi,source:"玩股網（臺指選擇權 P/C 比）"};
+  }
+  return latest;
+ }catch{return null;}
+}
+function futuresVerdict(foreign:number|null,volume:number|null,oi:number|null):{sentiment:"bullish"|"bearish"|"neutral";verdict:string;reason:string}{
+ const signals:number[]=[];
+ if(foreign!==null)signals.push(foreign<=-10000?-2:foreign<0?-1:foreign>=10000?2:foreign>0?1:0);
+ if(oi!==null)signals.push(oi>=100?1:oi<75?-1:0);
+ if(volume!==null)signals.push(volume>=110?1:volume<85?-1:0);
+ const score=signals.reduce((a,b)=>a+b,0);
+ if(!signals.length)return {sentiment:"neutral",verdict:"資料不足，暫不判斷",reason:"缺少可驗證的期貨或選擇權籌碼"};
+ if(score<=-2)return {sentiment:"bearish",verdict:"期權籌碼偏空，建議降低追價與槓桿",reason:"外資期貨空方或 P/C 比偏弱"};
+ if(score>=2)return {sentiment:"bullish",verdict:"期權籌碼偏多，仍需確認開盤量價",reason:"期貨與選擇權訊號偏正向"};
+ return {sentiment:"neutral",verdict:"期權訊號分歧，建議中性觀望",reason:"期貨與選擇權訊號尚未形成一致方向"};
+}
 export async function GET(request:Request){
  const cronAuthorized=Boolean(process.env.CRON_SECRET)&&request.headers.get("authorization")==="Bearer "+process.env.CRON_SECRET;
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
  const now=taipeiParts(),reportDate=now.minute>=510?now.date:new Date(Date.parse(now.date+"T00:00:00+08:00")-86400000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
- const [quotes,twse,news,margin,futuresOptions]=await Promise.all([
+ const [quotes,twse,news,margin,futuresOptions,wantgooRatio]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
   latestMargin(),
-  latestFuturesOptions()
+  latestFuturesOptions(),
+  wantgooPutCall()
  ]);
  const by=(symbol:string)=>quotes.find(q=>q.symbol===symbol);
  const us=by("ES=F"),tech=by("NQ=F"),semi=by("^SOX"),fx=by("TWD=X"),vix=by("^VIX");
@@ -172,11 +199,16 @@ export async function GET(request:Request){
   :riskScore<=-1?{low:30,high:50,reason:"市場風險偏高，避免過度曝險"}
   :{low:40,high:60,reason:"多空訊號混合，維持中性配置"};
  const allocationAdvice="今日建議股票總倉位 "+allocation.low+"%～"+allocation.high+"%，保留現金 "+(100-allocation.high)+"%～"+(100-allocation.low)+"%；"+allocation.reason+"。倉位以帳戶淨資產計算，含融資部位的股票市值也須計入；盤前屬情境建議，開盤後依量價及風險調整，不是保證報酬。";
+ const optionRatio=wantgooRatio&&(!futuresOptions||wantgooRatio.date>=futuresOptions.date)?wantgooRatio:null;
+ const optionVolume=optionRatio?.volume??futuresOptions?.putCallVolume??null;
+ const optionOi=optionRatio?.oi??futuresOptions?.putCallOpenInterest??null;
+ const futuresSignal=futuresVerdict(futuresOptions?.foreignTxNet??null,optionVolume,optionOi);
+ const optionDate=optionRatio?.date??futuresOptions?.date??null;
  const sections=[
   {title:"美股與期貨",body:compact(["標普期 "+pct(us),"那指期 "+pct(tech),"費半 "+pct(semi)]),sentiment:mood(abroadScore),verdict:abroadScore===null?"待確認":abroadScore>0?"外圍偏多":abroadScore<0?"外圍偏空":"多空分歧"},
   {title:"外資與投信",body:foreign||trust?"最近公布 "+(flow?.date??"日期未提供")+"："+moneyLabel(foreign)+"；"+moneyLabel(trust)+"（新台幣，非當日盤前數據）。":"法人買賣超暫無可靠數字。",sentiment:mood(investorScore),verdict:investorScore===null?"籌碼待確認":investorScore>0?"法人合計偏買":investorScore<0?"法人合計偏賣":"法人買賣相抵"},
   {title:"融資融券",body:margin?"最近公布 "+margin.date+"（盤前沿用上一交易日，非今日盤中）：「融資餘額」"+margin.financingBalance?.toLocaleString("en-US")+"；「融券餘額」"+margin.shortBalance?.toLocaleString("en-US")+(margin.financingChange!==null?"；融資增減 "+(margin.financingChange!>=0?"+":"")+margin.financingChange?.toLocaleString("en-US"):"")+(margin.shortChange!==null?"；融券增減 "+(margin.shortChange!>=0?"+":"")+margin.shortChange?.toLocaleString("en-US"):"")+"。來源："+margin.source+"；融資單位億元、融券單位張。":"最新已公布交易日的資券統計暫時無法取得，請參考 Yahoo 股市資券餘額頁：https://tw.stock.yahoo.com/margin-balance",sentiment:margin?.financingChange==null?"neutral":margin.financingChange>0?"bullish":margin.financingChange<0?"bearish":"neutral",verdict:margin?"已更新 "+margin.date:"資料待更新"},
-  {title:"期貨與選擇權",body:futuresOptions?["最近公布資料："+futuresOptions.date+"（非今日盤中）",futuresOptions.foreignTxNet!==null?"外資台指期未平倉淨口數："+futuresOptions.foreignTxNet.toLocaleString("en-US")+" 口":"外資台指期未平倉：尚未公布或無法核對",futuresOptions.putCallVolume!==null?"選擇權成交量 Put/Call Ratio："+futuresOptions.putCallVolume.toFixed(2)+"%":"成交量 P/C 比：暫未取得",futuresOptions.putCallOpenInterest!==null?"選擇權未平倉 Put/Call Ratio："+futuresOptions.putCallOpenInterest.toFixed(2)+"%":"未平倉 P/C 比：暫未取得","來源："+futuresOptions.source].join("；")+"。":"期交所最新資料暫時無法讀取，請參考 https://www.taifex.com.tw/cht/3/pcRatio；不以過期數據冒充當日數據。",sentiment:"neutral",verdict:futuresOptions?"期交所 "+futuresOptions.date:"待取得官方數據"},
+  {title:"期貨與選擇權",body:"結論："+futuresSignal.verdict+"。"+futuresSignal.reason+"。"+(futuresOptions?.foreignTxNet!=null?"外資台指期未平倉淨口數 "+futuresOptions.foreignTxNet.toLocaleString("en-US")+" 口（"+futuresOptions.date+"）；":"外資台指期淨口數待核對；")+(optionVolume!==null?"選擇權成交量 P/C 比 "+optionVolume.toFixed(2)+"%；":"成交量 P/C 比待取得；")+(optionOi!==null?"選擇權未平倉 P/C 比 "+optionOi.toFixed(2)+"%；":"未平倉 P/C 比待取得；")+"選擇權資料日 "+(optionDate??"未取得")+"；來源："+(optionRatio?.source??futuresOptions?.source??"暫無可核對來源")+"。盤前參考最近公布交易日，非今日即時數據。",sentiment:futuresSignal.sentiment,verdict:futuresSignal.verdict},
   {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
   {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
   {title:"技術面與量能",body:"開盤先看能否站穩開盤價、量能是否放大及5日線位置。",sentiment:"neutral",verdict:"等開盤確認"},
