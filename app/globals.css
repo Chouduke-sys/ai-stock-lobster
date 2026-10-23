@@ -273,7 +273,7 @@
  .mobile-bottom-nav button:focus-visible{outline:2px solid #ff9566;outline-offset:-3px;border-radius:9px}
  .site-shell[data-mobile-tab] > .morning-brief,
  .site-shell[data-mobile-tab] > .hero,
- .site-shell[data-mobile-tab] > .volume-leaders-panel,
+ .site-shell[data-mobile-tab] > section[aria-label="當日爆量與法人買超排行榜"],
  .site-shell[data-mobile-tab] > .vix-panel,
  .site-shell[data-mobile-tab] > .stats-grid,
  .site-shell[data-mobile-tab] > #rankings,
@@ -286,7 +286,7 @@
  .site-shell[data-mobile-tab="home"] > .vix-panel,
  .site-shell[data-mobile-tab="home"] > .stats-grid,
  .site-shell[data-mobile-tab="sectors"] > .hero,
- .site-shell[data-mobile-tab="sectors"] > .volume-leaders-panel,
+ .site-shell[data-mobile-tab="sectors"] > section[aria-label="當日爆量與法人買超排行榜"],
  .site-shell[data-mobile-tab="flows"] > #rankings,
  .site-shell[data-mobile-tab="flows"] > #five-day-institutional,
  .site-shell[data-mobile-tab="charts"] > #charts,
