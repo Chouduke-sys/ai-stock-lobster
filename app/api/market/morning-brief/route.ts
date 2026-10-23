@@ -299,7 +299,36 @@ export async function GET(request:Request){
  const overallStance=stance;
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
-  summary.body="綜合結論："+overallLabel+"。前八板塊利多 "+bullishCount+" 項、利空 "+bearishCount+" 項、中性或待確認 "+neutralCount+" 項。風險調整後建議股票總倉位："+allocationText+"。"+adjustmentText+(modelAvailable?"樣本外測試 "+allocationModel.testDays+" 個交易日，年化報酬 "+allocationModel.annualReturn?.toFixed(1)+"%，最大回撤 "+allocationModel.maxDrawdown?.toFixed(1)+"%，同期大盤年化 "+allocationModel.benchmarkAnnualReturn?.toFixed(1)+"%。":"")+confidenceNote+" 模型只使用台股加權指數歷史價格，尚未納入前八板塊的歷史訊號；融資曝險與個人風險另須控管。";
+  // Narrative recap: use only verified directional signals from the first eight cards.
+  const narrative:string[]=[];
+  const first=firstEight[0];
+  if(first.sentiment==="bullish")narrative.push("國際股市與科技期貨表現偏強，外圍氣氛有利台股開盤。");
+  else if(first.sentiment==="bearish")narrative.push("國際股市與科技期貨偏弱，台股開盤仍須提防賣壓。");
+  const institution=firstEight[1];
+  if(institution.sentiment==="bullish")narrative.push("法人籌碼呈現買超，顯示資金有回流跡象。");
+  else if(institution.sentiment==="bearish")narrative.push("法人籌碼偏向賣超，反彈仍需觀察買盤能否延續。");
+  const marginSection=firstEight[2];
+  if(marginSection.sentiment==="bearish")narrative.push("融資融券顯示槓桿買盤降溫、空方部位增加，短線籌碼仍有壓力。");
+  else if(marginSection.sentiment==="bullish")narrative.push("融資融券顯示槓桿買盤回升、空方回補，短線籌碼有所改善。");
+  const futuresSection=firstEight[3];
+  if(futuresSection.sentiment==="bearish")narrative.push("期貨與選擇權訊號偏空，市場避險情緒尚未完全解除。");
+  else if(futuresSection.sentiment==="bullish")narrative.push("期貨與選擇權訊號轉強，有助於市場短線信心。");
+  const currency=firstEight[4];
+  if(currency.sentiment==="bearish")narrative.push("匯率與利率環境對資金面較不利，需留意外資動向。");
+  else if(currency.sentiment==="bullish")narrative.push("匯率與利率環境相對有利，有助於資金風險偏好。");
+  const volatility=firstEight[5];
+  if(volatility.sentiment==="bearish")narrative.push("市場波動與避險情緒升溫，追價風險提高。");
+  else if(volatility.sentiment==="bullish")narrative.push("市場波動相對平穩，短線風險情緒有所改善。");
+  const policy=firstEight[7];
+  if(policy.sentiment==="bearish")narrative.push("重大政策與科技消息偏向利空，相關族群仍須留意消息面壓力。");
+  else if(policy.sentiment==="bullish")narrative.push("重大政策與科技消息偏向利多，可留意相關族群的資金反應。");
+  if(narrative.length===0)narrative.push("目前盤前關鍵訊號尚不明朗，缺乏足夠依據判斷短線方向。");
+  const conclusion=overallDirection==="bearish"
+   ?"整體而言，短線反彈尚不足以確認行情轉強，建議保持審慎，等待量能、法人與匯率同步改善後，再逐步提高水位。"
+   :overallDirection==="bullish"
+   ?"整體而言，盤前多方訊號占優，但仍需觀察開盤量價能否延續，避免追高，採分批布局。"
+   :"整體而言，多空訊號仍有分歧，建議維持中性水位，等待量能與資金方向更明確後再調整。";
+  summary.body=narrative.slice(0,5).join(" ")+" "+conclusion+" "+(recommendedAllocation===null?"目前回測資料不足，暫不提供具體倉位。":"風險調整後參考股票總倉位約 "+allocationText+"，最高不超過90%；融資部位須另行控管。");
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
