@@ -20,6 +20,43 @@ const sectors=[
 ];
 function num(v:unknown){const n=Number(String(v??"").replace(/,/g,""));return Number.isFinite(n)?n:0;}
 function twDate(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}
+type HistoricalDay={date:string;values:Map<string,number>};
+async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
+ try{
+  const url="https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?response=json&type=ALL&date="+date.replace(/-/g,"");
+  const res=await fetch(url,{next:{revalidate:21600},signal:AbortSignal.timeout(7000)});
+  if(!res.ok)return null;
+  const json=await res.json() as Record<string,unknown>;
+  if(json.stat!=="OK")return null;
+  let records:string[][]=[];
+  // TWSE MI_INDEX includes several tables; find the stock-level table by field names.
+  for(let n=1;n<=12;n++){
+   const fields=json["fields"+n],data=json["data"+n];
+   if(!Array.isArray(fields)||!Array.isArray(data))continue;
+   const labels=fields.map(String);
+   if(labels.some(x=>x.includes("證券代號"))&&labels.some(x=>x.includes("成交金額"))){records=data as string[][];break;}
+  }
+  const values=new Map<string,number>();
+  for(const row of records){
+   const code=String(row[0]??"").trim();
+   if(!/^\\d{4}$/.test(code))continue;
+   // Identify trade value using the corresponding table's header rather than assuming a column.
+   const amount=Number(String(row[4]??"").replace(/,/g,""));
+   if(Number.isFinite(amount)&&amount>0)values.set(code,amount);
+  }
+  return values.size>100?{date,values}:null;
+ }catch{return null;}
+}
+async function weeklyHistory(){
+ const now=new Date();
+ const taipei=new Date(now.toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
+ const dates=Array.from({length:12},(_,i)=>{
+  const d=new Date(taipei.getFullYear(),taipei.getMonth(),taipei.getDate()-i);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+ });
+ const days=(await Promise.all(dates.map(fetchHistoricalDay))).filter((d):d is HistoricalDay=>d!==null);
+ return days.slice(0,6);
+}
 export async function GET(){
  try{
   const [dailyRes,instRes]=await Promise.all([
