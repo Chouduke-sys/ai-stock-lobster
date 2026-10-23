@@ -290,12 +290,12 @@ export async function GET(request:Request){
  const modelAvailable=allocationModel.allocation!==null;
  const allocationText=modelAvailable?allocationModel.allocation+"%":"歷史回測資料暫不可用";
  const confidenceNote=modelAvailable?"模型採滾動樣本外測試；歷史表現不保證未來，並非針對個人風險的最佳解。":"歷史行情尚未取得，暫不顯示未經回測的倉位百分比。";
- const overallStance="前八大板塊綜合評估："+overallLabel+"（利多 "+bullishCount+"、利空 "+bearishCount+"、中性或待確認 "+neutralCount+"）。回測模型建議股票總倉位："+allocationText+"。";
+ const overallStance=stance;
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
   summary.body="綜合結論："+overallLabel+"。前八板塊利多 "+bullishCount+" 項、利空 "+bearishCount+" 項、中性或待確認 "+neutralCount+" 項。歷史回測模型建議股票總倉位："+allocationText+"。"+(modelAvailable?"樣本外測試 "+allocationModel.testDays+" 個交易日，年化報酬 "+allocationModel.annualReturn?.toFixed(1)+"%，最大回撤 "+allocationModel.maxDrawdown?.toFixed(1)+"%，同期大盤年化 "+allocationModel.benchmarkAnnualReturn?.toFixed(1)+"%。":"")+confidenceNote+" 模型只使用台股加權指數歷史價格，尚未納入前八板塊的歷史訊號；融資曝險與個人風險另須控管。";
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation:allocationModel.allocation,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
