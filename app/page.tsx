@@ -262,7 +262,7 @@ useEffect(()=>{
   const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
-  const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;weeklyChange:number|null;weeklyDelta:number|null;historyDays:number;historyDate:string|null;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
+  const [aiFlow,setAiFlow]=useState<{asOf:string;groups:{name:string;chain:string;turnover:number;weeklyChange:number|null;weeklyDelta:number|null;turnoverShare:number|null;leaderShare:number|null;historicalQuality:string;historyDays:number;historyDate:string|null;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
   const [leaderNews,setLeaderNews]=useState<{symbol:string;name:string;title:string;url:string;publishedAt:string|null;source:string}[]>([]);
   const [leaderNewsError,setLeaderNewsError]=useState("");
@@ -606,21 +606,21 @@ useEffect(()=>{
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
         {member ? <>
-        <p className="footnote">優先使用證交所近週歷史交易日成交金額，比較最新一日與先前交易日均值；若官方歷史資料不足，才使用本裝置已累積的快照。成交金額變化代表交易熱度，不等於資金淨流入。</p>
+        <p className="footnote">使用證交所近週歷史交易日成交金額，比較最新一日與先前交易日均值；歷史資料不足時維持灰色，不以瀏覽器快照替代官方歷史趨勢。成交金額變化代表交易熱度，不等於資金淨流入。</p>
         <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
         <p className="footnote">判讀門檻：最新成交金額相較近週前幾日均值，增加至少 50 億為快速集中、增加未滿 50 億為緩慢增加；減少未滿 50 億為緩慢減少、減少至少 50 億為快速減少。依成交金額增減億元排名，而非百分比。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
         <div className="sector-rotation-list">
           {aiFlow?.groups?.map((g,i)=>{
             const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
             const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
-            const delta=typeof g.weeklyDelta==="number"?g.weeklyDelta:prior&&prior>0?g.turnover-prior:null;
+            const delta=typeof g.weeklyDelta==="number"?g.weeklyDelta:null;
             const deltaYi=delta===null?null:delta/1e8;
             // Absolute TWD turnover change; percentage is not used for status or rank.
             const rotationClass=deltaYi===null?"rotation-unknown":deltaYi>=50?"rotation-fast-in":deltaYi>0?"rotation-slow-in":deltaYi<=-50?"rotation-fast-out":"rotation-slow-out";
             const rotationLabel=deltaYi===null?"資料不足":deltaYi>=50?"資金快速集中":deltaYi>0?"資金緩慢流入":deltaYi<=-50?"資金快速流出":"資金緩慢流出";
             return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
               <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
-              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{deltaYi===null?"歷史資料累積中":(deltaYi>0?"+":"")+deltaYi.toFixed(1)+" 億（"+(typeof g.weeklyDelta==="number"?"較近週前幾日均值":"較 "+older?.date)+"）"}</small></div>
+              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{typeof g.turnoverShare==="number"?"市場成交占比 "+g.turnoverShare.toFixed(1)+"% · ":""}{typeof g.leaderShare==="number"?"最大成分股占族群 "+g.leaderShare.toFixed(0)+"% · ":""}{deltaYi===null?"歷史資料累積中":(deltaYi>0?"+":"")+deltaYi.toFixed(1)+" 億（"+(typeof g.weeklyDelta==="number"?"較近週前幾日均值":"較 "+older?.date)+"）"}</small></div>
             </article>;
           })}
           {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
