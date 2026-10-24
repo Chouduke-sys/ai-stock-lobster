@@ -30,8 +30,8 @@ async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
   if(json.stat!=="OK")return null;
   let records:string[][]=[];let codeIndex=-1,amountIndex=-1;
   // TWSE MI_INDEX includes several tables; find the stock-level table by field names.
-  for(let n=1;n<=12;n++){
-   const fields=json["fields"+n],data=json["data"+n];
+  for(let n=0;n<=12;n++){
+   const fields=json[n===0?"fields":"fields"+n],data=json[n===0?"data":"data"+n];
    if(!Array.isArray(fields)||!Array.isArray(data))continue;
    const labels=fields.map(String);
    if(labels.some(x=>x.includes("證券代號"))&&labels.some(x=>x.includes("成交金額"))){records=data as string[][];codeIndex=labels.findIndex(x=>x.includes("證券代號"));amountIndex=labels.findIndex(x=>x.includes("成交金額"));break;}
@@ -54,7 +54,7 @@ async function weeklyHistory(){
   const d=new Date(taipei.getFullYear(),taipei.getMonth(),taipei.getDate()-i);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
  });
- const days=(await Promise.all(dates.map(fetchHistoricalDay))).filter((d):d is HistoricalDay=>d!==null);
+ const days=(await Promise.all(dates.map(fetchHistoricalDay))).filter((d):d is HistoricalDay=>d!==null).sort((a,b)=>b.date.localeCompare(a.date));
  return days.slice(0,6);
 }
 export async function GET(){
@@ -69,13 +69,16 @@ export async function GET(){
   if(!Array.isArray(raw)||raw.length<100)throw Error("證交所個股行情資料不足");
   const rows=raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\d{4}$/.test(symbol))return [];const volume=num(r.TradeVolume),value=num(r.TradeValue),close=num(r.ClosingPrice);return [{symbol,name:r.Name??symbol,volume,value,close,change:r.Change??"",transactions:num(r.Transaction)}];});
   const bySymbol=new Map(rows.map(r=>[r.symbol,r]));
-  const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.some(code=>d.values.has(code)));
+  const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.every(code=>d.values.has(code)));
    const current=validDays[0],previous=validDays.slice(1,6);
    const currentAmount=current?g.stocks.reduce((sum,code)=>sum+(current.values.get(code)??0),0):null;
    const priorAverage=previous.length>=3?previous.reduce((sum,d)=>sum+g.stocks.reduce((v,code)=>v+(d.values.get(code)??0),0),0)/previous.length:null;
    const weeklyChange=currentAmount!==null&&priorAverage!==null&&priorAverage>0?(currentAmount/priorAverage-1)*100:null;
    const weeklyDelta=currentAmount!==null&&priorAverage!==null?currentAmount-priorAverage:null;
-   return {...g,turnover,weeklyChange,weeklyDelta,historyDays:previous.length,historyDate:current?.date??null,stocks:stocks.sort((a,b)=>b.value-a.value).slice(0,5)};}).filter(g=>g.turnover>0).sort((a,b)=>(b.weeklyDelta??-Infinity)-(a.weeklyDelta??-Infinity)||b.turnover-a.turnover);
+   const turnoverShare=rows.reduce((sum,row)=>sum+row.value,0)>0?turnover/rows.reduce((sum,row)=>sum+row.value,0)*100:null;
+   const leaderShare=turnover>0?Math.max(0,...stocks.map(stock=>stock.value))/turnover*100:null;
+   const historicalQuality=weeklyDelta===null?"insufficient":"verified";
+   return {...g,turnover,weeklyChange,weeklyDelta,turnoverShare,leaderShare,historicalQuality,historyDays:previous.length,historyDate:current?.date??null,stocks:stocks.sort((a,b)=>b.value-a.value).slice(0,5)};}).filter(g=>g.turnover>0).sort((a,b)=>(b.weeklyDelta??-Infinity)-(a.weeklyDelta??-Infinity)||b.turnover-a.turnover);
   const volumeLeaders=rows.filter(r=>r.volume>0&&r.close>0).sort((a,b)=>b.value-a.value).slice(0,15);
   let instDate:string|null=null;const buyers:{symbol:string;name:string;shares:number;volume:number;value:number}[]=[];
   if(instRes.ok){
@@ -86,7 +89,7 @@ export async function GET(){
    }
   }
   buyers.sort((a,b)=>b.shares-a.shares);
-  return NextResponse.json({status:"ok",asOf:twDate(),groups,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:"TWSE STOCK_DAY_ALL / T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。資料為最近取得的盤後快照，並非逐筆即時。"},
+  return NextResponse.json({status:"ok",asOf:history[0]?.date??twDate(),historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:"TWSE STOCK_DAY_ALL / T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。資料為最近取得的盤後快照，並非逐筆即時。"},
    {headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
  }catch(e){return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"暫無可驗證行情"},{status:503});}
 }
