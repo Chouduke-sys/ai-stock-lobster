@@ -261,6 +261,9 @@ useEffect(()=>{
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
+  const [dailyReview,setDailyReview]=useState<{latest:{date:string;prediction:string;predictionLabel:string;outcome:null|{changePct:number;actual:string;correct:boolean}}[];metrics:{days30:{evaluated:number;rate:number|null};days90:{evaluated:number;rate:number|null}};method:string}|null>(null);
+  useEffect(()=>{let cancelled=false;fetch("/api/market/daily-review").then(r=>r.ok?r.json():null).then(data=>{if(!cancelled&&data?.status==="ok")setDailyReview(data);}).catch(()=>{});return()=>{cancelled=true;};},[]);
+  
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
   const [aiFlow,setAiFlow]=useState<{asOf:string;radar?:{hottest:{name:string;turnover:number;weeklyDelta:number|null;turnoverShare:number|null}[];emerging:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[];cooling:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[]};groups:{name:string;chain:string;turnover:number;weeklyChange:number|null;weeklyDelta:number|null;turnoverShare:number|null;leaderShare:number|null;historicalQuality:string;risingSessions:number|null;shareDelta:number|null;medianPriceMove:number|null;breadth:number|null;radarStatus:string;historyDays:number;historyDate:string|null;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
@@ -630,6 +633,10 @@ useEffect(()=>{
         </div>
         <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
         </> : <p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後與每日 08:30 台股盤前分析一同解鎖，無需再次登入。</p>}
+      </section>
+      <section className="section sector-rotation-member" aria-label="會員 AI 盤後檢討">
+        <div className="section-heading"><div><div className="eyebrow">AI DAILY REVIEW · 預測績效追蹤</div><h2>AI 盤後檢討</h2><p>保留每日盤前方向快照，與當日證交所正式收盤結果核對，不回填事後預測。</p></div></div>
+        {member?<><div className="sector-radar-grid"><div className="sector-radar-panel"><h3>近 30 個已驗證交易日</h3><strong>{dailyReview?.metrics.days30.rate==null?"累積中":dailyReview.metrics.days30.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days30.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>近 90 個已驗證交易日</h3><strong>{dailyReview?.metrics.days90.rate==null?"累積中":dailyReview.metrics.days90.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days90.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>驗證方式</h3><p>盤前偏多／偏空／中性，對照當日加權指數漲跌；尚未累積的交易日不計入勝率。</p></div></div><div className="sector-radar-panel">{dailyReview?.latest.length?dailyReview.latest.map(day=><div className="sector-radar-entry" key={day.date}><strong>{day.date}　盤前：{day.predictionLabel}</strong><span>{day.outcome?"盤後："+(day.outcome.changePct>=0?"+":"")+day.outcome.changePct.toFixed(2)+"%　"+(day.outcome.correct?"方向符合":"方向未符合"):"盤後結果待驗證"}</span></div>):<p>歷史預測尚未累積。首次排程成功執行後，才會開始顯示可核對的紀錄。</p>}</div><p className="footnote">{dailyReview?.method??"盤前與盤後資料須完成自動封存後才能計算命中率。"} 命中率不代表策略報酬率。</p></>:<p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後查看 AI 盤後檢討與歷史命中率。</p>}
       </section>
       <section className="hero hero-balanced">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
