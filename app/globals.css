@@ -449,3 +449,14 @@
 .sector-rotation-row .rotation-status{align-self:flex-end;max-width:100%;white-space:normal;text-align:center}
 @media(max-width:900px){.sector-rotation-list{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:440px){.sector-rotation-row{grid-template-columns:minmax(0,1fr);gap:10px}.sector-rotation-row>div:last-child{align-items:flex-start;text-align:left;min-width:0}.sector-rotation-row .rotation-status{align-self:flex-start}}
+
+/* Member sector capital radar: three compact, responsive ranking panels. */
+.sector-radar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.sector-radar-panel{min-width:0;border:1px solid #34445c;border-radius:14px;background:#142338;padding:16px;overflow:hidden}
+.sector-radar-panel h3{font-size:17px;line-height:1.5;margin:0 0 6px;color:#f8fafc}
+.sector-radar-panel p{font-size:12px;line-height:1.6;color:#9caec7;margin:0 0 14px}
+.sector-radar-panel>small{font-size:12px;color:#9caec7;line-height:1.6}
+.sector-radar-entry{display:flex;flex-direction:column;gap:5px;padding:10px 0;border-top:1px solid #34445c;min-width:0}
+.sector-radar-entry strong{font-size:13px;color:#fff;overflow-wrap:anywhere}
+.sector-radar-entry span{font-size:12px;color:#cbd5e1;overflow-wrap:anywhere}
+@media(max-width:900px){.sector-radar-grid{grid-template-columns:minmax(0,1fr)}}
