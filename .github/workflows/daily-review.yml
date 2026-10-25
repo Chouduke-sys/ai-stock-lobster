@@ -1,0 +1,41 @@
+name: Daily AI Market Review Archive
+on:
+  schedule:
+    - cron: "45 0 * * 1-5"
+    - cron: "30 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: morning or close
+        required: true
+        type: choice
+        options: [morning, close]
+permissions:
+  contents: write
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Capture morning prediction or verified close
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          if [ -z "$MODE" ]; then
+            HOUR=$(TZ=Asia/Taipei date +%H)
+            if [ "$HOUR" -lt 12 ]; then MODE=morning; else MODE=close; fi
+          fi
+          node scripts/archive-daily-review.cjs "$MODE"
+      - name: Commit verified archive
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/daily-review.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Archive daily market prediction and close"
+            git push
+          fi
