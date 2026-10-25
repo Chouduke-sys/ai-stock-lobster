@@ -17,12 +17,12 @@ function parseTable(html:string, heading:string):Row[]{
 }
 function extractInstitutionalTotals(html:string){
  const section=html.split("台股大盤 法人累積進出")[1]?.split("台股大盤 相關文章")[0]??"";
- const rows=Array.from(section.matchAll(/<tr[^>]*>([\\s\\S]*?)<\\/tr>/gi));
+ const rows=Array.from(section.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
  for(const row of rows){
-  const cells=Array.from(row[1].matchAll(/<(?:td|th)[^>]*>([\\s\\S]*?)<\\/(?:td|th)>/gi)).map(m=>decode(m[1]));
-  if(cells.length<5||!/^20[0-9]{2}[/][0-9]{1,2}[/][0-9]{1,2}$/.test(cells[0]))continue;
+  const cells=Array.from(row[1].matchAll(/<(?:td|th)\b[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)).map(m=>decode(m[1]));
+  if(cells.length<5||!/^20[0-9]{2}\/[0-9]{1,2}\/[0-9]{1,2}$/.test(cells[0]))continue;
   const numbers=cells.slice(1,5).map(v=>Number(v.replace(/,/g,"")));
-  if(numbers.every(Number.isFinite))return {date:cells[0].replace(/[/]/g,"-"),foreignYi:numbers[0],trustYi:numbers[1],dealerYi:numbers[2],totalYi:numbers[3]};
+  if(numbers.every(Number.isFinite))return {date:cells[0].replace(/\//g,"-"),foreignYi:numbers[0],trustYi:numbers[1],dealerYi:numbers[2],totalYi:numbers[3]};
  }
  return null;
 }
