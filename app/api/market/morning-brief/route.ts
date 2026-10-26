@@ -10,14 +10,26 @@ type Q={label:string;symbol:string;value:number|null;changePct:number|null;time:
 const symbols:[string,string][]=[["台指期近月","TX=F"],["標普500期貨","ES=F"],["那斯達克100期貨","NQ=F"],["費城半導體","^SOX"],["那斯達克指數","^IXIC"],["美元／新台幣","TWD=X"],["美元指數","DX-Y.NYB"],["VIX","^VIX"],["美國10年公債殖利率","^TNX"]];
 async function quote([label,symbol]:[string,string]):Promise<Q>{
  const empty={label,symbol,value:null,changePct:null,time:null};
+ const future=symbol==="ES=F"||symbol==="NQ=F"||symbol==="TX=F";
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
-   const res=await fetch("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=5d",{next:{revalidate:300},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
+   const interval=future?"5m":"1d",range=future?"2d":"5d";
+   const res=await fetch("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval="+interval+"&range="+range,{next:{revalidate:future?60:300},signal:AbortSignal.timeout(4500),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
    if(!res.ok)continue;
-   const result=(await res.json() as {chart?:{result?:{meta?:{regularMarketPrice?:number;previousClose?:number;chartPreviousClose?:number;regularMarketTime?:number}}[]}}).chart?.result?.[0]?.meta;
-   const value=result?.regularMarketPrice,prev=result?.previousClose??result?.chartPreviousClose;
-   if(typeof value!=="number"||!Number.isFinite(value))continue;
-   return {label,symbol,value,changePct:typeof prev==="number"&&prev!==0?(value/prev-1)*100:null,time:typeof result?.regularMarketTime==="number"?new Date(result.regularMarketTime*1000).toISOString():null};
+   const data=await res.json() as {chart?:{result?:Array<{meta?:{regularMarketPrice?:number;previousClose?:number;chartPreviousClose?:number;regularMarketTime?:number};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
+   const result=data.chart?.result?.[0],meta=result?.meta;
+   const timestamps=result?.timestamp??[],closes=result?.indicators?.quote?.[0]?.close??[];
+   let lastIndex=-1;
+   for(let i=0;i<timestamps.length;i++)if(typeof closes[i]==="number"&&Number.isFinite(closes[i])&&closes[i]!>0)lastIndex=i;
+   const lastTime=lastIndex>=0?timestamps[lastIndex]:meta?.regularMarketTime;
+   if(typeof lastTime!=="number")continue;
+   const age=Date.now()-lastTime*1000;
+   // Never present a previous session's futures percentage as the current move.
+   if(age< -300000||age>(future?12:96)*3600000)continue;
+   const value=lastIndex>=0?closes[lastIndex]:meta?.regularMarketPrice;
+   const prev=meta?.previousClose??meta?.chartPreviousClose;
+   if(typeof value!=="number"||!Number.isFinite(value)||value<=0)continue;
+   return {label,symbol,value,changePct:typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:new Date(lastTime*1000).toISOString()};
   }catch{}
  }
  return empty;
