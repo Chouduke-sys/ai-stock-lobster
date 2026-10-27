@@ -30,11 +30,19 @@ async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
   if(json.stat!=="OK")return null;
   let records:string[][]=[];let codeIndex=-1,amountIndex=-1,closeIndex=-1;
   // TWSE MI_INDEX includes several tables; find the stock-level table by field names.
-  for(let n=0;n<=12;n++){
-   const fields=json[n===0?"fields":"fields"+n],data=json[n===0?"data":"data"+n];
-   if(!Array.isArray(fields)||!Array.isArray(data))continue;
+  // TWSE can change numbered table keys. Inspect every fields/data pair rather than assuming <=12.
+  for(const [key,fields] of Object.entries(json)){
+   if(!/^fields\\d*$/.test(key)||!Array.isArray(fields))continue;
+   const data=json[key.replace("fields","data")];
+   if(!Array.isArray(data))continue;
    const labels=fields.map(String);
-   if(labels.some(x=>x.includes("證券代號"))&&labels.some(x=>x.includes("成交金額"))){records=data as string[][];codeIndex=labels.findIndex(x=>x.includes("證券代號"));amountIndex=labels.findIndex(x=>x.includes("成交金額"));closeIndex=labels.findIndex(x=>x.includes("收盤價"));break;}
+   const code=labels.findIndex(x=>x.includes("證券代號"));
+   const amount=labels.findIndex(x=>x.includes("成交金額"));
+   if(code<0||amount<0)continue;
+   const sample=data.find((row):row is unknown[]=>Array.isArray(row)&&/^\\d{4}$/.test(String(row[code]??"").trim()));
+   if(!sample)continue;
+   records=data as string[][];codeIndex=code;amountIndex=amount;
+   closeIndex=labels.findIndex(x=>x.includes("收盤價"));break;
   }
   const values=new Map<string,number>();const closes=new Map<string,number>();
   for(const row of records){
@@ -102,7 +110,7 @@ export async function GET(){
    }
   }
   buyers.sort((a,b)=>b.shares-a.shares);
-  return NextResponse.json({status:"ok",asOf:history[0]?.date??twDate(),historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:"TWSE STOCK_DAY_ALL / T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。資料為最近取得的盤後快照，並非逐筆即時。"},
+  return NextResponse.json({status:"ok",asOf:history[0]?.date??null,asOfVerified:history.length>0,historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:"TWSE STOCK_DAY_ALL / T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。盤後個股快照若無可驗證交易日則不標示為今日資料；並非逐筆即時。"},
    {headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
  }catch(e){return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"暫無可驗證行情"},{status:503});}
 }
