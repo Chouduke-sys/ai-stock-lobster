@@ -263,7 +263,8 @@ export async function GET(request:Request){
  const flowRows=Array.isArray(flow?.data)?flow!.data!.slice(0,8).map(row=>row.join("／")).filter(Boolean):[];
  const parseMoney=(value:string)=>{const n=Number(value.replace(/,/g,"").replace(/\s/g,""));return Number.isFinite(n)?n:null;};
  const investorRows=(flow?.data??[]).flatMap(row=>{const label=String(row[0]??"");if(!/外資|投信|自營商/.test(label))return [];const value=parseMoney(String(row[row.length-1]??""));return value===null?[]:[{label,value}];});
- const foreign=verifiedHiStock?{label:"外資",value:verifiedHiStock.foreignYi*1e8}:flowDate===referenceDate?investorRows.find(row=>/外資/.test(row.label)):undefined,trust=verifiedHiStock?{label:"投信",value:verifiedHiStock.trustYi*1e8}:flowDate===referenceDate?investorRows.find(row=>/投信/.test(row.label)):undefined;
+ const verifiedFlow=flowDate===referenceDate||flowDate===marginReferenceDate;
+ const foreign=verifiedHiStock?{label:"外資",value:verifiedHiStock.foreignYi*1e8}:verifiedFlow?investorRows.find(row=>/外資/.test(row.label)):undefined,trust=verifiedHiStock?{label:"投信",value:verifiedHiStock.trustYi*1e8}:verifiedFlow?investorRows.find(row=>/投信/.test(row.label)):undefined;
  const investorScore=foreign&&trust?(foreign.value+trust.value>0?1:foreign.value+trust.value<0?-1:0):null;
  const moneyLabel=(row:{label:string;value:number}|undefined)=>row?row.label+" "+(row.value>=0?"+":"")+(row.value/1e8).toFixed(2)+"億元":"未取得";
  const title=news.match(/<item>[\s\S]*?<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g,"").replace(/<[^>]*>/g,"").replace(/&amp;/g,"&")??null;
