@@ -32,14 +32,14 @@ async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
   // TWSE MI_INDEX includes several tables; find the stock-level table by field names.
   // TWSE can change numbered table keys. Inspect every fields/data pair rather than assuming <=12.
   for(const [key,fields] of Object.entries(json)){
-   if(!/^fields\\d*$/.test(key)||!Array.isArray(fields))continue;
+   if(!/^fields\d*$/.test(key)||!Array.isArray(fields))continue;
    const data=json[key.replace("fields","data")];
    if(!Array.isArray(data))continue;
    const labels=fields.map(String);
    const code=labels.findIndex(x=>x.includes("證券代號"));
    const amount=labels.findIndex(x=>x.includes("成交金額"));
    if(code<0||amount<0)continue;
-   const sample=data.find((row):row is unknown[]=>Array.isArray(row)&&/^\\d{4}$/.test(String(row[code]??"").trim()));
+   const sample=data.find((row):row is unknown[]=>Array.isArray(row)&&/^\d{4}$/.test(String(row[code]??"").trim()));
    if(!sample)continue;
    records=data as string[][];codeIndex=code;amountIndex=amount;
    closeIndex=labels.findIndex(x=>x.includes("收盤價"));break;
