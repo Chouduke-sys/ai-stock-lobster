@@ -10,6 +10,7 @@ const archivePath=path.join(process.cwd(),"data","daily-review.json");
 fs.mkdirSync(path.dirname(archivePath),{recursive:true});
 const archive=fs.existsSync(archivePath)?JSON.parse(fs.readFileSync(archivePath,"utf8")):[];
 const get=async(url,headers={})=>{const r=await fetch(base+url,{headers});if(!r.ok)throw Error(url+" HTTP "+r.status);return r.json();};
+async function main(){
 if(mode==="morning"){
  const brief=await get("/api/market/morning-brief",{Authorization:"Bearer "+secret});
  if(brief.status!=="ok"||brief.reportDate!==day)throw Error("Invalid morning brief date");
@@ -32,3 +33,5 @@ if(mode==="morning"){
 archive.sort((a,b)=>a.date.localeCompare(b.date));
 fs.writeFileSync(archivePath,JSON.stringify(archive.slice(-400),null,2)+"\n");
 console.log(mode+" saved "+day);
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});
