@@ -78,7 +78,7 @@ async function histockQuotes():Promise<Quote[]>{
  for(const match of Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))){
   const cells=Array.from(match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)).map(m=>cleanHtml(m[1]));
   const code=cells.findIndex(c=>/^\d{4}$/.test(c));
-  if(code<0||cells.length-code<12)continue;
+  if(code<0||cells.length-code<13)continue;
   const symbol=cells[code],name=cells[code+1],close=num(cells[code+2]),volume=num(cells[code+11]),value=num(cells[code+12])*100000000;
   if(name&&close>0&&value>0&&volume>0)result.push({symbol,name,close,volume:volume*1000,value,change:cells[code+3]??"",transactions:0});
  }
@@ -105,7 +105,7 @@ async function yahooQuotes():Promise<{rows:Quote[];date:string}>{
  const pattern=/(\d{4})\.(?:TW|TWO)\s+([\d,]+(?:\.\d+)?)\s+[+-]?[\d,]+(?:\.\d+)?\s+[+-]?[\d.]+%\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+([\d,]+)\s+([\d,]+(?:\.\d+)?)/g;
  for(const match of Array.from(plain.matchAll(pattern))){
   const symbol=match[1],close=num(match[2]),volume=num(match[3])*1000,value=num(match[4])*100000000;
-  const before=plain.slice(Math.max(0,match.index-100),match.index).trim().split(/\s+/);
+  const before=plain.slice(Math.max(0,(match.index??0)-100),match.index??0).trim().split(/\s+/);
   const name=before.at(-1)??symbol;
   if(close>0&&volume>0&&value>0&&name)rows.push({symbol,name,close,volume,value,change:"",transactions:0});
  }
