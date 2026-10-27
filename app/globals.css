@@ -467,3 +467,16 @@
  .site-shell[data-mobile-tab="flows"] > section[aria-label="HiStock 外資投信買賣超監測"]{display:block!important;margin-top:12px!important}
  .site-shell[data-mobile-tab="sectors"] > section[aria-label="當日爆量與法人買超排行榜"]{display:none!important}
 }
+
+/* Compact mobile institutional dashboard and keep wide ranking tables scrollable. */
+@media(max-width:640px){
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="HiStock 外資投信買賣超監測"],
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"]{padding-top:16px!important;padding-bottom:20px!important;margin-top:0!important}
+ .site-shell[data-mobile-tab="flows"] > .institutional-side-by-side .section{padding-top:18px!important;padding-bottom:20px!important}
+ .site-shell[data-mobile-tab="flows"] .section-heading{margin-bottom:14px!important}
+ .site-shell[data-mobile-tab="flows"] .table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+ .site-shell[data-mobile-tab="flows"] .table-wrap table{min-width:550px}
+ .site-shell[data-mobile-tab="flows"] .table-wrap th,
+ .site-shell[data-mobile-tab="flows"] .table-wrap td{padding:12px 9px;font-size:12px;white-space:nowrap}
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"] .section-heading h2{font-size:21px;line-height:1.35}
+}
