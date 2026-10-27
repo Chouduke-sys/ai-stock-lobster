@@ -45,7 +45,7 @@ type MarginData={date:string;financingBalance:number|null;financingChange:number
 function numeric(raw:unknown):number|null{const n=Number(String(raw??"").replace(/,/g,"").replace(/[^0-9.-]/g,""));return Number.isFinite(n)&&String(raw??"").trim()!==""?n:null;}
 async function yahooMargin():Promise<MarginData|null>{
  try{
-  const res=await fetch("https://tw.stock.yahoo.com/margin-balance",{next:{revalidate:600},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://tw.stock.yahoo.com/margin-balance",{next:{revalidate:180},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const plain=html.replace(new RegExp("<[^>]+>","g")," ").replace(new RegExp("&nbsp;|&#160;","g")," ").replace(/\s+/g," ");
@@ -64,7 +64,7 @@ async function yahooMargin():Promise<MarginData|null>{
 type HiStockMargin=MarginData & {borrowBalance:number|null;borrowChange:number|null};
 async function histockMargin():Promise<HiStockMargin|null>{
  try{
-  const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:600},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:180},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const tables=extractHtmlTables(html);
@@ -97,8 +97,9 @@ async function histockMargin():Promise<HiStockMargin|null>{
  }catch{return null;}
 }
 async function latestMargin():Promise<MarginData|null>{
- const histock=await histockMargin();if(histock)return histock;
- const yahoo=await yahooMargin();if(yahoo)return yahoo;
+ const [histock,yahoo]=await Promise.all([histockMargin(),yahooMargin()]);
+ const candidates=[histock,yahoo].filter((item):item is MarginData=>item!==null).sort((a,b)=>b.date.localeCompare(a.date));
+ if(candidates.length)return candidates[0];
  const today=new Date();
  const taipei=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(today);
  const anchor=new Date(taipei+"T00:00:00+08:00");
@@ -240,7 +241,9 @@ export async function GET(request:Request){
   backtestedAllocation(),
   getIndexTechnical()
  ]);
- const validatedMargin=margin?.date===referenceDate?margin:null;
+ // Accept today's verified closing figures once published, without losing the prior session's figures.
+ const marginReferenceDate=now.minute>=13*60+30?reportDate:referenceDate;
+ const validatedMargin=margin&&(margin.date===referenceDate||margin.date===marginReferenceDate)?margin:null;
  const marginBorrow=validatedMargin&&"borrowBalance" in validatedMargin?validatedMargin as HiStockMargin:null;
  const validatedFutures=futuresOptions?.date===referenceDate?futuresOptions:null;
  const validatedWantgoo=wantgooRatio?.date===referenceDate?wantgooRatio:null;
