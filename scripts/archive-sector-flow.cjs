@@ -7,11 +7,12 @@ async function main(){
  if(!response.ok)throw Error("Sector API HTTP "+response.status);
  const payload=await response.json();
  if(payload.status!=="ok"||!Array.isArray(payload.groups)||payload.groups.length<5)throw Error("Sector groups unavailable");
+ if(payload.asOfVerified!==true)throw Error("Sector source trading date not verified; refuse to archive");
  const date=payload.asOf;
  if(typeof date!=="string"||!/^20[0-9]{2}-[0-9]{2}-[0-9]{2}$/.test(date))throw Error("Invalid data date");
  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
  const lag=Math.floor((Date.parse(today+"T00:00:00Z")-Date.parse(date+"T00:00:00Z"))/86400000);
- if(lag<0||lag>5)throw Error("Historical data date stale or in future: "+date);
+ if(lag!==0)throw Error("Sector snapshot is not for current Taiwan trading date: "+date+" (today "+today+")");
  const groups=payload.groups.map(g=>({
   name:g.name,
   turnover:g.turnover,
