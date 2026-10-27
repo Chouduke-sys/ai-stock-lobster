@@ -75,8 +75,8 @@ async function histockQuotes():Promise<Quote[]>{
  if(!res.ok)throw Error("HiStock HTTP "+res.status);
  const html=await res.text();
  const result:Quote[]=[];
- for(const match of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)){
-  const cells=[...match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>cleanHtml(m[1]));
+ for(const match of Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi))){
+  const cells=Array.from(match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)).map(m=>cleanHtml(m[1]));
   const code=cells.findIndex(c=>/^\d{4}$/.test(c));
   if(code<0||cells.length-code<12)continue;
   const symbol=cells[code],name=cells[code+1],close=num(cells[code+2]),volume=num(cells[code+11]),value=num(cells[code+12])*100000000;
