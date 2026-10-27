@@ -460,3 +460,10 @@
 .sector-radar-entry strong{font-size:13px;color:#fff;overflow-wrap:anywhere}
 .sector-radar-entry span{font-size:12px;color:#cbd5e1;overflow-wrap:anywhere}
 @media(max-width:900px){.sector-radar-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Mobile institutional tab: HiStock first, institutional rankings next, volume Top 10 last. */
+@media(max-width:640px){
+ .site-shell[data-mobile-tab] > section[aria-label="HiStock 外資投信買賣超監測"]{display:none!important}
+ .site-shell[data-mobile-tab="flows"] > section[aria-label="HiStock 外資投信買賣超監測"]{display:block!important;margin-top:12px!important}
+ .site-shell[data-mobile-tab="sectors"] > section[aria-label="當日爆量與法人買超排行榜"]{display:none!important}
+}
