@@ -34,7 +34,7 @@ async function check([name,path,kind]){
   const status=response.status;
   const summary={name,path,http:status,latencyMs:elapsed,status:body?.status??null,date:body?.asOf??body?.dataDate??body?.date??null};
   results.push(summary);
-  if(kind==="html"){if(!response.ok||!/<html[\\s>]/i.test(raw)||raw.length<500)issue(name,"error","首頁無法正常顯示");return;}
+  if(kind==="html"){if(!response.ok||!raw.toLowerCase().includes("<html")||raw.length<500)issue(name,"error","首頁無法正常顯示");return;}
   if(kind==="auth"){if(status===401){issue(name,"warning","需要登入，無法驗證會員內文");return;}if(!response.ok||body?.status!=="ok")issue(name,"error","HTTP "+status+"／"+body?.status);return;}
   if(kind==="index"){if(status===409&&!(["Mon","Tue","Wed","Thu","Fri"].includes(day)&&minute>=540&&minute<=810))return;if(!response.ok||body?.status!=="ok")issue(name,"warning","非正常回應 HTTP "+status);return;}
   if(kind==="night"){if(status===409&&!nightOpen)return;if(nightOpen&&(!response.ok||body?.status!=="ok"))issue(name,"error","夜盤時段無有效報價 HTTP "+status+" "+(body?.status||""));return;}
