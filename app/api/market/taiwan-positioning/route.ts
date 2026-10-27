@@ -54,11 +54,9 @@ function parseThreeInstitutional(html:string){
 }
 export async function GET(){
  try{
-  const response=await fetch("https://histock.tw/台股大盤",{cache:"no-store",signal:AbortSignal.timeout(9000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
-  if(!response.ok)throw new Error("HiStock HTTP "+response.status);
-  const html=await response.text();
+  const [response,hiStockThree]=await Promise.all([fetch("https://histock.tw/台股大盤",{cache:"no-store",signal:AbortSignal.timeout(9000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}}).catch(()=>null),fetchHiStockThree()]);
+  const html=response?.ok?await response.text():"";
   const institutional=parseTable(html,"台股大盤 三大法人買賣超");
-  const hiStockThree=await fetchHiStockThree();
   const liveInstitutional=hiStockThree?{...hiStockThree,unit:"億元"}:null;
   const institutionalTotals=extractInstitutionalTotals(html);
   const margin=parseTable(html,"融資融券餘額");
