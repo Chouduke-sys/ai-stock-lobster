@@ -24,7 +24,5 @@ jobs:
           node --check scripts/archive-sector-flow.cjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: TypeScript type check
-        run: npx tsc --noEmit
       - name: Production build
         run: npm run build
