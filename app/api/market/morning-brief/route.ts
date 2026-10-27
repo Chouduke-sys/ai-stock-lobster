@@ -231,7 +231,7 @@ export async function GET(request:Request){
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
  const now=taipeiParts(),reportDate=now.date,referenceDate=priorTaiwanTradingDay(new Date());
- const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals,allocationModel,technical,histockThree]=await Promise.all([
+ const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals,allocationModel,technical,histockThree,sectorFlow]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+referenceDate.replace(/-/g,"")+"&response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
@@ -241,7 +241,8 @@ export async function GET(request:Request){
   getPolicySignals(),
   backtestedAllocation(),
   getIndexTechnical(),
-  fetchHiStockThree()
+  fetchHiStockThree(),
+  fetch(new URL("/api/market/ai-flow",request.url),{next:{revalidate:300},signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null) as Promise<{status:string;historyStatus:string;asOfVerified:boolean;groups:{historicalQuality:string;weeklyDelta:number|null;shareDelta:number|null}[]}|null>
  ]);
  // Accept today's verified closing figures once published, without losing the prior session's figures.
  const marginReferenceDate=now.minute>=13*60+30?reportDate:referenceDate;
@@ -299,7 +300,7 @@ export async function GET(request:Request){
   {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
   {title:"技術面與量能",body:technical.body,sentiment:technical.sentiment,verdict:technical.verdict},
   {title:"重大政策與科技",body:policySignals.items.length?policySignals.items.map((item,i)=>(i+1)+"．"+item.title+"｜影響："+item.sector+"｜"+(item.impact==="bullish"?"偏利多":"偏利空")+"："+item.reason+"。").join(" ")+(policySignals.score===0?" 綜合結論：利多利空交錯，短線偏中性。":policySignals.score!==null&&policySignals.score>0?" 綜合結論：政策與科技消息偏利多，仍須留意實際財報與市場反應。":" 綜合結論：政策與科技消息偏利空，注意相關族群風險。"):"近48小時未找到可由標題確認方向的重大政策或科技事件，暫不推論利多利空。",sentiment:mood(policySignals.score),verdict:policySignals.score===null?"事件待確認":policySignals.score>0?"消息偏利多":policySignals.score<0?"消息偏利空":"消息多空分歧"},
-  {title:"今日盤前小總結",body:stance+"。"+allocationAdvice+" 優先確認開盤量價、台幣與法人方向；不追高，槓桿部位嚴守風控。",sentiment:mood(abroadScore),verdict:abroadScore===null?"資訊不足":abroadScore>0?"偏多觀察":abroadScore<0?"偏空謹慎":"中性觀望"}
+  {title:"今日盤前小總結",body:"九項風險因子加權計算中。",sentiment:"neutral" as Direction,verdict:"計算中"}
  ];
  const missing=[!validatedMargin?"融資融券":null,foreignFuturesNet==null?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
  const dataComplete=missing.length===0;
@@ -307,8 +308,9 @@ export async function GET(request:Request){
  const bullishCount=firstEight.filter(item=>item.sentiment==="bullish").length;
  const bearishCount=firstEight.filter(item=>item.sentiment==="bearish").length;
  const neutralCount=firstEight.length-bullishCount-bearishCount;
- const overallDirection=bullishCount>bearishCount?"bullish":bearishCount>bullishCount?"bearish":"neutral";
- const overallLabel=overallDirection==="bullish"?"利多":overallDirection==="bearish"?"利空":"多空中性";
+ // Only use verified multi-session sector turnover trends; turnover alone is not net inflow.
+ const sectorDirection:Direction|null=sectorFlow?.status==="ok"&&sectorFlow.historyStatus==="available"&&sectorFlow.asOfVerified&&sectorFlow.groups?.some(g=>g.historicalQuality==="verified")
+  ?(()=>{const valid=sectorFlow.groups.filter(g=>g.historicalQuality==="verified"&&typeof g.weeklyDelta==="number"&&typeof g.shareDelta==="number");const sum=valid.reduce((n,g)=>n+(g.weeklyDelta>0&&g.shareDelta>0?1:g.weeklyDelta<0&&g.shareDelta<0?-1:0),0);return valid.length<3?null:sum>0?"bullish":sum<0?"bearish":"neutral";})():null;
  const modelAvailable=allocationModel.allocation!==null;
  const baseAllocation=modelAvailable?Math.max(0,Math.min(90,allocationModel.allocation!)):null;
  const riskAssessment=assessAllocation([
@@ -317,48 +319,27 @@ export async function GET(request:Request){
   {name:"外資期貨與選擇權",weight:10,direction:foreignFuturesNet!=null&&optionVolume!==null?sections[3].sentiment as Direction:null},
   {name:"融資融券",weight:15,direction:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?sections[2].sentiment as Direction:null},
   {name:"國際股市與美股期貨",weight:15,direction:us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null?sections[0].sentiment as Direction:null},
-  {name:"產業資金輪動",weight:10,direction:null},
+  {name:"產業資金輪動",weight:10,direction:sectorDirection},
   {name:"匯率與利率",weight:5,direction:fx?.changePct!=null?sections[4].sentiment as Direction:null},
   {name:"VIX",weight:3,direction:vix?.value!=null?sections[5].sentiment as Direction:null},
   {name:"重大政策",weight:2,direction:policySignals.score!==null?sections[7].sentiment as Direction:null}
  ],baseAllocation);
  const riskCap=riskAssessment.riskCap;
  const recommendedAllocation=riskAssessment.recommendedAllocation;
- const overallStance=stance;
+ const score=riskAssessment.score,coverage=riskAssessment.coverage;
+ const overallDirection:Direction=score===null||coverage<50?"neutral":score>=60?"bullish":score<=40?"bearish":"neutral";
+ const overallLabel=coverage<50?"資料覆蓋不足":overallDirection==="bullish"?"加權偏多":overallDirection==="bearish"?"加權偏空":"加權中性";
+ const overallStance=overallLabel;
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
-  // Narrative recap: use only verified directional signals from the first eight cards.
-  const narrative:string[]=[];
-  const first=firstEight[0];
-  if(first.sentiment==="bullish")narrative.push("國際股市與科技期貨表現偏強，外圍氣氛有利台股開盤。");
-  else if(first.sentiment==="bearish")narrative.push("國際股市與科技期貨偏弱，台股開盤仍須提防賣壓。");
-  const institution=firstEight[1];
-  if(institution.sentiment==="bullish")narrative.push("法人籌碼呈現買超，顯示資金有回流跡象。");
-  else if(institution.sentiment==="bearish")narrative.push("法人籌碼偏向賣超，反彈仍需觀察買盤能否延續。");
-  const marginSection=firstEight[2];
-  if(marginSection.sentiment==="bearish")narrative.push("融資融券顯示槓桿買盤降溫、空方部位增加，短線籌碼仍有壓力。");
-  else if(marginSection.sentiment==="bullish")narrative.push("融資融券顯示槓桿買盤回升、空方回補，短線籌碼有所改善。");
-  const futuresSection=firstEight[3];
-  if(futuresSection.sentiment==="bearish")narrative.push("期貨與選擇權訊號偏空，市場避險情緒尚未完全解除。");
-  else if(futuresSection.sentiment==="bullish")narrative.push("期貨與選擇權訊號轉強，有助於市場短線信心。");
-  const currency=firstEight[4];
-  if(currency.sentiment==="bearish")narrative.push("匯率與利率環境對資金面較不利，需留意外資動向。");
-  else if(currency.sentiment==="bullish")narrative.push("匯率與利率環境相對有利，有助於資金風險偏好。");
-  const volatility=firstEight[5];
-  if(volatility.sentiment==="bearish")narrative.push("市場波動與避險情緒升溫，追價風險提高。");
-  else if(volatility.sentiment==="bullish")narrative.push("市場波動相對平穩，短線風險情緒有所改善。");
-  const policy=firstEight[7];
-  if(policy.sentiment==="bearish")narrative.push("重大政策與科技消息偏向利空，相關族群仍須留意消息面壓力。");
-  else if(policy.sentiment==="bullish")narrative.push("重大政策與科技消息偏向利多，可留意相關族群的資金反應。");
-  if(narrative.length===0)narrative.push("目前盤前關鍵訊號尚不明朗，缺乏足夠依據判斷短線方向。");
-  const conclusion=overallDirection==="bearish"
-   ?"整體而言，短線反彈尚不足以確認行情轉強，建議保持審慎，等待量能、法人與匯率同步改善後，再逐步提高水位。"
-   :overallDirection==="bullish"
-   ?"整體而言，盤前多方訊號占優，但仍需觀察開盤量價能否延續，避免追高，採分批布局。"
-   :"整體而言，多空訊號仍有分歧，建議維持中性水位，等待量能與資金方向更明確後再調整。";
-  summary.body=narrative.slice(0,5).join(" ")+" "+conclusion;
+  const ranked=riskAssessment.signals.filter(item=>item.direction!==null).sort((a,b)=>b.weight-a.weight);
+  const describe=(direction:Direction)=>ranked.filter(item=>item.direction===direction).map(item=>item.name+"（"+item.weight+"%）").slice(0,4).join("、");
+  const ups=describe("bullish"),downs=describe("bearish");
+  const missingSignals=riskAssessment.signals.filter(item=>item.direction===null).map(item=>item.name);
+  const exposure=recommendedAllocation===null?"目前資料覆蓋不足或基礎倉位模型無結果，暫不提供具體倉位。":"建議股票總倉位 "+recommendedAllocation+"%，風險上限 "+riskCap+"%；含融資部位的股票市值應計入總曝險。";
+  summary.body="九項因子加權風險分數："+(score===null?"未計算":score+"/100")+"；有效資料覆蓋 "+coverage+"%。"+(ups?" 偏多依據："+ups+"。":"")+(downs?" 偏空依據："+downs+"。":"")+(missingSignals.length?" 尚缺有效訊號："+missingSignals.join("、")+"，不以零分代替。":"")+" 八大分析項目利多 "+bullishCount+"／利空 "+bearishCount+"／中性 "+neutralCount+"。"+exposure+" 此為規則式風險建議，尚未完成歷史績效校準。";
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / HiStock / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
