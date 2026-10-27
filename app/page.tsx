@@ -756,34 +756,6 @@ useEffect(()=>{
         </div>
       </section>
 
-      <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
-        <div className="section-heading"><div><div className="eyebrow">VOLUME & COMPANY NEWS</div><h2>當日成交金額熱門股／公司最新新聞</h2><p>左側依上市個股成交金額排名；右側對應各公司的最新新聞，方便追蹤量能與題材。</p></div></div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
-          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
-          {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
-          {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
-          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">成交金額 Top 10 公司最新新聞</div><p className="holdings-date">依左側成交金額排名對應 · 近七天新聞 · 每十分鐘檢查</p>
-          {aiFlow?.volumeLeaders?.slice(0,10).map((stock,i)=>{const article=leaderNews.find(n=>n.symbol===stock.symbol);return <div key={stock.symbol} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr)",gap:5,padding:"13px 0",borderBottom:"1px solid #64748b33",minWidth:0}}>
-            <div style={{fontSize:14,fontWeight:700,lineHeight:1.5,overflowWrap:"anywhere"}}>{i+1}. {stock.name} <span style={{fontSize:12,opacity:.7}}>{stock.symbol}</span></div>
-            <div style={{minWidth:0,fontSize:13,lineHeight:1.65,overflowWrap:"anywhere",wordBreak:"break-word"}}>{article?<a href={article.url} target="_blank" rel="noopener noreferrer" style={{color:"inherit",textDecoration:"underline",textUnderlineOffset:3,display:"block",whiteSpace:"normal",overflowWrap:"anywhere"}}>{article.title}</a>:<span style={{opacity:.65}}>近七天尚無可取得新聞</span>}</div>
-            {article?.publishedAt&&<div style={{fontSize:11,opacity:.65,lineHeight:1.5}}>{new Date(article.publishedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} · {article.source}</div>}
-          </div>;})}
-          {!aiFlow?.volumeLeaders?.length&&<p className="footnote">{aiFlowError||"成交金額排行載入中…"}</p>}
-          {leaderNewsError&&<p className="footnote">新聞來源暫不可用：{leaderNewsError}</p>}
-          </div>
-        </div>
-        <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。新聞來源：Google 新聞 RSS，搜尋結果不代表公司官方公告，請點閱原文確認。</p>
-      </section>
-      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
-        <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
-        <div className="holdings-panel">
-          {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
-          <div className="daily-market-grid">{([{label:"外資買賣超",value:positioning.liveInstitutional.foreignYi},{label:"投信買賣超",value:positioning.liveInstitutional.trustYi},{label:"自營商買賣超",value:positioning.liveInstitutional.dealerYi},{label:"三大法人合計",value:positioning.liveInstitutional.totalYi}]).map(item=><div className="daily-market-quote" key={item.label}><small>{item.label}</small><strong className={item.value>=0?"market-up":"market-down"}>{item.value>0?"+":""}{item.value.toFixed(2)} 億</strong></div>)}</div>
-          <p className="holdings-note">法人動向：{positioning.liveInstitutional.foreignYi<0?"外資賣超":"外資買超"}、{positioning.liveInstitutional.trustYi<0?"投信賣超":"投信買超"}；{positioning.liveInstitutional.totalYi>=0?"三大法人合計買超":"三大法人合計賣超"}。此為資金面觀察，不單獨構成進出場訊號。</p></> : <p className="holdings-note">HiStock 法人數據尚未成功驗證，暫不顯示估計值。{positioningError}</p>}
-          <p className="footnote">來源：HiStock 上市三大法人籌碼圖表 · 更新頻率取決於來源網站實際公布時間。</p>
-        </div>
-      </section>
-
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
@@ -837,6 +809,16 @@ useEffect(()=>{
         .institutional-side-by-side .footnote { font-size:13px; line-height:1.65; }
         @media(max-width:1050px){ .institutional-side-by-side { grid-template-columns:minmax(0,1fr); gap:12px; } }
       `}</style>
+      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
+        <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
+        <div className="holdings-panel">
+          {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
+          <div className="daily-market-grid">{([{label:"外資買賣超",value:positioning.liveInstitutional.foreignYi},{label:"投信買賣超",value:positioning.liveInstitutional.trustYi},{label:"自營商買賣超",value:positioning.liveInstitutional.dealerYi},{label:"三大法人合計",value:positioning.liveInstitutional.totalYi}]).map(item=><div className="daily-market-quote" key={item.label}><small>{item.label}</small><strong className={item.value>=0?"market-up":"market-down"}>{item.value>0?"+":""}{item.value.toFixed(2)} 億</strong></div>)}</div>
+          <p className="holdings-note">法人動向：{positioning.liveInstitutional.foreignYi<0?"外資賣超":"外資買超"}、{positioning.liveInstitutional.trustYi<0?"投信賣超":"投信買超"}；{positioning.liveInstitutional.totalYi>=0?"三大法人合計買超":"三大法人合計賣超"}。此為資金面觀察，不單獨構成進出場訊號。</p></> : <p className="holdings-note">HiStock 法人數據尚未成功驗證，暫不顯示估計值。{positioningError}</p>}
+          <p className="footnote">來源：HiStock 上市三大法人籌碼圖表 · 更新頻率取決於來源網站實際公布時間。</p>
+        </div>
+      </section>
+
       <div className="institutional-side-by-side">
       <section className="section institutional-panel" id="rankings">
         <div className="section-heading"><div><div className="eyebrow">INSTITUTIONAL FLOW</div><h2>三大法人買賣超排行</h2><p>當日買超與賣超前五名 · 盤後公布</p></div><span className="tag tag-amber">{rankDate && rows.length ? `資料日 ${rankDate}` : loadingRank ? "讀取中" : "最新交易日資料待確認"}</span></div>
@@ -861,6 +843,25 @@ useEffect(()=>{
       </section>
 
       </div>
+
+      <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
+        <div className="section-heading"><div><div className="eyebrow">VOLUME & COMPANY NEWS</div><h2>當日成交金額熱門股／公司最新新聞</h2><p>左側依上市個股成交金額排名；右側對應各公司的最新新聞，方便追蹤量能與題材。</p></div></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
+          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">當日成交金額 Top 10</div><p className="holdings-date">{aiFlow?.asOf??"等待資料"} · 上市個股盤後快照</p>
+          {aiFlow?.volumeLeaders?.slice(0,10).map((x,i)=><div className="holdings-row" key={x.symbol}><span className="holdings-name">{i+1}. {x.name} <small>{x.symbol}</small></span><strong>{(x.value/1e8).toFixed(1)} 億</strong></div>)}
+          {!aiFlow&&<p>{aiFlowError||"載入中…"}</p>}</div>
+          <div className="holdings-panel volume-leaders-panel"><div className="holdings-fund-title">成交金額 Top 10 公司最新新聞</div><p className="holdings-date">依左側成交金額排名對應 · 近七天新聞 · 每十分鐘檢查</p>
+          {aiFlow?.volumeLeaders?.slice(0,10).map((stock,i)=>{const article=leaderNews.find(n=>n.symbol===stock.symbol);return <div key={stock.symbol} style={{display:"grid",gridTemplateColumns:"minmax(0,1fr)",gap:5,padding:"13px 0",borderBottom:"1px solid #64748b33",minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:700,lineHeight:1.5,overflowWrap:"anywhere"}}>{i+1}. {stock.name} <span style={{fontSize:12,opacity:.7}}>{stock.symbol}</span></div>
+            <div style={{minWidth:0,fontSize:13,lineHeight:1.65,overflowWrap:"anywhere",wordBreak:"break-word"}}>{article?<a href={article.url} target="_blank" rel="noopener noreferrer" style={{color:"inherit",textDecoration:"underline",textUnderlineOffset:3,display:"block",whiteSpace:"normal",overflowWrap:"anywhere"}}>{article.title}</a>:<span style={{opacity:.65}}>近七天尚無可取得新聞</span>}</div>
+            {article?.publishedAt&&<div style={{fontSize:11,opacity:.65,lineHeight:1.5}}>{new Date(article.publishedAt).toLocaleDateString("zh-TW",{timeZone:"Asia/Taipei"})} · {article.source}</div>}
+          </div>;})}
+          {!aiFlow?.volumeLeaders?.length&&<p className="footnote">{aiFlowError||"成交金額排行載入中…"}</p>}
+          {leaderNewsError&&<p className="footnote">新聞來源暫不可用：{leaderNewsError}</p>}
+          </div>
+        </div>
+        <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。新聞來源：Google 新聞 RSS，搜尋結果不代表公司官方公告，請點閱原文確認。</p>
+      </section>
 
       <section className="section" id="charts">
         <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 5 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
@@ -893,7 +894,7 @@ useEffect(()=>{
 
 
       <nav className="mobile-bottom-nav" aria-label="手機版主要功能">
-        {([{id:"news",label:"新聞",icon:NewsIcon},{id:"market",label:"今日台股",icon:TrendingUp},{id:"index",label:"加權指數",icon:BarChart3},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"flows",label:"法人籌碼",icon:Users},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
+        {([{id:"news",label:"新聞",icon:NewsIcon},{id:"market",label:"今日台股",icon:TrendingUp},{id:"index",label:"加權指數",icon:BarChart3},{id:"flows",label:"法人籌碼",icon:Users},{id:"sectors",label:"熱門產業",icon:Layers3},{id:"charts",label:"個股分析",icon:CandlestickChart},{id:"account",label:"會員",icon:UserRound}] as const).map(item=>{const Icon=item.icon;return <button type="button" key={item.id} className={mobileTab===item.id?"active":""} aria-current={mobileTab===item.id?"page":undefined} onClick={()=>selectMobileTab(item.id)}><Icon size={22} strokeWidth={mobileTab===item.id?2.6:1.9}/><span>{item.label}</span></button>;})}
       </nav>
 
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
