@@ -1,3 +1,4 @@
+import {assessAllocation} from "../../../../lib/market-risk-score";
 import {getServerSession} from "next-auth";
 import {authOptions} from "../../../../lib/auth";
 import {NextResponse} from "next/server";
@@ -301,13 +302,19 @@ export async function GET(request:Request){
  const overallLabel=overallDirection==="bullish"?"利多":overallDirection==="bearish"?"利空":"多空中性";
  const modelAvailable=allocationModel.allocation!==null;
  const baseAllocation=modelAvailable?Math.max(0,Math.min(90,allocationModel.allocation!)):null;
- const bearishLead=bearishCount-bullishCount;
- // Safety overlay: transparent conservative limits, not yet optimized by historical backtesting.
- const riskCap=bearishLead>=5?40:bearishLead>=3?50:bearishLead>=1?65:bearishLead===0?75:90;
- const recommendedAllocation=baseAllocation===null?null:Math.min(baseAllocation,riskCap);
- const allocationText=recommendedAllocation===null?"歷史回測資料暫不可用":recommendedAllocation+"%";
- const adjustmentText=baseAllocation!==null&&recommendedAllocation!==null&&recommendedAllocation<baseAllocation?"原始回測水位 "+baseAllocation+"%，因前八板塊偏空而依風險上限降至 "+recommendedAllocation+"%。":"目前未觸發額外減碼上限。";
- const confidenceNote=modelAvailable?"風險上限是保守規則，尚未完成含八板塊歷史訊號的回測驗證；不保證最佳報酬。":"歷史行情尚未取得，不提供未經計算的倉位百分比。";
+ const riskAssessment=assessAllocation([
+  {name:"大盤技術面與成交量",weight:25,direction:null},
+  {name:"外資與投信",weight:15,direction:foreign&&trust?sections[1].sentiment:null},
+  {name:"外資期貨與選擇權",weight:10,direction:validatedFutures?.foreignTxNet!=null&&optionVolume!==null?sections[3].sentiment:null},
+  {name:"融資融券",weight:15,direction:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?sections[2].sentiment:null},
+  {name:"國際股市與美股期貨",weight:15,direction:us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null?sections[0].sentiment:null},
+  {name:"產業資金輪動",weight:10,direction:null},
+  {name:"匯率與利率",weight:5,direction:fx?.changePct!=null?sections[4].sentiment:null},
+  {name:"VIX",weight:3,direction:vix?.value!=null?sections[5].sentiment:null},
+  {name:"重大政策",weight:2,direction:policySignals.score!==null?sections[7].sentiment:null}
+ ],baseAllocation);
+ const riskCap=riskAssessment.riskCap;
+ const recommendedAllocation=riskAssessment.recommendedAllocation;
  const overallStance=stance;
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
@@ -344,5 +351,5 @@ export async function GET(request:Request){
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
