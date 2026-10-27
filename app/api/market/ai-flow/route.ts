@@ -118,19 +118,24 @@ function comparableQuotes(a:Quote[],b:Quote[]){
  return compared.length>=5&&compared.filter(delta=>delta<=0.02).length>=5&&compared.filter(delta=>delta<=0.02).length/compared.length>=0.8;
 }
 async function marketQuotes():Promise<{rows:Quote[];source:string;quoteDate:string|null;coverage:string}>{
+ // Parallel probes cap worst-case latency: a failed primary must not consume the whole function timeout.
+ const [h,y,t]=await Promise.allSettled([histockQuotes(),yahooQuotes(),twseQuotes()]);
+ const histock=h.status==="fulfilled"?h.value:null;
+ const yahoo=y.status==="fulfilled"?y.value:null;
+ const official=t.status==="fulfilled"?t.value:null;
  let primary:Quote[]|null=null,source="",quoteDate:string|null=null;
- try{primary=await histockQuotes();source="HiStock";}catch{}
- if(!primary){try{const yahoo=await yahooQuotes();primary=yahoo.rows;quoteDate=yahoo.date;source="Yahoo 股市";}catch{}}
- if(!primary)return {rows:await twseQuotes(),source:"TWSE（前兩來源無效）",quoteDate:null,coverage:"listed_full"};
- // Ranking pages are partial universes; supplement only when TWSE prices/turnover agree.
- try{
-  const official=await twseQuotes();
-  if(comparableQuotes(primary,official)){
-   const merged=new Map(official.map(x=>[x.symbol,x]));
-   for(const row of primary)merged.set(row.symbol,row);
-   return {rows:Array.from(merged.values()),source:source+" + TWSE 一致性驗證補齊",quoteDate,coverage:"listed_full_plus_ranking"};
-  }
- }catch{}
+ if(histock){primary=histock;source="HiStock";}
+ if(yahoo&&(!primary||(yahoo.date===twDate()&&!comparableQuotes(primary,yahoo.rows)))){
+  primary=yahoo.rows;source="Yahoo 股市";quoteDate=yahoo.date;
+ }
+ if(!primary&&official)return {rows:official,source:"TWSE（前兩來源無效）",quoteDate:null,coverage:"listed_full"};
+ if(!primary)throw Error("HiStock、Yahoo 與 TWSE 行情來源均無有效資料");
+ // Never mix unmatched dates from independent feeds.
+ if(official&&comparableQuotes(primary,official)){
+  const merged=new Map(official.map(x=>[x.symbol,x]));
+  for(const row of primary)merged.set(row.symbol,row);
+  return {rows:Array.from(merged.values()),source:source+" + TWSE 一致性驗證補齊",quoteDate,coverage:"listed_full_plus_ranking"};
+ }
  return {rows:primary,source,quoteDate,coverage:"ranking_partial"};
 }
 export async function GET(){
