@@ -261,7 +261,7 @@ export async function GET(request:Request){
  const flow=twse&&typeof twse==="object"?twse as {date?:string;data?:string[][];fields?:string[]}:null;
  const flowDate=normalizedDate(flow?.date);
  const flowRows=Array.isArray(flow?.data)?flow!.data!.slice(0,8).map(row=>row.join("／")).filter(Boolean):[];
- const parseMoney=(value:string)=>{const n=Number(value.replace(/,/g,"").replace(/\\s/g,""));return Number.isFinite(n)?n:null;};
+ const parseMoney=(value:string)=>{const n=Number(value.replace(/,/g,"").replace(/\s/g,""));return Number.isFinite(n)?n:null;};
  const investorRows=(flow?.data??[]).flatMap(row=>{const label=String(row[0]??"");if(!/外資|投信|自營商/.test(label))return [];const value=parseMoney(String(row[row.length-1]??""));return value===null?[]:[{label,value}];});
  const foreign=verifiedHiStock?{label:"外資",value:verifiedHiStock.foreignYi*1e8}:flowDate===referenceDate?investorRows.find(row=>/外資/.test(row.label)):undefined,trust=verifiedHiStock?{label:"投信",value:verifiedHiStock.trustYi*1e8}:flowDate===referenceDate?investorRows.find(row=>/投信/.test(row.label)):undefined;
  const investorScore=foreign&&trust?(foreign.value+trust.value>0?1:foreign.value+trust.value<0?-1:0):null;
