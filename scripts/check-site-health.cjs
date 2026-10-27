@@ -38,7 +38,8 @@ async function check([name,path,kind]){
   if(kind==="auth"){if(status===401){issue(name,"warning","需要登入，無法驗證會員內文");return;}if(!response.ok||body?.status!=="ok")issue(name,"error","HTTP "+status+"／"+body?.status);return;}
   if(kind==="index"){if(status===409&&!(["Mon","Tue","Wed","Thu","Fri"].includes(day)&&minute>=540&&minute<=810))return;if(!response.ok||body?.status!=="ok")issue(name,"warning","非正常回應 HTTP "+status);return;}
   if(kind==="night"){if(status===409&&!nightOpen)return;if(nightOpen&&(!response.ok||body?.status!=="ok"))issue(name,"error","夜盤時段無有效報價 HTTP "+status+" "+(body?.status||""));return;}
-  if(kind==="sources"&&response.ok&&body?.status==="degraded"){issue(name,"warning","部分上游來源異常");return;}\n  if(!response.ok||body?.status!=="ok"){issue(name,"error","HTTP "+status+" "+(body?.status||""));return;}
+  if(kind==="sources"&&response.ok&&body?.status==="degraded"){issue(name,"warning","部分上游來源異常");return;}
+  if(!response.ok||body?.status!=="ok"){issue(name,"error","HTTP "+status+" "+(body?.status||""));return;}
   if(kind==="flow"){
    if(!Array.isArray(body.volumeLeaders)||body.volumeLeaders.length<10)issue(name,"error","成交金額排行不足10檔");
    if(!Array.isArray(body.groups)||body.groups.length<3)issue(name,"error","產業資料不足3組");
