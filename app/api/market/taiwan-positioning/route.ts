@@ -1,3 +1,4 @@
+import {fetchHiStockThree} from "../../../../lib/histock-three";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,8 +58,8 @@ export async function GET(){
   if(!response.ok)throw new Error("HiStock HTTP "+response.status);
   const html=await response.text();
   const institutional=parseTable(html,"台股大盤 三大法人買賣超");
-  const threeResponse=await fetch("https://histock.tw/stock/three.aspx",{next:{revalidate:60},signal:AbortSignal.timeout(9000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}}).catch(()=>null);
-  const liveInstitutional=threeResponse?.ok?parseThreeInstitutional(await threeResponse.text()):null;
+  const hiStockThree=await fetchHiStockThree();
+  const liveInstitutional=hiStockThree?{...hiStockThree,unit:"億元"}:null;
   const institutionalTotals=extractInstitutionalTotals(html);
   const margin=parseTable(html,"融資融券餘額");
   const futures=parseTable(html,"台股期貨未平倉量");
