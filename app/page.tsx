@@ -613,6 +613,16 @@ useEffect(()=>{
         <div className="sector-radar-grid">
           {([{key:"hottest",title:"現在最熱的是誰？",description:"近一交易日成交金額最高的三大產業",empty:"歷史資料不足，暫不排名"},{key:"emerging",title:"下一個可能輪到誰？",description:"成交熱度連續增強、占比上升且價格漲幅尚不明顯",empty:"目前沒有符合全部條件的產業"},{key:"cooling",title:"誰正在退燒？",description:"成交金額及市場占比下降，產業代表股價格偏弱",empty:"目前沒有符合全部條件的產業"}] as const).map(panel=><div className="sector-radar-panel" key={panel.key}><h3>{panel.title}</h3><p>{panel.description}</p>{aiFlow?.radar?.[panel.key]?.length?aiFlow.radar[panel.key].map((item,i)=><div className="sector-radar-entry" key={item.name}><strong>{i+1}. {item.name}</strong><span>{(item.turnover/1e8).toFixed(1)} 億 · {item.weeklyDelta===null?"趨勢待確認":(item.weeklyDelta>=0?"+":"")+(item.weeklyDelta/1e8).toFixed(1)+" 億"}</span></div>):<small>{panel.empty}</small>}</div>)}
         </div>
+        {aiFlow?.groups?.filter(g=>g.name.includes("CCL")||g.name.includes("PCB")).map(g=>{
+          const verified=g.historicalQuality==="verified"&&typeof g.weeklyDelta==="number"&&typeof g.shareDelta==="number"&&typeof g.medianPriceMove==="number";
+          const retreat=verified&&g.weeklyDelta!<0&&g.shareDelta!<0&&g.medianPriceMove!<0;
+          const warning=retreat?"🔴 短線資金撤離警戒":verified&&g.weeklyDelta!<0?"🟠 成交動能降溫":"⚪ 尚無充分撤離證據";
+          return <div className="sector-radar-panel" key={"alert-"+g.name} role="status" style={{marginBottom:12,borderLeft:retreat?"4px solid #dc3545":"4px solid #d49a35"}}>
+            <strong>{g.name}｜{warning}</strong>
+            <p style={{margin:"8px 0 4px"}}>{retreat?"成交金額、全市場占比及代表股價格同步轉弱，短線應留意賣壓；但不足以判定長期產業趨勢反轉。":verified?"依近週官方交易資料觀察成交熱度，尚未同時符合撤離警戒條件。":"歷史資料不足，暫不依單日跌停或成交量判定整個產業資金撤離。"}</p>
+            <small>{g.historyDate??"日期待確認"} · {verified?"近週成交變化 "+(g.weeklyDelta!>=0?"+":"")+(g.weeklyDelta!/1e8).toFixed(1)+" 億元；成交占比變化 "+(g.shareDelta!>=0?"+":"")+g.shareDelta!.toFixed(2)+" 個百分點":"等待官方歷史資料"} · 成交金額不等於資金淨流出</small>
+          </div>;
+        })}
         <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
         <p className="footnote">判讀門檻：最新成交金額相較近週前幾日均值，增加至少 50 億為快速集中、增加未滿 50 億為緩慢增加；減少未滿 50 億為緩慢減少、減少至少 50 億為快速減少。依成交金額增減億元排名，而非百分比。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
         <div className="sector-rotation-list">
