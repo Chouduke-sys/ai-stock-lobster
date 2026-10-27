@@ -63,8 +63,9 @@ async function check([name,path,kind]){
  }catch(e){results.push({name,path,error:String(e)});issue(name,"error",String(e));}
 }
 async function probeProviders(){
+ const histockValues=new Map(),yahooValues=new Map();
  const sources=[["HiStock","https://histock.tw/stock/rank.aspx?m=13"],["Yahoo 股市","https://tw.finance.yahoo.com/rank/turnover"]];
- return Promise.all(sources.map(async([name,url])=>{
+ const results=await Promise.all(sources.map(async([name,url])=>{
   try{
    const response=await fetch(url,{signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
    const html=await response.text();
@@ -76,17 +77,21 @@ async function probeProviders(){
      const code=cells.findIndex(c=>/^\d{4}$/.test(c));
      if(code<0||cells.length-code<13)continue;
      const close=Number(cells[code+2].replace(/,/g,"")),volume=Number(cells[code+11].replace(/,/g,"")),value=Number(cells[code+12].replace(/,/g,""));
-     if(close>0&&volume>0&&value>0){valid++;if(samples.length<2)samples.push({symbol:cells[code],value});}
+     if(close>0&&volume>0&&value>0){valid++;histockValues.set(cells[code],value);if(samples.length<2)samples.push({symbol:cells[code],value});}
     }
     return {name,http:response.status,htmlBytes:html.length,tableRows:rows.length,validQuotes:valid,samples};
    }
    const plain=html.replace(/<[^>]*>/g," ").replace(/\s+/g," ");
    const rankPattern=/(\d{4})\.(?:TW|TWO)\s+([\d,]+(?:\.\d+)?)\s+[+-]?[\d,]+(?:\.\d+)?\s+[+-]?[\d.]+%\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+([\d,]+)\s+([\d,]+(?:\.\d+)?)/g;
    const parsed=Array.from(plain.matchAll(rankPattern));
+   for(const x of parsed)yahooValues.set(x[1],Number(x[4].replace(/,/g,"")));
    const tickerAt=plain.indexOf("2330.TW");
    return {name,http:response.status,htmlBytes:html.length,date:(plain.match(/資料時間\s*[:：]\s*(20\d{2}[\/.-]\d{1,2}[\/.-]\d{1,2})/)||[])[1]??null,parsedQuotes:parsed.length,sample:parsed.slice(0,2).map(x=>({symbol:x[1],close:x[2],volume:x[3],value:x[4]})),tickerSnippet:tickerAt<0?null:plain.slice(Math.max(0,tickerAt-50),tickerAt+190)};
   }catch(e){return {name,error:String(e)};}
  }));
+ const overlap=Array.from(histockValues.entries()).slice(0,30).flatMap(([symbol,value])=>{const other=yahooValues.get(symbol);return other>0?[{symbol,deltaPct:Math.round(Math.abs(value/other-1)*10000)/100}]:[];});
+ results.push({name:"HiStock/Yahoo 成交金額交叉比對",matched:overlap.length,within2pct:overlap.filter(x=>x.deltaPct<=2).length,medianDeltaPct:overlap.length?overlap.map(x=>x.deltaPct).sort((a,b)=>a-b)[Math.floor(overlap.length/2)]:null,largestDeltas:[...overlap].sort((a,b)=>b.deltaPct-a.deltaPct).slice(0,4)});
+ return results;
 }
 (async()=>{
  const providerResults=await probeProviders();
