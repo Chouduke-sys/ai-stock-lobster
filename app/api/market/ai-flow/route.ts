@@ -67,17 +67,42 @@ async function weeklyHistory(){
  const days=(await Promise.all(dates.map(fetchHistoricalDay))).filter((d):d is HistoricalDay=>d!==null).sort((a,b)=>b.date.localeCompare(a.date));
  return days.slice(0,6);
 }
+
+type Quote={symbol:string;name:string;volume:number;value:number;close:number;change:string;transactions:number};
+function cleanHtml(s:string){return s.replace(/<[^>]+>/g,"").replace(/&nbsp;|&#160;/g," ").replace(/&amp;/g,"&").trim();}
+async function histockQuotes():Promise<Quote[]>{
+ const res=await fetch("https://histock.tw/stock/rank.aspx?m=13&p=all",{headers:{"User-Agent":"Mozilla/5.0 (compatible; AIStockLobster/1.0)","Accept":"text/html"},next:{revalidate:300},signal:AbortSignal.timeout(5500)});
+ if(!res.ok)throw Error("HiStock HTTP "+res.status);
+ const html=await res.text();
+ const result:Quote[]=[];
+ for(const match of html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)){
+  const cells=[...match[1].matchAll(/<td\\b[^>]*>([\\s\\S]*?)<\\/td>/gi)].map(m=>cleanHtml(m[1]));
+  const code=cells.findIndex(c=>/^\\d{4}$/.test(c));
+  if(code<0||cells.length-code<12)continue;
+  const symbol=cells[code],name=cells[code+1],close=num(cells[code+2]),volume=num(cells[code+11]),value=num(cells[code+12])*100000000;
+  if(name&&close>0&&value>0&&volume>0)result.push({symbol,name,close,volume:volume*1000,value,change:cells[code+3]??"",transactions:0});
+ }
+ if(result.length<20)throw Error("HiStock 排行資料解析不足");
+ return result;
+}
+async function twseQuotes():Promise<Quote[]>{
+ const res=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{next:{revalidate:300},signal:AbortSignal.timeout(6500)});
+ if(!res.ok)throw Error("TWSE HTTP "+res.status);
+ const raw=await res.json() as Row[];
+ if(!Array.isArray(raw)||raw.length<100)throw Error("TWSE 個股資料不足");
+ return raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\\d{4}$/.test(symbol))return [];return [{symbol,name:r.Name??symbol,volume:num(r.TradeVolume),value:num(r.TradeValue),close:num(r.ClosingPrice),change:r.Change??"",transactions:num(r.Transaction)}];});
+}
+async function marketQuotes():Promise<{rows:Quote[];source:string}>{
+ try{return {rows:await histockQuotes(),source:"HiStock"};}
+ catch{ return {rows:await twseQuotes(),source:"TWSE"};}
+}
 export async function GET(){
  try{
-  const [dailyRes,instRes,history]=await Promise.all([
-   fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{next:{revalidate:300},signal:AbortSignal.timeout(8000)}),
+  const [{rows,source},instRes,history]=await Promise.all([
+   marketQuotes(),
    fetch("https://www.twse.com.tw/rwd/zh/fund/T86?date="+twDate().replace(/-/g,"")+"&selectType=ALL&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(6000)}).catch(()=>new Response(null,{status:503})),
    Promise.race([weeklyHistory(),new Promise<HistoricalDay[]>(resolve=>setTimeout(()=>resolve([]),4500))])
   ]);
-  if(!dailyRes.ok)throw Error("證交所個股行情來源不可用");
-  const raw=await dailyRes.json() as Row[];
-  if(!Array.isArray(raw)||raw.length<100)throw Error("證交所個股行情資料不足");
-  const rows=raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\d{4}$/.test(symbol))return [];const volume=num(r.TradeVolume),value=num(r.TradeValue),close=num(r.ClosingPrice);return [{symbol,name:r.Name??symbol,volume,value,close,change:r.Change??"",transactions:num(r.Transaction)}];});
   const bySymbol=new Map(rows.map(r=>[r.symbol,r]));
   const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.filter(code=>d.values.has(code)).length>=Math.ceil(g.stocks.length*.8));
    const current=validDays[0],previous=validDays.slice(1,6);
@@ -110,7 +135,7 @@ export async function GET(){
    }
   }
   buyers.sort((a,b)=>b.shares-a.shares);
-  return NextResponse.json({status:"ok",asOf:history[0]?.date??null,asOfVerified:history.length>0,historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:"TWSE STOCK_DAY_ALL / T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。盤後個股快照若無可驗證交易日則不標示為今日資料；並非逐筆即時。"},
+  return NextResponse.json({status:"ok",asOf:history[0]?.date??null,asOfVerified:history.length>0,historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:source+" / TWSE T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。盤後個股快照若無可驗證交易日則不標示為今日資料；並非逐筆即時。"},
    {headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
  }catch(e){return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"暫無可驗證行情"},{status:503});}
 }
