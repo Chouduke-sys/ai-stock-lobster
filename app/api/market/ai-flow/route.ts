@@ -128,6 +128,13 @@ async function marketQuotes():Promise<{rows:Quote[];source:string;quoteDate:stri
  if(yahoo&&(!primary||(yahoo.date===twDate()&&!comparableQuotes(primary,yahoo.rows)))){
   primary=yahoo.rows;source="Yahoo 股市";quoteDate=yahoo.date;
  }
+ // HiStock's ranking HTML has no reliable trade-date field. Only attach Yahoo's
+ // independently published date when at least five turnover figures agree within 2%.
+ // This also works just after midnight, when the latest trading day is yesterday.
+ if(histock&&primary===histock&&yahoo&&comparableQuotes(histock,yahoo.rows)){
+  quoteDate=yahoo.date;
+  source="HiStock（Yahoo 成交金額與日期交叉驗證）";
+ }
  if(!primary&&official)return {rows:official,source:"TWSE（前兩來源無效）",quoteDate:null,coverage:"listed_full"};
  if(!primary)throw Error("HiStock、Yahoo 與 TWSE 行情來源均無有效資料");
  // Never mix unmatched dates from independent feeds.
