@@ -125,8 +125,17 @@ async function marketQuotes():Promise<{rows:Quote[];source:string;quoteDate:stri
  const official=t.status==="fulfilled"?t.value:null;
  let primary:Quote[]|null=null,source="",quoteDate:string|null=null;
  if(histock){primary=histock;source="HiStock";}
- if(yahoo&&(!primary||(yahoo.date===twDate()&&!comparableQuotes(primary,yahoo.rows)))){
-  primary=yahoo.rows;source="Yahoo 股市";quoteDate=yahoo.date;
+ const taipeiClock=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",weekday:"short",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
+ const hour=Number(taipeiClock.find(p=>p.type==="hour")?.value??12);
+ const weekday=taipeiClock.find(p=>p.type==="weekday")?.value??"";
+ const previousSessionAllowed=hour<9||weekday==="Sat"||weekday==="Sun";
+ const yahooAgeDays=(Date.parse(twDate()+"T00:00:00Z")-Date.parse((yahoo?.date??"1970-01-01")+"T00:00:00Z"))/86400000;
+ // A dated Yahoo ranking is safer than an undated HiStock snapshot when the
+ // providers disagree. Before market open or on weekends, accept the last
+ // verified trading session (up to four days old), never silently label it today.
+ const yahooUsable=Boolean(yahoo&&yahooAgeDays>=0&&yahooAgeDays<=4&&(yahoo.date===twDate()||previousSessionAllowed));
+ if(yahooUsable&&yahoo&&(!primary||!comparableQuotes(primary,yahoo.rows))){
+  primary=yahoo.rows;source="Yahoo 股市（已標示交易日期）";quoteDate=yahoo.date;
  }
  // HiStock's ranking HTML has no reliable trade-date field. Only attach Yahoo's
  // independently published date when at least five turnover figures agree within 2%.
