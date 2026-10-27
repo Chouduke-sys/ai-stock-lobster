@@ -141,6 +141,9 @@ function MarketMiniTrend({values,label}:{values:number[];label:string}){
 export default function Home() {
   const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
   const [memberLoading,setMemberLoading]=useState(true);
+  const [isAdmin,setIsAdmin]=useState(false);
+  useEffect(()=>{if(!member?.email){setIsAdmin(false);return;}let active=true;fetch("/api/admin/access",{cache:"no-store"}).then(r=>r.json()).then(x=>{if(active)setIsAdmin(x.isAdmin===true);}).catch(()=>{});return()=>{active=false;};},[member?.email]);
+
   // Anonymous browser identifier; only its salted hash is persisted server-side.
   useEffect(()=>{
    let visitorId="";
@@ -610,7 +613,7 @@ useEffect(()=>{
       {showLogin && <section className="modal-card">
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
         <h2>AI股市龍蝦會員</h2>
-        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
+        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。{isAdmin&&<a href="/admin" className="btn btn-primary" style={{marginLeft:12}}>🦞 管理者後台</a>}</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
         {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}
         {loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}
         {!loginProviders.google&&!loginProviders.apple&&<p>登入服務尚未完成設定，管理員需在 Vercel 設定 Google／Apple OAuth 金鑰。</p>}</>}
