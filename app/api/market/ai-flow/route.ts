@@ -75,9 +75,9 @@ async function histockQuotes():Promise<Quote[]>{
  if(!res.ok)throw Error("HiStock HTTP "+res.status);
  const html=await res.text();
  const result:Quote[]=[];
- for(const match of html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)){
-  const cells=[...match[1].matchAll(/<td\\b[^>]*>([\\s\\S]*?)<\\/td>/gi)].map(m=>cleanHtml(m[1]));
-  const code=cells.findIndex(c=>/^\\d{4}$/.test(c));
+ for(const match of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)){
+  const cells=[...match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>cleanHtml(m[1]));
+  const code=cells.findIndex(c=>/^\d{4}$/.test(c));
   if(code<0||cells.length-code<12)continue;
   const symbol=cells[code],name=cells[code+1],close=num(cells[code+2]),volume=num(cells[code+11]),value=num(cells[code+12])*100000000;
   if(name&&close>0&&value>0&&volume>0)result.push({symbol,name,close,volume:volume*1000,value,change:cells[code+3]??"",transactions:0});
@@ -90,7 +90,7 @@ async function twseQuotes():Promise<Quote[]>{
  if(!res.ok)throw Error("TWSE HTTP "+res.status);
  const raw=await res.json() as Row[];
  if(!Array.isArray(raw)||raw.length<100)throw Error("TWSE 個股資料不足");
- return raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\\d{4}$/.test(symbol))return [];return [{symbol,name:r.Name??symbol,volume:num(r.TradeVolume),value:num(r.TradeValue),close:num(r.ClosingPrice),change:r.Change??"",transactions:num(r.Transaction)}];});
+ return raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\d{4}$/.test(symbol))return [];return [{symbol,name:r.Name??symbol,volume:num(r.TradeVolume),value:num(r.TradeValue),close:num(r.ClosingPrice),change:r.Change??"",transactions:num(r.Transaction)}];});
 }
 async function marketQuotes():Promise<{rows:Quote[];source:string}>{
  try{return {rows:await histockQuotes(),source:"HiStock"};}
