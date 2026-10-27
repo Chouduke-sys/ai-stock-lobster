@@ -750,16 +750,6 @@ useEffect(()=>{
         </div>
       </section>
 
-      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
-        <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
-        <div className="holdings-panel">
-          {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
-          <div className="daily-market-grid">{([{label:"外資買賣超",value:positioning.liveInstitutional.foreignYi},{label:"投信買賣超",value:positioning.liveInstitutional.trustYi},{label:"自營商買賣超",value:positioning.liveInstitutional.dealerYi},{label:"三大法人合計",value:positioning.liveInstitutional.totalYi}]).map(item=><div className="daily-market-quote" key={item.label}><small>{item.label}</small><strong className={item.value>=0?"market-up":"market-down"}>{item.value>0?"+":""}{item.value.toFixed(2)} 億</strong></div>)}</div>
-          <p className="holdings-note">法人動向：{positioning.liveInstitutional.foreignYi<0?"外資賣超":"外資買超"}、{positioning.liveInstitutional.trustYi<0?"投信賣超":"投信買超"}；{positioning.liveInstitutional.totalYi>=0?"三大法人合計買超":"三大法人合計賣超"}。此為資金面觀察，不單獨構成進出場訊號。</p></> : <p className="holdings-note">HiStock 法人數據尚未成功驗證，暫不顯示估計值。{positioningError}</p>}
-          <p className="footnote">來源：HiStock 上市三大法人籌碼圖表 · 更新頻率取決於來源網站實際公布時間。</p>
-        </div>
-      </section>
-
       <section className="section" aria-label="當日爆量與法人買超排行榜" style={{marginTop:24}}>
         <div className="section-heading"><div><div className="eyebrow">VOLUME & COMPANY NEWS</div><h2>當日成交金額熱門股／公司最新新聞</h2><p>左側依上市個股成交金額排名；右側對應各公司的最新新聞，方便追蹤量能與題材。</p></div></div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:20}}>
@@ -778,8 +768,17 @@ useEffect(()=>{
         </div>
         <p className="footnote">資料：TWSE 公開資訊；每五分鐘檢查更新。若證交所尚未發布當日盤後資訊，資料可能是上一交易日，請依日期判讀。新聞來源：Google 新聞 RSS，搜尋結果不代表公司官方公告，請點閱原文確認。</p>
       </section>
+      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
+        <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
+        <div className="holdings-panel">
+          {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
+          <div className="daily-market-grid">{([{label:"外資買賣超",value:positioning.liveInstitutional.foreignYi},{label:"投信買賣超",value:positioning.liveInstitutional.trustYi},{label:"自營商買賣超",value:positioning.liveInstitutional.dealerYi},{label:"三大法人合計",value:positioning.liveInstitutional.totalYi}]).map(item=><div className="daily-market-quote" key={item.label}><small>{item.label}</small><strong className={item.value>=0?"market-up":"market-down"}>{item.value>0?"+":""}{item.value.toFixed(2)} 億</strong></div>)}</div>
+          <p className="holdings-note">法人動向：{positioning.liveInstitutional.foreignYi<0?"外資賣超":"外資買超"}、{positioning.liveInstitutional.trustYi<0?"投信賣超":"投信買超"}；{positioning.liveInstitutional.totalYi>=0?"三大法人合計買超":"三大法人合計賣超"}。此為資金面觀察，不單獨構成進出場訊號。</p></> : <p className="holdings-note">HiStock 法人數據尚未成功驗證，暫不顯示估計值。{positioningError}</p>}
+          <p className="footnote">來源：HiStock 上市三大法人籌碼圖表 · 更新頻率取決於來源網站實際公布時間。</p>
+        </div>
+      </section>
+
           <div className="market-analysis-wide">          <div className="holdings-divider" />
-          <div className="mobile-us-futures-summary"><strong>美股期貨參考</strong><p>{usFutures?usFutures.name+"："+formatPrice(usFutures.price)+" 點"+(usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""):"目前無可用的美股期貨報價"}</p><small>{usFutures?.quoteTime?"資料時間："+new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"資料時間待確認"} · 期貨行情可能延遲</small></div>
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
           <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span><MarketMiniTrend values={q.trend5d??[]} label={q.label}/></div>)}</div>
@@ -787,6 +786,7 @@ useEffect(()=>{
           <p className="holdings-note"><b>台幣升貶影響：</b>{dailyAnalysis?.currency??"等待資料"}</p>
           <p className="holdings-note"><b>今日觀察重點：</b>{dailyAnalysis?.risk??"等待資料"}</p>
           <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
+          <div className="mobile-us-futures-summary"><strong>美股期貨參考</strong><p>{usFutures?usFutures.name+"："+formatPrice(usFutures.price)+" 點"+(usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""):"目前無可用的美股期貨報價"}</p><small>{usFutures?.quoteTime?"資料時間："+new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"資料時間待確認"} · 期貨行情可能延遲</small></div>
 </div>
 
       <section className="vix-panel" aria-label="全球市場恐慌程度">
