@@ -332,12 +332,27 @@ export async function GET(request:Request){
  const overallStance=overallLabel;
  const summary=sections.find(item=>item.title==="今日盤前小總結");
  if(summary){
-  const ranked=riskAssessment.signals.filter(item=>item.direction!==null).sort((a,b)=>b.weight-a.weight);
-  const describe=(direction:Direction)=>ranked.filter(item=>item.direction===direction).map(item=>item.name+"（"+item.weight+"%）").slice(0,4).join("、");
-  const ups=describe("bullish"),downs=describe("bearish");
-  const missingSignals=riskAssessment.signals.filter(item=>item.direction===null).map(item=>item.name);
-  const exposure=recommendedAllocation===null?"目前資料覆蓋不足或基礎倉位模型無結果，暫不提供具體倉位。":"建議股票總倉位 "+recommendedAllocation+"%，風險上限 "+riskCap+"%；含融資部位的股票市值應計入總曝險。";
-  summary.body="九項因子加權風險分數："+(score===null?"未計算":score+"/100")+"；有效資料覆蓋 "+coverage+"%。"+(ups?" 偏多依據："+ups+"。":"")+(downs?" 偏空依據："+downs+"。":"")+(missingSignals.length?" 尚缺有效訊號："+missingSignals.join("、")+"，不以零分代替。":"")+" 八大分析項目利多 "+bullishCount+"／利空 "+bearishCount+"／中性 "+neutralCount+"。"+exposure+" 此為規則式風險建議，尚未完成歷史績效校準。";
+  const technicalWeak=technical.valid&&technical.sentiment==="bearish";
+  const foreignPositive=investorScore!==null&&investorScore>0;
+  const futuresNegative=foreignFuturesNet!==null&&foreignFuturesNet<0;
+  const broadWeak=abroadScore!==null&&abroadScore<0;
+  const broadStrong=abroadScore!==null&&abroadScore>0;
+  const highRisk=score!==null&&score<=40;
+  const lowCoverage=coverage<50;
+  const scenario=lowCoverage?"盤前資料不足，開盤方向暫不預測。"
+   :broadStrong&&technicalWeak?"外圍偏強但台股技術面偏弱，留意開高後賣壓，可能開高走低。"
+   :broadWeak&&technicalWeak?"外圍與技術面同步偏弱，開低後仍有下探風險。"
+   :broadStrong&&foreignPositive&&!technicalWeak?"外圍與法人資金偏多，可能開高走強，但須確認量能。"
+   :highRisk?"空方訊號占優，短線可能震盪走弱。"
+   :score!==null&&score>=60?"多方訊號較強，偏向震盪走高，仍須留意追價風險。"
+   :"多空訊號分歧，預期震盪整理，暫不追高。";
+  const timing=lowCoverage?"等法人、期權等關鍵數據補齊，再決定是否進場。"
+   :technicalWeak?"等指數站回短期均線、成交量回升後再分批布局。"
+   :futuresNegative?"等外資期貨空單收斂、盤中回測支撐不破再進場。"
+   :score!==null&&score>=60?"等開盤回測支撐、量價維持強勢後再分批進場。"
+   :"等開盤前30～60分鐘確認量價方向，回測支撐不破再分批進場。";
+  const exposure=recommendedAllocation===null?"倉位：資料不足，暫不提供數字。":"建議倉位 "+recommendedAllocation+"%（含融資曝險）。";
+  summary.body=scenario+" "+exposure+" "+timing+(coverage<75?" 關鍵籌碼尚未齊全，判斷信心較低。":"");
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
