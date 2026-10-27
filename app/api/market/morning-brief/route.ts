@@ -272,7 +272,23 @@ export async function GET(request:Request){
  const scoreOf=(q:Q|undefined,invert=false)=>q?.changePct==null?null:Math.abs(q.changePct)<0.05?0:(q.changePct>0?1:-1)*(invert?-1:1);
  const abroadScore=signals.length?positive>negative?1:negative>positive?-1:0:null;
  const fxScore=scoreOf(fx,true);
- const vixScore=vix?.value==null?null:vix.value>=30?-1:vix.value>=25?-1:vix.value<15?1:0;
+ // VIX is a volatility/risk gauge, not a directional stock-price forecast.
+ // A >=10% daily jump is a warning even below 25; a sharp decline eases risk,
+ // but VIX >=30 never becomes an outright bullish signal.
+ const vixLevel=vix?.value??null,vixChange=vix?.changePct??null;
+ const vixScore=vixLevel===null?null:
+  vixLevel>=30?(vixChange!==null&&vixChange<=-10?0:-1):
+  vixLevel>=25?(vixChange!==null&&vixChange<=-10?1:-1):
+  vixChange!==null&&vixChange>=10?-1:
+  vixLevel>=22?-1:
+  vixLevel<=18?1:
+  vixChange!==null&&vixChange<=-5?1:
+  vixChange!==null&&vixChange>=5?-1:0;
+ const vixDescription=vixLevel===null?"VIX 最新數據尚未取得。":
+  "VIX "+vixLevel.toFixed(2)+"（"+pct(vix)+"）。"+
+  (vixLevel>=30?"仍處高度波動區；":vixLevel>=25?"波動偏高；":vixLevel>=22?"避險警戒區；":vixLevel<=18?"低波動區；":"中間波動區；")+
+  (vixChange===null?"缺少日變動率，僅按絕對值判讀。":vixChange>=10?"單日恐慌快速升溫。":vixChange<=-10?"單日恐慌明顯緩解。":vixChange>=5?"避險情緒升溫。":vixChange<=-5?"避險情緒降溫。":"日變動有限。")+
+  "VIX 衡量美股預期波動，不直接預測台股漲跌。";
  const compact=(items:string[])=>items.join("；")+"。";
  const riskInputs=[abroadScore,investorScore,fxScore,vixScore].filter((n):n is number=>n!==null);
  const riskScore=riskInputs.reduce((sum,n)=>sum+n,0);
@@ -299,7 +315,7 @@ export async function GET(request:Request){
   {title:"融資融券",body:validatedMargin?("結論："+(validatedMargin.financingChange!=null&&validatedMargin.shortChange!=null?(validatedMargin.financingChange<0&&validatedMargin.shortChange>0?"短線偏空：融資減少、融券增加，槓桿買盤退場且空方部位增加。":validatedMargin.financingChange>0&&validatedMargin.shortChange<0?"短線偏多：融資增加、融券減少，買方槓桿回升且空方回補。":"多空訊號分歧，需配合指數量價判斷。"):"籌碼方向尚未明朗。")+" 融資"+(validatedMargin.financingChange==null?"變化未確認":(validatedMargin.financingChange>=0?"+":"")+validatedMargin.financingChange.toLocaleString("en-US")+" 億")+"；融券"+(validatedMargin.shortChange==null?"變化未確認":(validatedMargin.shortChange>=0?"+":"")+validatedMargin.shortChange.toLocaleString("en-US")+" 張")+"。"+(marginBorrow?.borrowChange!=null?"借券賣出"+(marginBorrow.borrowChange>=0?"+":"")+marginBorrow.borrowChange.toLocaleString("en-US")+" 張。":"")+"融資下降不一定是利空，也可能是籌碼沉澱；須搭配股價與法人動向確認。"):"融資融券數據尚未取得，暫不判斷利多或利空。",sentiment:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?(validatedMargin.financingChange<0&&validatedMargin.shortChange>0?"bearish":validatedMargin.financingChange>0&&validatedMargin.shortChange<0?"bullish":"neutral"):"neutral",verdict:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?(validatedMargin.financingChange<0&&validatedMargin.shortChange>0?"偏空":validatedMargin.financingChange>0&&validatedMargin.shortChange<0?"偏多":"多空分歧"):"資料待確認"},
   {title:"期貨與選擇權",body:"結論："+futuresSignal.verdict+"。"+futuresSignal.reason+"。"+(foreignFuturesNet!=null?"外資台指期淨部位 "+foreignFuturesNet.toLocaleString("en-US")+" 口；":"")+(optionVolume!==null?"選擇權成交量 P/C "+optionVolume.toFixed(2)+"%；":"")+(optionOi!==null?"未平倉 P/C "+optionOi.toFixed(2)+"%。":"")+futuresInterpretation,sentiment:futuresSignal.sentiment,verdict:futuresSignal.verdict},
   {title:"匯率與利率",body:compact(["美元／台幣 "+pct(fx),"美元指數 "+pct(by("DX-Y.NYB")),"美債10年期指標 "+pct(by("^TNX"))]),sentiment:mood(fxScore),verdict:fxScore===null?"匯率待確認":fxScore>0?"台幣偏強，有利資金面":fxScore<0?"台幣偏弱，留意外資":"匯率影響中性"},
-  {title:"VIX 市場情緒",body:vix?.value!=null?"VIX "+vix.value.toFixed(2)+"（"+pct(vix)+"）；數值越高，預期波動越大。":"VIX 最新數據尚未取得。",sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"市場較平靜":vixScore<0?"避險情緒升溫":"波動正常"},
+  {title:"VIX 市場情緒",body:vixDescription,sentiment:mood(vixScore),verdict:vixScore===null?"待確認":vixScore>0?"風險情緒改善":vixScore<0?"避險警戒":"中性觀察"},
   {title:"技術面與量能",body:technical.body,sentiment:technical.sentiment,verdict:technical.verdict},
   {title:"重大政策與科技",body:policySignals.items.length?policySignals.items.map((item,i)=>(i+1)+"．"+item.title+"｜影響："+item.sector+"｜"+(item.impact==="bullish"?"偏利多":"偏利空")+"："+item.reason+"。").join(" ")+(policySignals.score===0?" 綜合結論：利多利空交錯，短線偏中性。":policySignals.score!==null&&policySignals.score>0?" 綜合結論：政策與科技消息偏利多，仍須留意實際財報與市場反應。":" 綜合結論：政策與科技消息偏利空，注意相關族群風險。"):"近48小時未找到可由標題確認方向的重大政策或科技事件，暫不推論利多利空。",sentiment:mood(policySignals.score),verdict:policySignals.score===null?"事件待確認":policySignals.score>0?"消息偏利多":policySignals.score<0?"消息偏利空":"消息多空分歧"},
   {title:"今日盤前小總結",body:"九項風險因子加權計算中。",sentiment:"neutral" as Direction,verdict:"計算中"}
