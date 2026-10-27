@@ -141,6 +141,28 @@ function MarketMiniTrend({values,label}:{values:number[];label:string}){
 export default function Home() {
   const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
   const [memberLoading,setMemberLoading]=useState(true);
+  // Anonymous browser identifier; only its salted hash is persisted server-side.
+  useEffect(()=>{
+   let visitorId="";
+   try{visitorId=localStorage.getItem("lobster-anon-visitor")??"";if(!/^[a-f0-9-]{16,64}$/i.test(visitorId)){visitorId=crypto.randomUUID();localStorage.setItem("lobster-anon-visitor",visitorId);}}catch{return;}
+   void fetch("/api/analytics/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:"page_view",visitorId}),keepalive:true}).catch(()=>{});
+  },[]);
+  useEffect(()=>{
+   if(!member?.email)return;
+   let visitorId="";try{visitorId=localStorage.getItem("lobster-anon-visitor")??"";}catch{return;}
+   if(!visitorId)return;
+   // Record an authenticated view only when the member actually opens the nine-factor section.
+   const target=document.querySelector('[aria-label="每日八點半台股盤前分析"]');
+   if(!target)return;
+   let sent=false;
+   const observer=new IntersectionObserver(entries=>{
+    if(sent||!entries.some(e=>e.isIntersecting))return;
+    sent=true;observer.disconnect();
+    void fetch("/api/analytics/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:"morning_brief_view",visitorId}),keepalive:true}).catch(()=>{});
+   },{threshold:0.2});
+   observer.observe(target);return()=>observer.disconnect();
+  },[member?.email]);
+
   const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean}>({});
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
