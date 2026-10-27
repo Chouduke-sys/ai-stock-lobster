@@ -81,7 +81,10 @@ async function probeProviders(){
     return {name,http:response.status,htmlBytes:html.length,tableRows:rows.length,validQuotes:valid,samples};
    }
    const plain=html.replace(/<[^>]*>/g," ").replace(/\s+/g," ");
-   return {name,http:response.status,htmlBytes:html.length,date:(plain.match(/資料時間\s*[:：]\s*(20\d{2}[\/.-]\d{1,2}[\/.-]\d{1,2})/)||[])[1]??null};
+   const rankPattern=/(\d{4})\.(?:TW|TWO)\s+([\d,]+(?:\.\d+)?)\s+[+-]?[\d,]+(?:\.\d+)?\s+[+-]?[\d.]+%\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+([\d,]+)\s+([\d,]+(?:\.\d+)?)/g;
+   const parsed=Array.from(plain.matchAll(rankPattern));
+   const tickerAt=plain.indexOf("2330.TW");
+   return {name,http:response.status,htmlBytes:html.length,date:(plain.match(/資料時間\s*[:：]\s*(20\d{2}[\/.-]\d{1,2}[\/.-]\d{1,2})/)||[])[1]??null,parsedQuotes:parsed.length,sample:parsed.slice(0,2).map(x=>({symbol:x[1],close:x[2],volume:x[3],value:x[4]})),tickerSnippet:tickerAt<0?null:plain.slice(Math.max(0,tickerAt-50),tickerAt+190)};
   }catch(e){return {name,error:String(e)};}
  }));
 }
