@@ -147,9 +147,9 @@ export default function Home() {
   const [investor, setInvestor] = useState("all");
   const [ftse,setFtse]=useState<{price:number;change:number;changePercent:number;quoteTime:string|null;delayMinutes:number|null;source:string;isStale?:boolean}|null>(null);
   const [ftseError,setFtseError]=useState("");
-  const [positioning,setPositioning]=useState<{status:string;institutional:{label:string;values:string[]}[];margin:{label:string;values:string[]}[];futures:{label:string;values:string[]}[];retrievedAt:string}|null>(null);
+  const [positioning,setPositioning]=useState<{status:string;institutional:{label:string;values:string[]}[];margin:{label:string;values:string[]}[];futures:{label:string;values:string[]}[];retrievedAt:string;liveInstitutional?:{date:string;foreignYi:number;trustYi:number;dealerYi:number;totalYi:number;unit:string;source:string}|null}|null>(null);
   const [positioningError,setPositioningError]=useState("");
-  useEffect(()=>{let active=true;const load=async()=>{try{const res=await fetch("/api/market/taiwan-positioning",{cache:"no-store"});const data=await res.json();if(!res.ok||data.status!=="ok")throw new Error(data.error||"資料暫不可用");if(active){setPositioning(data);setPositioningError("");}}catch(e){if(active)setPositioningError(e instanceof Error?e.message:"資料暫不可用");}};void load();const timer=setInterval(()=>void load(),300000);return()=>{active=false;clearInterval(timer);};},[]);
+  useEffect(()=>{let active=true;const load=async()=>{try{const res=await fetch("/api/market/taiwan-positioning",{cache:"no-store"});const data=await res.json();if(!res.ok||data.status!=="ok")throw new Error(data.error||"資料暫不可用");if(active){setPositioning(data);setPositioningError("");}}catch(e){if(active)setPositioningError(e instanceof Error?e.message:"資料暫不可用");}};void load();const timer=setInterval(()=>{if(document.visibilityState==="visible")void load();},60000);return()=>{active=false;clearInterval(timer);};},[]);
 
   useEffect(()=>{
     let active=true;
@@ -722,6 +722,16 @@ useEffect(()=>{
           </details>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
+        </div>
+      </section>
+
+      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
+        <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
+        <div className="holdings-panel">
+          {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
+          <div className="daily-market-grid">{([{label:"外資買賣超",value:positioning.liveInstitutional.foreignYi},{label:"投信買賣超",value:positioning.liveInstitutional.trustYi},{label:"自營商買賣超",value:positioning.liveInstitutional.dealerYi},{label:"三大法人合計",value:positioning.liveInstitutional.totalYi}]).map(item=><div className="daily-market-quote" key={item.label}><small>{item.label}</small><strong className={item.value>=0?"market-up":"market-down"}>{item.value>0?"+":""}{item.value.toFixed(2)} 億</strong></div>)}</div>
+          <p className="holdings-note">法人動向：{positioning.liveInstitutional.foreignYi<0?"外資賣超":"外資買超"}、{positioning.liveInstitutional.trustYi<0?"投信賣超":"投信買超"}；{positioning.liveInstitutional.totalYi>=0?"三大法人合計買超":"三大法人合計賣超"}。此為資金面觀察，不單獨構成進出場訊號。</p></> : <p className="holdings-note">HiStock 法人數據尚未成功驗證，暫不顯示估計值。{positioningError}</p>}
+          <p className="footnote">來源：HiStock 上市三大法人籌碼圖表 · 更新頻率取決於來源網站實際公布時間。</p>
         </div>
       </section>
 
