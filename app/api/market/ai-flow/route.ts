@@ -52,7 +52,7 @@ async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
 async function weeklyHistory(){
  const now=new Date();
  const taipei=new Date(now.toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
- const dates=Array.from({length:12},(_,i)=>{
+ const dates=Array.from({length:16},(_,i)=>{
   const d=new Date(taipei.getFullYear(),taipei.getMonth(),taipei.getDate()-i);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
  });
@@ -71,26 +71,27 @@ export async function GET(){
   if(!Array.isArray(raw)||raw.length<100)throw Error("證交所個股行情資料不足");
   const rows=raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\d{4}$/.test(symbol))return [];const volume=num(r.TradeVolume),value=num(r.TradeValue),close=num(r.ClosingPrice);return [{symbol,name:r.Name??symbol,volume,value,close,change:r.Change??"",transactions:num(r.Transaction)}];});
   const bySymbol=new Map(rows.map(r=>[r.symbol,r]));
-  const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.every(code=>d.values.has(code)));
+  const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.filter(code=>d.values.has(code)).length>=Math.ceil(g.stocks.length*.8));
    const current=validDays[0],previous=validDays.slice(1,6);
-   const currentAmount=current?g.stocks.reduce((sum,code)=>sum+(current.values.get(code)??0),0):null;
-   const priorAverage=previous.length>=3?previous.reduce((sum,d)=>sum+g.stocks.reduce((v,code)=>v+(d.values.get(code)??0),0),0)/previous.length:null;
+   const currentAmount=current&&g.stocks.every(code=>current.values.has(code))?g.stocks.reduce((sum,code)=>sum+current.values.get(code)!,0):null;
+   const completePrevious=previous.filter(d=>g.stocks.every(code=>d.values.has(code)));
+   const priorAverage=completePrevious.length>=3?completePrevious.reduce((sum,d)=>sum+g.stocks.reduce((v,code)=>v+d.values.get(code)!,0),0)/completePrevious.length:null;
    const weeklyChange=currentAmount!==null&&priorAverage!==null&&priorAverage>0?(currentAmount/priorAverage-1)*100:null;
    const weeklyDelta=currentAmount!==null&&priorAverage!==null?currentAmount-priorAverage:null;
    const turnoverShare=rows.reduce((sum,row)=>sum+row.value,0)>0?turnover/rows.reduce((sum,row)=>sum+row.value,0)*100:null;
    const leaderShare=turnover>0?Math.max(0,...stocks.map(stock=>stock.value))/turnover*100:null;
    const historicalQuality=weeklyDelta===null?"insufficient":"verified";
-   const dailyAmounts=validDays.slice(0,5).map(d=>g.stocks.reduce((sum,code)=>sum+(d.values.get(code)??0),0));
-   const dailyShares=validDays.slice(0,5).map((d,i)=>d.total>0?dailyAmounts[i]/d.total*100:0);
-   const risingSessions=dailyAmounts.length>=4?dailyAmounts.slice(0,3).filter((v,i)=>v>dailyAmounts[i+1]).length:null;
-   const shareDelta=dailyShares.length>=4?dailyShares[0]-dailyShares.slice(1,4).reduce((a,b)=>a+b,0)/3:null;
+   const dailyAmounts=validDays.slice(0,5).map(d=>g.stocks.every(code=>d.values.has(code))?g.stocks.reduce((sum,code)=>sum+d.values.get(code)!,0):null);
+   const dailyShares=validDays.slice(0,5).map((d,i)=>d.total>0&&dailyAmounts[i]!==null?dailyAmounts[i]!/d.total*100:null);
+   const risingSessions=dailyAmounts.length>=4&&dailyAmounts.slice(0,4).every(v=>v!==null)?dailyAmounts.slice(0,3).filter((v,i)=>v!>dailyAmounts[i+1]!).length:null;
+   const shareDelta=dailyShares.length>=4&&dailyShares.slice(0,4).every(v=>v!==null)?dailyShares[0]!-dailyShares.slice(1,4).reduce<number>((a,b)=>a+b!,0)/3:null;
    const priceMoves=validDays.length>=4?g.stocks.flatMap(code=>{const latest=validDays[0].closes.get(code),earlier=validDays[3].closes.get(code);return latest&&earlier?[latest/earlier-1]:[];}):[];
    const medianPriceMove=priceMoves.length>=Math.ceil(g.stocks.length*.7)?priceMoves.sort((a,b)=>a-b)[Math.floor(priceMoves.length/2)]*100:null;
    const risingStocks=validDays.length>=2?g.stocks.filter(code=>(validDays[0].closes.get(code)??0)>(validDays[1].closes.get(code)??Infinity)).length:null;
    const breadth=risingStocks!==null?Math.round(risingStocks/g.stocks.length*100):null;
    const radarStatus=weeklyDelta===null||shareDelta===null||medianPriceMove===null||risingSessions===null?"insufficient":weeklyDelta>0&&shareDelta>0&&risingSessions>=2&&medianPriceMove<3?"emerging":weeklyDelta<0&&shareDelta<0&&medianPriceMove<0?"cooling":"stable";
    return {...g,turnover,weeklyChange,weeklyDelta,turnoverShare,leaderShare,historicalQuality,risingSessions,shareDelta,medianPriceMove,breadth,radarStatus,historyDays:previous.length,historyDate:current?.date??null,stocks:stocks.sort((a,b)=>b.value-a.value).slice(0,5)};}).filter(g=>g.turnover>0).sort((a,b)=>(b.weeklyDelta??-Infinity)-(a.weeklyDelta??-Infinity)||b.turnover-a.turnover);
-  const radar={hottest:[...groups].filter(g=>g.historicalQuality==="verified").sort((a,b)=>b.turnover-a.turnover).slice(0,3),emerging:[...groups].filter(g=>g.radarStatus==="emerging").sort((a,b)=>(b.weeklyDelta??0)-(a.weeklyDelta??0)).slice(0,3),cooling:[...groups].filter(g=>g.radarStatus==="cooling").sort((a,b)=>(a.weeklyDelta??0)-(b.weeklyDelta??0)).slice(0,3)};
+  const radar={hottest:[...groups].sort((a,b)=>b.turnover-a.turnover).slice(0,3),emerging:[...groups].filter(g=>g.radarStatus==="emerging").sort((a,b)=>(b.weeklyDelta??0)-(a.weeklyDelta??0)).slice(0,3),cooling:[...groups].filter(g=>g.radarStatus==="cooling").sort((a,b)=>(a.weeklyDelta??0)-(b.weeklyDelta??0)).slice(0,3)};
   const volumeLeaders=rows.filter(r=>r.volume>0&&r.close>0).sort((a,b)=>b.value-a.value).slice(0,15);
   let instDate:string|null=null;const buyers:{symbol:string;name:string;shares:number;volume:number;value:number}[]=[];
   if(instRes.ok){
