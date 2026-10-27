@@ -188,7 +188,8 @@ async function latestFuturesOptions():Promise<FuturesOptions|null>{
  const net=foreign?numValue(field(foreign,["未平倉","淨額"])??field(foreign,["Open","Net"])):null;
  if(!ratioDate&&(!foreignDate||net===null))return null;
  const chosen=ratioDate&&foreignDate?(ratioDate>=foreignDate?ratioDate:foreignDate):(ratioDate??foreignDate)!;
- return {date:chosen,foreignTxNet:net,putCallVolume:volume,putCallOpenInterest:oi,source:"臺灣期貨交易所 OpenAPI"};
+ // Never combine a futures position from one session with option ratios from another.
+ return {date:chosen,foreignTxNet:foreignDate===chosen?net:null,putCallVolume:ratioDate===chosen?volume:null,putCallOpenInterest:ratioDate===chosen?oi:null,source:"臺灣期貨交易所 OpenAPI"};
 }
 async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;source:string}|null>{
  try{
