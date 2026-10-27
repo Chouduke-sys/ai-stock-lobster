@@ -117,7 +117,7 @@ async function latestMargin():Promise<MarginData|null>{
    for(const table of tables){
     const fields=table.fields??[],rows=table.data??[];
     if(!rows.length)continue;
-    const normalized=fields.map(x=>x.replace(/<[^>]*>/g,"").replace(/\\s/g,""));
+    const normalized=fields.map(x=>x.replace(/<[^>]*>/g,"").replace(/\s/g,""));
     const financingBalanceIndex=normalized.findIndex(x=>/融資/.test(x)&&/餘額/.test(x));
     const shortBalanceIndex=normalized.findIndex(x=>/融券/.test(x)&&/餘額/.test(x));
     const financingChangeIndex=normalized.findIndex(x=>/融資/.test(x)&&/增減|差額/.test(x));
@@ -143,7 +143,7 @@ function numValue(x:unknown):number|null{
 }
 function normalizedDate(x:unknown):string|null{
  const raw=String(x??"").trim();
- const m=raw.match(/(20\d{2}|1\d{2})[\\/-](\d{1,2})[\\/-](\d{1,2})/);
+ const m=raw.match(/(20\d{2}|1\d{2})[\/-](\d{1,2})[\/-](\d{1,2})/);
  if(m){const year=Number(m[1])<1911?Number(m[1])+1911:Number(m[1]);return year+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0");}
  const compact=raw.match(/^(20\d{2}|1\d{2})(\d{2})(\d{2})$/);
  if(compact){const year=Number(compact[1])<1911?Number(compact[1])+1911:Number(compact[1]);return year+"-"+compact[2]+"-"+compact[3];}
