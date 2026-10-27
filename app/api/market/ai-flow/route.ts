@@ -60,7 +60,7 @@ async function fetchHistoricalDay(date:string):Promise<HistoricalDay|null>{
 async function weeklyHistory(){
  const now=new Date();
  const taipei=new Date(now.toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
- const dates=Array.from({length:16},(_,i)=>{
+ const dates=Array.from({length:12},(_,i)=>{
   const d=new Date(taipei.getFullYear(),taipei.getMonth(),taipei.getDate()-i);
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
  });
@@ -71,8 +71,8 @@ export async function GET(){
  try{
   const [dailyRes,instRes,history]=await Promise.all([
    fetch("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",{next:{revalidate:300},signal:AbortSignal.timeout(8000)}),
-   fetch("https://www.twse.com.tw/rwd/zh/fund/T86?date="+twDate().replace(/-/g,"")+"&selectType=ALL&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(8000)}),
-   weeklyHistory()
+   fetch("https://www.twse.com.tw/rwd/zh/fund/T86?date="+twDate().replace(/-/g,"")+"&selectType=ALL&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(6000)}).catch(()=>new Response(null,{status:503})),
+   Promise.race([weeklyHistory(),new Promise<HistoricalDay[]>(resolve=>setTimeout(()=>resolve([]),4500))])
   ]);
   if(!dailyRes.ok)throw Error("證交所個股行情來源不可用");
   const raw=await dailyRes.json() as Row[];
