@@ -1,4 +1,4 @@
-import {assessAllocation} from "../../../../lib/market-risk-score";
+import {assessAllocation, type Direction} from "../../../../lib/market-risk-score";
 import {getServerSession} from "next-auth";
 import {authOptions} from "../../../../lib/auth";
 import {NextResponse} from "next/server";
@@ -304,14 +304,14 @@ export async function GET(request:Request){
  const baseAllocation=modelAvailable?Math.max(0,Math.min(90,allocationModel.allocation!)):null;
  const riskAssessment=assessAllocation([
   {name:"大盤技術面與成交量",weight:25,direction:null},
-  {name:"外資與投信",weight:15,direction:foreign&&trust?sections[1].sentiment:null},
-  {name:"外資期貨與選擇權",weight:10,direction:validatedFutures?.foreignTxNet!=null&&optionVolume!==null?sections[3].sentiment:null},
-  {name:"融資融券",weight:15,direction:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?sections[2].sentiment:null},
-  {name:"國際股市與美股期貨",weight:15,direction:us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null?sections[0].sentiment:null},
+  {name:"外資與投信",weight:15,direction:foreign&&trust?sections[1].sentiment as Direction:null},
+  {name:"外資期貨與選擇權",weight:10,direction:validatedFutures?.foreignTxNet!=null&&optionVolume!==null?sections[3].sentiment as Direction:null},
+  {name:"融資融券",weight:15,direction:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?sections[2].sentiment as Direction:null},
+  {name:"國際股市與美股期貨",weight:15,direction:us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null?sections[0].sentiment as Direction:null},
   {name:"產業資金輪動",weight:10,direction:null},
-  {name:"匯率與利率",weight:5,direction:fx?.changePct!=null?sections[4].sentiment:null},
-  {name:"VIX",weight:3,direction:vix?.value!=null?sections[5].sentiment:null},
-  {name:"重大政策",weight:2,direction:policySignals.score!==null?sections[7].sentiment:null}
+  {name:"匯率與利率",weight:5,direction:fx?.changePct!=null?sections[4].sentiment as Direction:null},
+  {name:"VIX",weight:3,direction:vix?.value!=null?sections[5].sentiment as Direction:null},
+  {name:"重大政策",weight:2,direction:policySignals.score!==null?sections[7].sentiment as Direction:null}
  ],baseAllocation);
  const riskCap=riskAssessment.riskCap;
  const recommendedAllocation=riskAssessment.recommendedAllocation;
