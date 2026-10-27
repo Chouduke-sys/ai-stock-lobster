@@ -1,0 +1,29 @@
+name: AI Stock Lobster Production Health
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/check-site-health.cjs'
+      - '.github/workflows/site-health.yml'
+      - 'app/api/**'
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate probe syntax
+        run: node --check scripts/check-site-health.cjs
+      - name: Wait for deployment on push
+        if: github.event_name == 'push'
+        run: sleep 60
+      - name: Check production data APIs
+        run: node scripts/check-site-health.cjs
