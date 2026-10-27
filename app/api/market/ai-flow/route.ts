@@ -92,18 +92,63 @@ async function twseQuotes():Promise<Quote[]>{
  if(!Array.isArray(raw)||raw.length<100)throw Error("TWSE 個股資料不足");
  return raw.flatMap(r=>{const symbol=String(r.Code??"").trim();if(!/^\d{4}$/.test(symbol))return [];return [{symbol,name:r.Name??symbol,volume:num(r.TradeVolume),value:num(r.TradeValue),close:num(r.ClosingPrice),change:r.Change??"",transactions:num(r.Transaction)}];});
 }
-async function marketQuotes():Promise<{rows:Quote[];source:string}>{
- try{return {rows:await histockQuotes(),source:"HiStock"};}
- catch{ return {rows:await twseQuotes(),source:"TWSE"};}
+async function yahooQuotes():Promise<{rows:Quote[];date:string}>{
+ const response=await fetch("https://tw.finance.yahoo.com/rank/turnover",{headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"},next:{revalidate:300},signal:AbortSignal.timeout(5500)});
+ if(!response.ok)throw Error("Yahoo HTTP "+response.status);
+ const html=await response.text();
+ const plain=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/gi," ").replace(/\s+/g," ");
+ const dateMatch=plain.match(/資料時間\s*[:：]\s*(20\d{2})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+ if(!dateMatch)throw Error("Yahoo 無法確認交易日期");
+ const date=dateMatch[1]+"-"+dateMatch[2].padStart(2,"0")+"-"+dateMatch[3].padStart(2,"0");
+ if(date>twDate())throw Error("Yahoo 日期異常");
+ const rows:Quote[]=[];
+ const pattern=/(\d{4})\.(?:TW|TWO)\s+([\d,]+(?:\.\d+)?)\s+[+-]?[\d,]+(?:\.\d+)?\s+[+-]?[\d.]+%\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+[\d,]+(?:\.\d+)?\s+([\d,]+)\s+([\d,]+(?:\.\d+)?)/g;
+ for(const match of Array.from(plain.matchAll(pattern))){
+  const symbol=match[1],close=num(match[2]),volume=num(match[3])*1000,value=num(match[4])*100000000;
+  const before=plain.slice(Math.max(0,match.index-100),match.index).trim().split(/\s+/);
+  const name=before.at(-1)??symbol;
+  if(close>0&&volume>0&&value>0&&name)rows.push({symbol,name,close,volume,value,change:"",transactions:0});
+ }
+ if(rows.length<10)throw Error("Yahoo 成交金額排行解析不足");
+ return {rows,date};
+}
+function comparableQuotes(a:Quote[],b:Quote[]){
+ const map=new Map(b.map(x=>[x.symbol,x.value]));
+ const compared=a.slice(0,30).flatMap(x=>{const v=map.get(x.symbol);return v&&v>0?[Math.abs(x.value/v-1)]:[];});
+ return compared.length>=5&&compared.filter(delta=>delta<=0.02).length>=5&&compared.filter(delta=>delta<=0.02).length/compared.length>=0.8;
+}
+async function marketQuotes():Promise<{rows:Quote[];source:string;quoteDate:string|null;coverage:string}>{
+ let primary:Quote[]|null=null,source="",quoteDate:string|null=null;
+ try{primary=await histockQuotes();source="HiStock";}catch{}
+ if(!primary){try{const yahoo=await yahooQuotes();primary=yahoo.rows;quoteDate=yahoo.date;source="Yahoo 股市";}catch{}}
+ if(!primary)return {rows:await twseQuotes(),source:"TWSE（前兩來源無效）",quoteDate:null,coverage:"listed_full"};
+ // Ranking pages are partial universes; supplement only when TWSE prices/turnover agree.
+ try{
+  const official=await twseQuotes();
+  if(comparableQuotes(primary,official)){
+   const merged=new Map(official.map(x=>[x.symbol,x]));
+   for(const row of primary)merged.set(row.symbol,row);
+   return {rows:Array.from(merged.values()),source:source+" + TWSE 一致性驗證補齊",quoteDate,coverage:"listed_full_plus_ranking"};
+  }
+ }catch{}
+ return {rows:primary,source,quoteDate,coverage:"ranking_partial"};
 }
 export async function GET(){
  try{
-  const [{rows,source},instRes,history]=await Promise.all([
+  const [{rows,source,quoteDate,coverage},instRes,history]=await Promise.all([
    marketQuotes(),
    fetch("https://www.twse.com.tw/rwd/zh/fund/T86?date="+twDate().replace(/-/g,"")+"&selectType=ALL&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(6000)}).catch(()=>new Response(null,{status:503})),
    Promise.race([weeklyHistory(),new Promise<HistoricalDay[]>(resolve=>setTimeout(()=>resolve([]),4500))])
   ]);
   const bySymbol=new Map(rows.map(r=>[r.symbol,r]));
+  // A date on a separate history feed is not proof that this quote snapshot is from that day.
+  const verifiedHistory=history.find(day=>{
+   const compared=rows.slice(0,30).flatMap(row=>{const v=day.values.get(row.symbol);return v&&v>0?[Math.abs(row.value/v-1)]:[];});
+   return compared.length>=5&&compared.filter(delta=>delta<=0.02).length>=5&&compared.filter(delta=>delta<=0.02).length/compared.length>=0.8;
+  });
+  const asOf=quoteDate??verifiedHistory?.date??null;
+  const asOfVerified=Boolean(asOf);
+  const completeCoverage=coverage!=="ranking_partial";
   const groups=sectors.map(g=>{const stocks=g.stocks.flatMap(code=>{const row=bySymbol.get(code);return row?[row]:[]});const turnover=stocks.reduce((sum,r)=>sum+r.value,0);const validDays=history.filter(d=>g.stocks.filter(code=>d.values.has(code)).length>=Math.ceil(g.stocks.length*.8));
    const current=validDays[0],previous=validDays.slice(1,6);
    const currentAmount=current&&g.stocks.every(code=>current.values.has(code))?g.stocks.reduce((sum,code)=>sum+current.values.get(code)!,0):null;
@@ -111,7 +156,7 @@ export async function GET(){
    const priorAverage=completePrevious.length>=3?completePrevious.reduce((sum,d)=>sum+g.stocks.reduce((v,code)=>v+d.values.get(code)!,0),0)/completePrevious.length:null;
    const weeklyChange=currentAmount!==null&&priorAverage!==null&&priorAverage>0?(currentAmount/priorAverage-1)*100:null;
    const weeklyDelta=currentAmount!==null&&priorAverage!==null?currentAmount-priorAverage:null;
-   const turnoverShare=rows.reduce((sum,row)=>sum+row.value,0)>0?turnover/rows.reduce((sum,row)=>sum+row.value,0)*100:null;
+   const turnoverShare=completeCoverage&&rows.reduce((sum,row)=>sum+row.value,0)>0?turnover/rows.reduce((sum,row)=>sum+row.value,0)*100:null;
    const leaderShare=turnover>0?Math.max(0,...stocks.map(stock=>stock.value))/turnover*100:null;
    const historicalQuality=weeklyDelta===null?"insufficient":"verified";
    const dailyAmounts=validDays.slice(0,5).map(d=>g.stocks.every(code=>d.values.has(code))?g.stocks.reduce((sum,code)=>sum+d.values.get(code)!,0):null);
@@ -135,7 +180,7 @@ export async function GET(){
    }
   }
   buyers.sort((a,b)=>b.shares-a.shares);
-  return NextResponse.json({status:"ok",asOf:history[0]?.date??null,asOfVerified:history.length>0,historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:source+" / TWSE T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。盤後個股快照若無可驗證交易日則不標示為今日資料；並非逐筆即時。"},
+  return NextResponse.json({status:"ok",asOf,asOfVerified,coverage,historyStatus:history.length>=4?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:source+" / TWSE T86 / MI_INDEX 近週歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。排行來源若僅涵蓋部分股票，產業排名可能不完整；無法驗證行情日期時不標示為今日資料；並非逐筆即時。"},
    {headers:{"Cache-Control":"public, s-maxage=300, stale-while-revalidate=300"}});
  }catch(e){return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"暫無可驗證行情"},{status:503});}
 }
