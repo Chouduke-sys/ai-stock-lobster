@@ -34,7 +34,7 @@ async function check([name,path,kind]){
   const status=response.status;
   const summary={name,path,http:status,latencyMs:elapsed,status:body?.status??null,date:body?.asOf??body?.dataDate??body?.date??null};
   results.push(summary);
-  if(kind==="html"){if(!response.ok||!raw.includes("AI 股市龍蝦"))issue(name,"error","首頁無法正常顯示");return;}
+  if(kind==="html"){if(!response.ok||!/<html[\\s>]/i.test(raw)||raw.length<500)issue(name,"error","首頁無法正常顯示");return;}
   if(kind==="auth"){if(status===401){issue(name,"warning","需要登入，無法驗證會員內文");return;}if(!response.ok||body?.status!=="ok")issue(name,"error","HTTP "+status+"／"+body?.status);return;}
   if(kind==="index"){if(status===409&&!(["Mon","Tue","Wed","Thu","Fri"].includes(day)&&minute>=540&&minute<=810))return;if(!response.ok||body?.status!=="ok")issue(name,"warning","非正常回應 HTTP "+status);return;}
   if(kind==="night"){if(status===409&&!nightOpen)return;if(nightOpen&&(!response.ok||body?.status!=="ok"))issue(name,"error","夜盤時段無有效報價 HTTP "+status+" "+(body?.status||""));return;}
@@ -62,8 +62,32 @@ async function check([name,path,kind]){
   if(kind==="sources"&&Array.isArray(body.results)){const bad=body.results.filter(x=>x.status!=="ok");if(bad.length)issue(name,"warning",bad.map(x=>x.source).join(", ")+" 來源異常");}
  }catch(e){results.push({name,path,error:String(e)});issue(name,"error",String(e));}
 }
+async function probeProviders(){
+ const sources=[["HiStock","https://histock.tw/stock/rank.aspx?m=13"],["Yahoo 股市","https://tw.finance.yahoo.com/rank/turnover"]];
+ return Promise.all(sources.map(async([name,url])=>{
+  try{
+   const response=await fetch(url,{signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
+   const html=await response.text();
+   if(name==="HiStock"){
+    const rows=Array.from(html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi));
+    let valid=0;const samples=[];
+    for(const match of rows){
+     const cells=Array.from(match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)).map(m=>m[1].replace(/<[^>]*>/g,"").trim());
+     const code=cells.findIndex(c=>/^\d{4}$/.test(c));
+     if(code<0||cells.length-code<13)continue;
+     const close=Number(cells[code+2].replace(/,/g,"")),volume=Number(cells[code+11].replace(/,/g,"")),value=Number(cells[code+12].replace(/,/g,""));
+     if(close>0&&volume>0&&value>0){valid++;if(samples.length<2)samples.push({symbol:cells[code],value});}
+    }
+    return {name,http:response.status,htmlBytes:html.length,tableRows:rows.length,validQuotes:valid,samples};
+   }
+   const plain=html.replace(/<[^>]*>/g," ").replace(/\s+/g," ");
+   return {name,http:response.status,htmlBytes:html.length,date:(plain.match(/資料時間\s*[:：]\s*(20\d{2}[\/.-]\d{1,2}[\/.-]\d{1,2})/)||[])[1]??null};
+  }catch(e){return {name,error:String(e)};}
+ }));
+}
 (async()=>{
+ const providerResults=await probeProviders();
  await Promise.all(cases.map(check));
- console.log(JSON.stringify({checkedAt:new Date().toISOString(),taipeiDate:today,results,failures:fail,warnings:warn},null,2));
+ console.log(JSON.stringify({checkedAt:new Date().toISOString(),taipeiDate:today,results,providerResults,failures:fail,warnings:warn},null,2));
  if(fail.length){console.error("FAIL: "+fail.length+" critical health checks");process.exitCode=1;}
 })().catch(e=>{console.error(e);process.exitCode=1;});
