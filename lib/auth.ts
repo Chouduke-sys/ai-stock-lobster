@@ -15,6 +15,6 @@ export const authOptions:NextAuthOptions={
  pages:{signIn:"/"},
  callbacks:{
   async jwt({token,account}){if(account?.provider)token.provider=account.provider;return token;},
-  async session({session,token}){if(session.user){session.user.name=token.name??session.user.name;session.user.email=token.email??session.user.email;}return session;}
+  async session({session,token}){if(session.user){session.user.name=token.name??session.user.name;session.user.email=token.email??session.user.email;}(session as typeof session & {provider?:string}).provider=typeof token.provider==="string"?token.provider:undefined;return session;}
  }
 };
