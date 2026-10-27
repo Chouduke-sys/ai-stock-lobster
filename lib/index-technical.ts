@@ -28,7 +28,7 @@ export async function getIndexTechnical():Promise<TechnicalSignal>{
    const sentiment=score>=2?"bullish":score<=-2?"bearish":"neutral";
    const verdict=sentiment==="bullish"?"均線與動能偏多":sentiment==="bearish"?"均線與動能偏空":"技術訊號分歧";
    const date=new Date(latest.t*1000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
-   const body="加權指數 "+price.toFixed(0)+" 點；5日線 "+ma5.toFixed(0)+"、20日線 "+ma20.toFixed(0)+"、60日線 "+ma60.toFixed(0)+"；RSI(14) "+rsi.toFixed(1)+"；"+(volumeRatio===null?"量能比尚未取得":"成交量為前20日均量的 "+volumeRatio.toFixed(2)+" 倍")+"。資料日 "+date+"（Yahoo 日線；盤中成交量未收盤，量比僅供參考）。";
+   const body="加權指數 "+price.toFixed(0)+" 點；5日線 "+ma5.toFixed(0)+"、20日線 "+ma20.toFixed(0)+"、60日線 "+ma60.toFixed(0)+"；RSI(14) "+rsi.toFixed(1)+"；"+(volumeRatio===null?"量能比尚未取得":"成交量為前20日均量的 "+volumeRatio.toFixed(2)+" 倍")+"。資料日 "+date+"";
    return {body,sentiment,verdict,valid:true,date};
   }catch{}
  }
