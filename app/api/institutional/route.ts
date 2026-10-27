@@ -28,9 +28,15 @@ async function twse():Promise<MarketData|null>{
   const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
   const url="https://www.twse.com.tw/rwd/zh/fund/T86?date="+d.replace(/-/g,"")+"&selectType=ALL&response=json";
   try{
-   const response=await fetch(url,{next:{revalidate:300},signal:AbortSignal.timeout(6000)});
-   if(!response.ok)continue;
-   const body:unknown=await response.json();
+   // Today's T86 may intermittently fail or be cached as unavailable. Probe both public hosts.
+   const urls=i===0?[url,url.replace("www.twse.com.tw","wwwc.twse.com.tw")]:[url];
+   const candidates=await Promise.all(urls.map(async endpoint=>{
+    try{
+     const response=await fetch(endpoint,{cache:"no-store",signal:AbortSignal.timeout(4500)});
+     return response.ok?await response.json() as unknown:null;
+    }catch{return null;}
+   }));
+   const body=candidates.find(v=>v&&typeof v==="object"&&!Array.isArray(v)&&(v as Obj).stat==="OK");
    if(!body||typeof body!=="object"||Array.isArray(body))continue;
    const r=body as Obj;
    if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))continue;
