@@ -590,3 +590,42 @@
  #desktop-news,#desktop-market,#desktop-index,#desktop-flows,#desktop-sectors,#charts,#membership{scroll-margin-top:22px}
  html{scroll-behavior:smooth}
 }
+
+/* Desktop two-column dashboard: public market stream left, member research right.
+   Keep mobile's original direct-child DOM and tab behavior unchanged. */
+@media(min-width:1051px){
+ .site-shell[data-mobile-tab]{
+   max-width:1600px;display:grid;
+   grid-template-columns:minmax(0,65fr) minmax(340px,35fr);
+   column-gap:22px;row-gap:16px;align-items:start;
+ }
+ .site-shell[data-mobile-tab] > *{min-width:0;grid-column:1}
+ .site-shell[data-mobile-tab] > .topbar,
+ .site-shell[data-mobile-tab] > footer,
+ .site-shell[data-mobile-tab] > .modal-card{grid-column:1/-1}
+ .site-shell[data-mobile-tab] > .morning-brief,
+ .site-shell[data-mobile-tab] > .sector-rotation-member,
+ .site-shell[data-mobile-tab] > .membership{grid-column:2}
+ .site-shell[data-mobile-tab] > .morning-brief{grid-row:2}
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"]{grid-row:3}
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員 AI 盤後檢討"]{grid-row:4}
+ .site-shell[data-mobile-tab] > .membership{grid-row:5}
+ .site-shell[data-mobile-tab] > .hero,
+ .site-shell[data-mobile-tab] > .market-analysis-wide,
+ .site-shell[data-mobile-tab] > .institutional-side-by-side,
+ .site-shell[data-mobile-tab] > .section{width:100%;min-width:0;margin-top:0}
+ .site-shell[data-mobile-tab] > .hero.hero-balanced{grid-template-columns:minmax(0,1fr)!important}
+ .site-shell[data-mobile-tab] > .hero.hero-balanced > *{min-width:0}
+ .site-shell[data-mobile-tab] .institutional-side-by-side{grid-template-columns:minmax(0,1fr)}
+ .site-shell[data-mobile-tab] .weekly-calendar-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+ .site-shell[data-mobile-tab] .weekly-calendar-day{min-width:0}
+ .site-shell[data-mobile-tab] .weekly-calendar-event{padding:9px 6px}
+ .site-shell[data-mobile-tab] .weekly-calendar-event strong{overflow-wrap:anywhere;font-size:12px}
+ .site-shell[data-mobile-tab] .weekly-calendar-day h3{font-size:12px}
+ .site-shell[data-mobile-tab] .morning-brief-grid,
+ .site-shell[data-mobile-tab] .sector-radar-grid{grid-template-columns:minmax(0,1fr)!important}
+ .site-shell[data-mobile-tab] .morning-brief,
+ .site-shell[data-mobile-tab] .sector-rotation-member,
+ .site-shell[data-mobile-tab] .membership{min-width:0;overflow-wrap:anywhere}
+ .site-shell[data-mobile-tab] > footer{margin-top:28px}
+}
