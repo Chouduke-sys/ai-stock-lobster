@@ -2,10 +2,11 @@ const fs=require("node:fs");
 const path=require("node:path");
 const base=process.env.SITE_URL||"https://ai-stock-lobster.vercel.app";
 const secret=process.env.CRON_SECRET;
-if(!secret)throw Error("CRON_SECRET is required");
 const now=new Date();
 const day=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
 const mode=process.argv[2];
+// Closing figures are public. Keep authorization mandatory for member-only morning predictions.
+if(mode==="morning"&&!secret)throw Error("CRON_SECRET is required for morning mode");
 const archivePath=path.join(process.cwd(),"data","daily-review.json");
 fs.mkdirSync(path.dirname(archivePath),{recursive:true});
 const archive=fs.existsSync(archivePath)?JSON.parse(fs.readFileSync(archivePath,"utf8")):[];
