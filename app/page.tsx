@@ -757,7 +757,6 @@ useEffect(()=>{
         </div>
       </section>
 
-          <WeeklyFinanceCalendar />
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
@@ -768,6 +767,8 @@ useEffect(()=>{
           <p className="holdings-note">資料來源：{dailyAnalysis?.source??"讀取中"}。{dailyAnalysis?.generatedAt?"查詢時間："+new Date(dailyAnalysis.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):""} · 每 5 分鐘查詢；行情可能延遲，分析為規則式研判，非即時交易建議。</p>
           <div className="mobile-us-futures-summary"><strong>美股期貨參考</strong><p>{usFutures?usFutures.name+"："+formatPrice(usFutures.price)+" 點"+(usFutures.change!=null?"（"+(usFutures.change>0?"+":"")+formatPrice(usFutures.change)+"）":""):"目前無可用的美股期貨報價"}</p><small>{usFutures?.quoteTime?"資料時間："+new Date(usFutures.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"資料時間待確認"} · 期貨行情可能延遲</small></div>
 </div>
+
+          <WeeklyFinanceCalendar />
 
       <section className="vix-panel" aria-label="全球市場恐慌程度">
         <div className="section-heading"><div><div className="eyebrow">MARKET VOLATILITY</div><h2>全球市場恐慌指標 · VIX</h2><p>以美國 CBOE VIX 波動率指數觀察全球市場風險情緒，並非全球所有股市的綜合恐慌指數。</p></div></div>
