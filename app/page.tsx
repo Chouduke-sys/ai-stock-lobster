@@ -627,7 +627,7 @@ useEffect(()=>{
           <span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span>
           <span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE · TAIWAN</small></span>
         </a>
-        <nav className="nav-links"><a href="#rankings">法人排行</a><a href="#charts">個股走勢</a><a href="#global">全球資訊</a><a href="#membership">會員方案</a></nav>
+        <nav className="nav-links" aria-label="電腦版主要功能"><a href="#desktop-news">新聞</a><a href="#desktop-market">今日台股</a><a href="#desktop-index">加權指數</a><a href="#desktop-flows">法人籌碼</a><a href="#desktop-sectors">熱門產業</a><a href="#charts">個股分析</a><a href="#membership">會員</a></nav>
         <button className="btn btn-outline login-btn" onClick={() => setShowLogin(!showLogin)}><LockKeyhole size={16}/> {member?"會員："+(member.name||member.email||"已登入"):"會員登入"}</button>
         <button className="icon-btn mobile-menu" aria-label="開啟登入面板" onClick={() => setShowLogin(!showLogin)}><Menu size={20}/></button>
       </header>
@@ -692,7 +692,7 @@ useEffect(()=>{
         <div className="section-heading"><div><div className="eyebrow">AI DAILY REVIEW · 預測績效追蹤</div><h2>AI 盤後檢討</h2><p>保留每日盤前方向快照，與當日證交所正式收盤結果核對，不回填事後預測。</p></div></div>
         {member?<><div className="sector-radar-grid"><div className="sector-radar-panel"><h3>近 30 個已驗證交易日</h3><strong>{dailyReview?.metrics.days30.rate==null?"累積中":dailyReview.metrics.days30.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days30.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>近 90 個已驗證交易日</h3><strong>{dailyReview?.metrics.days90.rate==null?"累積中":dailyReview.metrics.days90.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days90.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>驗證方式</h3><p>盤前偏多／偏空／中性，對照當日加權指數漲跌；尚未累積的交易日不計入勝率。</p></div></div><div className="sector-radar-panel">{dailyReview?.latest.length?dailyReview.latest.map(day=><div className="sector-radar-entry" key={day.date}><strong>{day.date}　盤前：{day.predictionLabel}</strong><span>{day.outcome?"盤後："+(day.outcome.changePct>=0?"+":"")+day.outcome.changePct.toFixed(2)+"%　"+(day.outcome.correct?"方向符合":"方向未符合"):"盤後結果待驗證"}</span></div>):<p>歷史預測尚未累積。首次排程成功執行後，才會開始顯示可核對的紀錄。</p>}</div><p className="footnote">{dailyReview?.method??"盤前與盤後資料須完成自動封存後才能計算命中率。"} 命中率不代表策略報酬率。</p></>:<p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後查看 AI 盤後檢討與歷史命中率。</p>}
       </section>
-      <section className="hero hero-balanced">
+      <section className="hero hero-balanced" id="desktop-news">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
           <div className="eyebrow"><span className="live-dot"></span> GLOBAL FINANCIAL NEWS · 多來源重要新聞</div>
           <h2 style={{fontSize:"clamp(24px,2.6vw,38px)",margin:"14px 0 6px"}}>全球即時財經快訊</h2>
@@ -711,7 +711,7 @@ useEffect(()=>{
             <a href="https://news.futunn.com/main" target="_blank" rel="noopener noreferrer" style={{color:"#fb725b",fontSize:14}}>前往富途牛牛查看最新新聞 ↗</a>
             <small style={{color:"#94a3b8"}}>{newsFetchedAt?"本站查詢："+new Date(newsFetchedAt).toLocaleTimeString("zh-TW",{timeZone:"Asia/Taipei"}):"尚未成功更新"}</small>
           </div>
-        <section className="holdings-panel" aria-label="AI熱門產業概念股-資金成交熱度">
+        <section className="holdings-panel" id="desktop-sectors" aria-label="AI熱門產業概念股-資金成交熱度">
           <div className="holdings-heading"><span>AI熱門產業概念股-資金成交熱度</span><small>CCL／PCB／先進封裝上下游</small></div>
           <div className="holdings-fund-title">今日 AI 供應鏈成交熱度 <span>{aiFlow?.asOf??"讀取中"} · 上市盤後資料</span></div>
           <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+aiFlow.groups[0].name+"（"+(aiFlow.groups[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
@@ -724,7 +724,7 @@ useEffect(()=>{
           <p className="footnote">代表公司來自本站產業觀察清單及證交所股票名稱，每組顯示成交金額較高的最多五家公司；並非產業完整名單。</p>
         </section>
         </div>
-        <div className="hero-visual">
+        <div className="hero-visual" id="desktop-index">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
           <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 開盤每 1 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
@@ -780,7 +780,7 @@ useEffect(()=>{
       </section>
 
 
-          <div className="market-analysis-wide">          <div className="holdings-divider" />
+          <div className="market-analysis-wide" id="desktop-market">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
           <div className="daily-market-grid">{dailyAnalysis?.quotes.map(q=><div key={q.symbol} className="daily-market-quote"><small>{q.label}</small><strong>{q.value==null?"暫無資料":q.value.toLocaleString("zh-TW",{maximumFractionDigits:2})}</strong><span className={q.changePct==null?"":q.changePct>0?"market-up":"market-down"}>{q.changePct==null?"—":(q.changePct>0?"+":"")+q.changePct.toFixed(2)+"%"}</span><MarketMiniTrend values={q.trend5d??[]} label={q.label}/></div>)}</div>
@@ -839,7 +839,7 @@ useEffect(()=>{
         .institutional-side-by-side .footnote { font-size:13px; line-height:1.65; }
         @media(max-width:1050px){ .institutional-side-by-side { grid-template-columns:minmax(0,1fr); gap:12px; } }
       `}</style>
-      <section className="section" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
+      <section className="section" id="desktop-flows" aria-label="HiStock 外資投信買賣超監測" style={{marginTop:24}}>
         <div className="section-heading"><div><div className="eyebrow">HISTOCK INSTITUTIONAL FLOW</div><h2>外資與投信買賣超｜HiStock 監測</h2><p>每 60 秒檢查 HiStock 已公布的最新交易日統計；非逐筆盤中即時交易數據。</p></div></div>
         <div className="holdings-panel">
           {positioning?.liveInstitutional ? <><p className="holdings-date">交易日：{positioning.liveInstitutional.date} · 單位：億元 · 資料擷取：{new Date(positioning.retrievedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</p>
