@@ -792,9 +792,9 @@ useEffect(()=>{
 </div>
 
                 <section className="section weekly-calendar" aria-label="本週行事曆">
-        <div className="section-heading"><div><div className="eyebrow">WEEKLY ECONOMIC CALENDAR</div><h2>🗓️ 本週行事曆</h2><p>週一至週五重要財經公布 · 時間均為台灣時間</p></div></div>
+        <div className="section-heading"><div><div className="eyebrow">WEEKLY ECONOMIC CALENDAR</div><h2>🦞 本週行事曆</h2><p>週一至週五重要財經公布 · 時間均為台灣時間</p></div></div>
         <div className="weekly-calendar-grid">{Array.from({length:5},(_,i)=>{const base=weekCalendar?.monday?new Date(weekCalendar.monday+"T12:00:00Z"):new Date();const date=new Date(base);date.setUTCDate(base.getUTCDate()+i);const day=date.toISOString().slice(0,10);const items=weekCalendar?.events.filter(e=>e.date===day).slice(0,5)??[];return <div key={i} className="weekly-calendar-day"><h3>{day.slice(5).replace("-","/")}　週{["一","二","三","四","五"][i]}</h3>{items.length?items.map((e,k)=><div className="weekly-calendar-event" key={k}><small>{e.region}　{e.time}　<span style={{color:e.level==="high"?"#fb7185":"#fbbf24"}}>●</span></small><strong>{e.title}</strong>{e.detail&&<small>{e.detail}</small>}</div>):<p className="weekly-calendar-empty">{weekCalendar?.status==="unavailable"?"資料來源暫不可用":"尚無已確認的重要公布"}</p>}</div>;})}</div>
-        <p className="holdings-note" style={{marginTop:12}}>資料來源：Forex Factory 經濟行事曆。法說會僅顯示已確認的公告，時間均為台灣時間。</p>
+        <p className="holdings-note" style={{marginTop:12}}>資料來源：Forex Factory 經濟行事曆。法說會聚焦各 AI 產業三家代表企業，僅顯示已確認的公告；時間均為台灣時間。</p>
       </section>
 
       <section className="vix-panel" aria-label="全球市場恐慌程度">
