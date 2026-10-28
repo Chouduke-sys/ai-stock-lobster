@@ -99,6 +99,15 @@ async function probeProviders(){
 (async()=>{
  const providerResults=await probeProviders();
  await Promise.all(cases.map(check));
+ // Cross-check data dates against the confirmed TWSE close date, not the calendar
+ // date: this avoids false alarms on holidays while detecting transient T86 regressions.
+ const closeResult=results.find(x=>x.path==="/api/market/taiex/close");
+ const institutionalResult=results.find(x=>x.path.startsWith("/api/institutional?"));
+ if(closeResult?.http===200&&institutionalResult?.http===200&&
+    validDate(closeResult.date)&&validDate(institutionalResult.date)&&
+    institutionalResult.date<closeResult.date){
+  issue("法人籌碼","warning","資料日 "+institutionalResult.date+" 落後已確認的加權收盤日 "+closeResult.date+"（可能為 T86 暫時回退）");
+ }
  console.log(JSON.stringify({checkedAt:new Date().toISOString(),taipeiDate:today,results,providerResults,failures:fail,warnings:warn},null,2));
  if(fail.length){console.error("FAIL: "+fail.length+" critical health checks");process.exitCode=1;}
 })().catch(e=>{console.error(e);process.exitCode=1;});
