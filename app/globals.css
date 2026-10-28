@@ -629,3 +629,23 @@
  .site-shell[data-mobile-tab] .membership{min-width:0;overflow-wrap:anywhere}
  .site-shell[data-mobile-tab] > footer{margin-top:28px}
 }
+
+/* Desktop member cards: prevent narrow flex columns from stacking CJK glyphs vertically.
+   Let the detailed member radar use the full page width beneath the initial side panel. */
+@media(min-width:1051px){
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"],
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員 AI 盤後檢討"],
+ .site-shell[data-mobile-tab] > .membership{
+   grid-column:1/-1;grid-row:auto;
+ }
+ .site-shell[data-mobile-tab] > .morning-brief{grid-column:2;grid-row:2}
+ .site-shell[data-mobile-tab] .sector-rotation-list{grid-template-columns:minmax(0,1fr)!important}
+ .site-shell[data-mobile-tab] .sector-rotation-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:12px}
+ .site-shell[data-mobile-tab] .sector-rotation-row > div{min-width:0!important;width:auto!important;max-width:100%}
+ .site-shell[data-mobile-tab] .sector-rotation-row > div:first-child{overflow-wrap:normal;word-break:normal}
+ .site-shell[data-mobile-tab] .sector-rotation-row > div:last-child{min-width:90px;white-space:normal}
+ .site-shell[data-mobile-tab] .sector-rotation-row strong,
+ .site-shell[data-mobile-tab] .sector-rotation-row small{word-break:normal;overflow-wrap:break-word;line-height:1.6}
+ .site-shell[data-mobile-tab] .sector-radar-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+ .site-shell[data-mobile-tab] .sector-radar-panel{min-width:0}
+}
