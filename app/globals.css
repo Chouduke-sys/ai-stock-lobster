@@ -546,3 +546,27 @@
  .weekly-calendar-empty{font-size:10px!important;line-height:1.45;padding:8px 3px!important;overflow-wrap:anywhere}
  .weekly-calendar .holdings-note{font-size:10px;line-height:1.5}
 }
+
+/* Stable mobile news tabs: identical two-column geometry in either category. */
+@media(max-width:640px){
+ .site-shell[data-mobile-tab="news"] > .hero.hero-balanced,
+ .site-shell[data-mobile-tab="news"] > .hero.hero-balanced .hero-copy{min-width:0!important;width:100%!important;max-width:100%!important;overflow-x:hidden!important}
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons{
+   display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+   flex-direction:unset!important;flex-wrap:unset!important;align-items:stretch!important;
+   gap:8px!important;margin:16px 0 20px!important;width:100%!important;min-width:0!important;
+ }
+ .site-shell[data-mobile-tab="news"] .news-tab-buttons > button{
+   display:flex!important;justify-content:center!important;align-items:center!important;
+   width:100%!important;min-width:0!important;max-width:100%!important;
+   flex:none!important;align-self:stretch!important;box-sizing:border-box!important;
+   margin:0!important;padding:10px 6px!important;min-height:56px!important;
+   font-size:clamp(11px,3.15vw,14px)!important;line-height:1.4!important;
+   text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;
+   word-break:break-word!important;border-radius:12px!important;
+ }
+ .site-shell[data-mobile-tab="news"] .global-news-expanded,
+ .site-shell[data-mobile-tab="news"] .global-news-expanded > a,
+ .site-shell[data-mobile-tab="news"] .global-news-expanded > a > div{min-width:0!important;max-width:100%!important}
+ .site-shell[data-mobile-tab="news"] .global-news-expanded > a > div{overflow-wrap:anywhere!important}
+}
