@@ -5,6 +5,17 @@ import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
+
+// OAuth state cookies are host-bound. Always start OAuth on the canonical
+// production hostname, even when someone opens a Vercel deployment alias.
+const AUTH_ORIGIN = "https://ai-stock-lobster.vercel.app";
+function startOAuth(provider: "google" | "apple") {
+  if (window.location.origin !== AUTH_ORIGIN) {
+    window.location.assign(AUTH_ORIGIN + "/?login=1");
+    return;
+  }
+  void signIn(provider, {callbackUrl: "/"});
+}
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound, Newspaper as NewsIcon } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
@@ -348,6 +359,12 @@ useEffect(()=>{
   const [newsError, setNewsError] = useState("");
   const [newsFetchedAt, setNewsFetchedAt] = useState<string|null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("login") === "1") {
+      setShowLogin(true);
+      window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    }
+  }, []);
   const [showPlan, setShowPlan] = useState(false);
   const [message, setMessage] = useState("");
   const [stockData, setStockData] = useState<StockResult | null>(null);
@@ -636,7 +653,7 @@ useEffect(()=>{
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
         <h2>AI股市龍蝦會員</h2>
         {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。{isAdmin&&<a href="/admin" className="btn btn-primary" style={{marginLeft:12}}>🦞 管理者後台</a>}</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Email 驗證碼登入，即可解鎖會員內容。</p>
-        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>🔵 使用 Google 登入</button>}
+        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{startOAuth("google");}}>🔵 使用 Google 登入</button>}
         {loginProviders["email-code"]&&<div style={{display:"grid",gap:10,marginTop:14,maxWidth:390}}>
           <label htmlFor="lobster-email">✉️ 使用 Email 驗證碼登入</label>
           <input id="lobster-email" type="email" autoComplete="email" placeholder="輸入電子郵件" value={emailLogin} onChange={e=>{setEmailLogin(e.target.value);setEmailSent(false);}} style={{padding:12,borderRadius:8,border:"1px solid #49617a",background:"#0d1b2c",color:"#fff",width:"100%"}}/>
@@ -654,7 +671,7 @@ useEffect(()=>{
           <div className="morning-brief-grid morning-brief-preview-grid" aria-hidden="true">
             {["美股與期貨","外資與投信","融資融券","期貨與選擇權","匯率與利率","VIX 市場情緒","技術面與量能","重大政策與科技","今日盤前小總結"].map((title,i)=><article className="morning-brief-item morning-brief-preview-card" key={title}><h3>{String(i+1).padStart(2,"0")}　{title}</h3><div className="morning-brief-skeleton-line"/><div className="morning-brief-skeleton-line short"/><span className="morning-brief-skeleton-badge">會員專屬分析</span></article>)}
           </div>
-          <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
+          <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{startOAuth("google");}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{startOAuth("apple");}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
         </div>}
         {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
         {member&&morningBrief?<><div className="morning-brief-summary"><div style={{display:"grid",gap:5,minWidth:0}}><strong>{morningBrief.stance}</strong><small style={{fontSize:12,lineHeight:1.6,color:"#c7d9ed",maxWidth:610}}>{(()=>{const bull=morningBrief.sections.filter(x=>x.sentiment==="bullish").length;const bear=morningBrief.sections.filter(x=>x.sentiment==="bearish").length;const neutral=morningBrief.sections.length-bull-bear;return `九大面向：利多 ${bull}／利空 ${bear}／中性 ${neutral}。${bull>bear?"多方訊號略占優勢，但仍須觀察量能與法人動向。":bear>bull?"空方訊號略占優勢，建議留意開盤後承接與風險控管。":"多空訊號相近，方向尚未明朗，先觀察量能與法人動向。"}${typeof morningBrief.recommendedAllocation==="number"?" 建議倉位上限 "+Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%。":""}`;})()}</small></div><small className="morning-brief-allocation">建議股票總倉水位：{typeof morningBrief.recommendedAllocation==="number"?Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%":"回測資料取得中"}</small><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
