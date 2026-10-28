@@ -582,3 +582,11 @@
    transform:none!important;margin:0!important;
  }
 }
+
+/* Desktop: seven navigation categories matching the mobile tab order. */
+@media(min-width:641px){
+ .topbar .nav-links{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 15px;min-width:0;font-size:12px}
+ .topbar .nav-links a{white-space:nowrap;line-height:1.6}
+ #desktop-news,#desktop-market,#desktop-index,#desktop-flows,#desktop-sectors,#charts,#membership{scroll-margin-top:22px}
+ html{scroll-behavior:smooth}
+}
