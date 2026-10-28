@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import WeeklyFinanceCalendar from "./components/WeeklyFinanceCalendar";
 import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
@@ -756,6 +757,7 @@ useEffect(()=>{
         </div>
       </section>
 
+          <WeeklyFinanceCalendar />
           <div className="market-analysis-wide">          <div className="holdings-divider" />
           <div className="holdings-fund-title">今日台灣股市分析 <span>{dailyAnalysis?.date ?? "載入中"} · 國際市場／日韓股／新台幣</span></div>
           <p className="holdings-note">{dailyAnalysis?.marketView ?? "正在取得國際市場行情與今日台股分析…"}</p>
