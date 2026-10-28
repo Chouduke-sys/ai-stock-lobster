@@ -58,7 +58,10 @@ async function check([name,path,kind]){
   if(kind==="global"&&(!Array.isArray(body.quotes)||body.quotes.filter(x=>typeof x.value==="number").length<3))issue(name,"error","全球市場有效報價不足3筆");
   if(kind==="news"&&(!Array.isArray(body.news)||body.news.length<5))issue(name,"error","富途新聞不足5筆");
   if(kind==="vix"&&!(typeof body.value==="number"&&body.value>0))issue(name,"error","VIX 無有效數值");
-  if(kind==="leaderNews"&&(!Array.isArray(body.items)||body.items.length===0))issue(name,"warning","個股新聞暫無資料");
+  if(kind==="leaderNews"){
+   if(!Array.isArray(body.items)||body.items.length===0)issue(name,"warning","個股新聞暫無最近72小時的有效文章");
+   else if(body.items.some(x=>!x.publishedAt||!Number.isFinite(Date.parse(x.publishedAt))||Date.now()-Date.parse(x.publishedAt)>72*3600000))issue(name,"warning","個股新聞含超過72小時或未標日期的文章");
+  }
   if(kind==="sources"&&Array.isArray(body.results)){const bad=body.results.filter(x=>x.status!=="ok");if(bad.length)issue(name,"warning",bad.map(x=>x.source).join(", ")+" 來源異常");}
  }catch(e){results.push({name,path,error:String(e)});issue(name,"error",String(e));}
 }
