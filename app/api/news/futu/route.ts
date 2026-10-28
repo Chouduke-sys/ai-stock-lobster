@@ -54,6 +54,16 @@ function parseNews(raw:unknown):News[]{
   return [{title:plainText(title),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl,summary}];
  });
 }
+function newsKey(title:string):string{
+ return title.toLowerCase().replace(/\s*[-–—|｜]\s*(富途牛牛|futunn|moomoo|鉅亨網|工商時報|經濟日報|聯合新聞網|中央社).*$/i,"").replace(/[\\s\\p{P}\\p{S}]/gu,"").slice(0,90);
+}
+function isReadableChinese(n:News):boolean{
+ const chinese=(n.title.match(/[\u3400-\u9fff]/g)||[]).length;
+ const latin=(n.title.match(/[a-z]/gi)||[]).length;
+ if(chinese<4||latin>chinese*3)return false;
+ if(/(?:login|signin|sign-in|register|subscribe|premium|paywall)/i.test(n.url))return false;
+ return true;
+}
 export async function GET(){
  try{
   const endpoint=process.env.FUTU_NEWS_API_URL||"https://ai-news-search.futunn.com/news_search";
@@ -74,7 +84,7 @@ export async function GET(){
    }catch{return [];}
   }));
   const seen=new Set<string>();
-  const news=batches.flat().filter(n=>{if(seen.has(n.url))return false;seen.add(n.url);return true;})
+  const news=batches.flat().filter(isReadableChinese).filter(n=>{const key=newsKey(n.title);if(seen.has(n.url)||seen.has(key))return false;seen.add(n.url);seen.add(key);return true;})
    .sort((a,b)=>(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,45);
   if(!news.length)throw Error("No verified Futu news");
   const important=/川普|特朗普|Trump|鮑爾|Powell|聯準會|美聯儲|Fed\b|FOMC|央行總裁|總統發言|財政部長|黃仁勳|Jensen Huang|台積電|金管會|中央銀行|台灣央行|台灣科技|台灣金融|關稅|利率決策/i;
