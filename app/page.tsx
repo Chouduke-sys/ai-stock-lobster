@@ -6,6 +6,8 @@ import {useIntradayHistory} from "../lib/useIntradayHistory";
 import { useEffect, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound, Newspaper as NewsIcon } from "lucide-react";
+
 // OAuth state cookies are host-bound. Always start OAuth on the canonical
 // production hostname, even when someone opens a Vercel deployment alias.
 const AUTH_ORIGIN = "https://ai-stock-lobster.vercel.app";
@@ -16,7 +18,6 @@ function startOAuth(provider: "google" | "apple") {
   }
   void signIn(provider, {callbackUrl: "/"});
 }
-import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CandlestickChart, CircleHelp, Globe2, Landmark, LockKeyhole, Menu, Newspaper, Search, ShieldCheck, TrendingUp, X, Home as HomeIcon, Layers3, Users, UserRound, Newspaper as NewsIcon } from "lucide-react";
 
 type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
