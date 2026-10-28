@@ -55,7 +55,7 @@ function parseNews(raw:unknown):News[]{
  });
 }
 function newsKey(title:string):string{
- return title.toLowerCase().replace(/\s*[-–—|｜]\s*(富途牛牛|futunn|moomoo|鉅亨網|工商時報|經濟日報|聯合新聞網|中央社).*$/i,"").replace(/[\\s\\p{P}\\p{S}]/gu,"").slice(0,90);
+ return title.toLowerCase().replace(/\s*[-–—|｜]\s*(富途牛牛|futunn|moomoo|鉅亨網|工商時報|經濟日報|聯合新聞網|中央社).*$/i,"").replace(new RegExp(String.raw`[\s\p{P}\p{S}]`,"gu"),"").slice(0,90);
 }
 function isReadableChinese(n:News):boolean{
  const chinese=(n.title.match(/[\u3400-\u9fff]/g)||[]).length;
