@@ -685,3 +685,39 @@
    grid-template-columns:minmax(0,1fr) auto;
  }
 }
+
+/* Balanced desktop layout: do not strand long industry rankings in the
+   35% sidebar while the left side is empty. Continue full-width below
+   the first paired hero / morning-brief row. */
+@media(min-width:1051px){
+ .site-shell[data-mobile-tab] > .hero.hero-balanced{
+   grid-column:1!important;grid-row:2!important;align-self:start;
+ }
+ .site-shell[data-mobile-tab] > .morning-brief{
+   grid-column:2!important;grid-row:2!important;align-self:start;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"]{
+   grid-column:1/-1!important;grid-row:3!important;width:100%;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員 AI 盤後檢討"]{
+   grid-column:1/-1!important;grid-row:4!important;width:100%;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .membership{
+   grid-column:1/-1!important;grid-row:5!important;width:100%;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-rotation-list{
+   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-radar-grid{
+   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-rotation-row{
+   min-width:0;grid-template-columns:minmax(0,1fr) minmax(100px,auto)!important;
+   align-items:center!important;gap:14px!important;
+ }
+}
+@media(min-width:1051px) and (max-width:1190px){
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-rotation-list{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+}
