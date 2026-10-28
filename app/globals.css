@@ -649,3 +649,39 @@
  .site-shell[data-mobile-tab] .sector-radar-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
  .site-shell[data-mobile-tab] .sector-radar-panel{min-width:0}
 }
+
+/* Corrected desktop flow: member content stays RIGHT; once it ends, PUBLIC
+   sections on the LEFT expand to the full page width. */
+@media(min-width:1051px){
+ .site-shell[data-mobile-tab] > *{grid-column:1/-1;grid-row:auto}
+ .site-shell[data-mobile-tab] > .topbar{grid-column:1/-1;grid-row:1}
+ .site-shell[data-mobile-tab] > .hero.hero-balanced{
+   grid-column:1;grid-row:2 / 6;align-self:start;
+ }
+ .site-shell[data-mobile-tab] > .morning-brief{
+   grid-column:2;grid-row:2;align-self:start;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"]{
+   grid-column:2;grid-row:3;align-self:start;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員 AI 盤後檢討"]{
+   grid-column:2;grid-row:4;align-self:start;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .membership{
+   grid-column:2;grid-row:5;align-self:start;margin:0!important;
+ }
+ .site-shell[data-mobile-tab] > .vix-panel,
+ .site-shell[data-mobile-tab] > .stats-grid,
+ .site-shell[data-mobile-tab] > .market-analysis-wide,
+ .site-shell[data-mobile-tab] > .institutional-side-by-side,
+ .site-shell[data-mobile-tab] > section:not(.hero):not(.morning-brief):not(.sector-rotation-member):not(.membership),
+ .site-shell[data-mobile-tab] > div:not(.institutional-side-by-side){
+   grid-column:1/-1;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-radar-grid{
+   grid-template-columns:minmax(0,1fr)!important;
+ }
+ .site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-rotation-row{
+   grid-template-columns:minmax(0,1fr) auto;
+ }
+}
