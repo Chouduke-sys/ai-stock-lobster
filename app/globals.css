@@ -519,3 +519,16 @@
  .lobster-week-bottom{grid-template-columns:1fr}
  .lobster-week-nav{width:100%;justify-content:space-between}
 }
+
+.weekly-calendar-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.weekly-calendar-day{min-width:0;background:#0b192e;border:1px solid #24517b;border-radius:12px;overflow:hidden}
+.weekly-calendar-day h3{margin:0;padding:13px 10px;background:#0d3157;color:#f8fafc;font-size:16px}
+.weekly-calendar-event{padding:12px 10px;border-top:1px solid #26415c;display:grid;gap:5px;min-width:0}
+.weekly-calendar-event strong{font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.weekly-calendar-event small{font-size:12px;color:#9db7d0;line-height:1.5}
+.weekly-calendar-empty{padding:12px;color:#94a3b8;font-size:13px}
+@media(max-width:640px){
+.weekly-calendar-grid{grid-template-columns:repeat(5,minmax(165px,1fr));overflow-x:auto;padding-bottom:8px}
+.site-shell[data-mobile-tab] > .weekly-calendar{display:none!important}
+.site-shell[data-mobile-tab="market"] > .weekly-calendar{display:block!important}
+}
