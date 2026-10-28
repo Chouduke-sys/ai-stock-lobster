@@ -721,3 +721,24 @@
    grid-template-columns:minmax(0,1fr)!important;
  }
 }
+
+/* Desktop navigation: prominent seven-category pill tabs, accessible focus. */
+@media(min-width:1051px){
+ .topbar{min-height:94px;height:auto;padding:14px 0;gap:18px}
+ .topbar .nav-links{display:flex;gap:6px!important;flex-wrap:wrap;justify-content:center;align-items:center;font-size:15px!important;font-weight:700;letter-spacing:.02em}
+ .topbar .nav-links a{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:11px 14px;border-radius:12px;border:1px solid #30465f;
+  background:#122137;color:#e5eefc;white-space:nowrap;line-height:1.35!important;
+  transition:background .2s,border-color .2s,transform .2s,color .2s;
+ }
+ .topbar .nav-links a:hover,.topbar .nav-links a:focus-visible{
+  background:#213a58;border-color:#ff8068;color:#fff;transform:translateY(-1px);
+ }
+ .topbar .nav-links a:focus-visible{outline:2px solid #ff8068;outline-offset:2px}
+ .topbar .nav-links a:first-child{border-color:#ff8068;background:#352b36;color:#ff9985}
+}
+@media(min-width:641px) and (max-width:1050px){
+ .topbar .nav-links{font-size:14px!important;gap:7px!important}
+ .topbar .nav-links a{padding:8px 10px;border-radius:9px;background:#132339;border:1px solid #30465f}
+}
