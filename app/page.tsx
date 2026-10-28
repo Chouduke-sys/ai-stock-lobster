@@ -173,7 +173,21 @@ export default function Home() {
    observer.observe(target);return()=>observer.disconnect();
   },[member?.email]);
 
-  const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean}>({});
+  const [loginProviders,setLoginProviders]=useState<{google?:boolean;apple?:boolean;"email-code"?:boolean}>({});
+  const [emailLogin,setEmailLogin]=useState("");
+  const [emailCode,setEmailCode]=useState("");
+  const [emailSent,setEmailSent]=useState(false);
+  const [emailBusy,setEmailBusy]=useState(false);
+  const [emailError,setEmailError]=useState("");
+  async function emailLoginAction(action:"send"|"verify"){
+    if(emailBusy)return;setEmailBusy(true);setEmailError("");
+    try{
+      const r=await fetch("/api/auth/email-code",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,email:emailLogin,code:emailCode})});
+      const data=await r.json();if(!r.ok)throw new Error(data.error??"驗證失敗");
+      if(action==="send"){setEmailSent(true);setEmailCode("");}
+      else{const result=await signIn("email-code",{accessToken:data.accessToken,redirect:false,callbackUrl:"/"});if(result?.error)throw new Error("登入驗證失敗");window.location.reload();}
+    }catch(e){setEmailError(e instanceof Error?e.message:"操作失敗");}finally{setEmailBusy(false);}
+  }
   const [rankSide, setRankSide] = useState<"buy" | "sell">("buy");
   const [market, setMarket] = useState("twse");
   const [investor, setInvestor] = useState("all");
@@ -208,7 +222,7 @@ useEffect(()=>{
         const [sessionResponse,providersResponse]=await Promise.all([fetch("/api/auth/session",{cache:"no-store"}),fetch("/api/auth/providers",{cache:"no-store"})]);
         const session=await sessionResponse.json();
         const providers=providersResponse.ok?await providersResponse.json():{};
-        if(active){setMember(session?.user??null);setLoginProviders({google:Boolean(providers?.google),apple:Boolean(providers?.apple)});}
+        if(active){setMember(session?.user??null);setLoginProviders({google:Boolean(providers?.google),apple:Boolean(providers?.apple),"email-code":Boolean(providers?.["email-code"])});}
       }catch{if(active)setMember(null);}
       finally{if(active)setMemberLoading(false);}
     }
@@ -622,10 +636,17 @@ useEffect(()=>{
       {showLogin && <section className="modal-card">
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
         <h2>AI股市龍蝦會員</h2>
-        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。{isAdmin&&<a href="/admin" className="btn btn-primary" style={{marginLeft:12}}>🦞 管理者後台</a>}</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Apple 帳號登入後，即可解鎖完整盤前分析。</p>
-        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>使用 Google 登入</button>}
-        {loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{void signIn("apple",{callbackUrl:"/"});}}>使用 Apple ID 登入</button>}
-        {!loginProviders.google&&!loginProviders.apple&&<p>登入服務尚未完成設定，管理員需在 Vercel 設定 Google／Apple OAuth 金鑰。</p>}</>}
+        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。{isAdmin&&<a href="/admin" className="btn btn-primary" style={{marginLeft:12}}>🦞 管理者後台</a>}</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Email 驗證碼登入，即可解鎖會員內容。</p>
+        {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{void signIn("google",{callbackUrl:"/"});}}>🔵 使用 Google 登入</button>}
+        {loginProviders["email-code"]&&<div style={{display:"grid",gap:10,marginTop:14,maxWidth:390}}>
+          <label htmlFor="lobster-email">✉️ 使用 Email 驗證碼登入</label>
+          <input id="lobster-email" type="email" autoComplete="email" placeholder="輸入電子郵件" value={emailLogin} onChange={e=>{setEmailLogin(e.target.value);setEmailSent(false);}} style={{padding:12,borderRadius:8,border:"1px solid #49617a",background:"#0d1b2c",color:"#fff",width:"100%"}}/>
+          {emailSent&&<input aria-label="Email 驗證碼" inputMode="numeric" autoComplete="one-time-code" placeholder="輸入收到的驗證碼" value={emailCode} onChange={e=>setEmailCode(e.target.value)} style={{padding:12,borderRadius:8,border:"1px solid #49617a",background:"#0d1b2c",color:"#fff",width:"100%"}}/>}
+          <button className="btn btn-secondary" disabled={emailBusy||!emailLogin} onClick={()=>void emailLoginAction(emailSent?"verify":"send")}>{emailBusy?"處理中…":emailSent?"驗證並登入":"✉️ 寄送驗證碼"}</button>
+          {emailSent&&<button className="btn btn-secondary" disabled={emailBusy} onClick={()=>void emailLoginAction("send")}>重新寄送驗證碼</button>}
+          {emailError&&<p role="alert" style={{color:"#fca5a5"}}>{emailError}</p>}
+        </div>}
+        {!loginProviders.google&&!loginProviders["email-code"]&&<p>登入服務尚未完成設定。</p>}</>}
       </section>}
 
       <section className="section morning-brief" aria-label="每日八點半台股盤前分析" style={{margin:"20px 0 26px"}}>
