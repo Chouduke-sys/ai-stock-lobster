@@ -480,3 +480,42 @@
  .site-shell[data-mobile-tab="flows"] .table-wrap td{padding:12px 9px;font-size:12px;white-space:nowrap}
  .site-shell[data-mobile-tab="flows"] > section[aria-label="當日爆量與法人買超排行榜"] .section-heading h2{font-size:21px;line-height:1.35}
 }
+
+/* Taiwan / US weekly finance calendar */
+.lobster-weekly-calendar{margin:22px 0;padding:22px;border:1px solid #245985;border-radius:20px;background:linear-gradient(145deg,#071a34,#071126);color:#edf7ff;min-width:0}
+.lobster-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.lobster-calendar-head h2{font-size:clamp(21px,2.5vw,30px);margin:0;color:#f9d65e}
+.lobster-calendar-head p{margin:6px 0;color:#9bc8e9}
+.lobster-week-nav{display:flex;align-items:center;gap:12px;font-size:13px}
+.lobster-week-nav button{background:#113c68;border:1px solid #2b79a8;border-radius:9px;color:white;padding:5px 12px;font-size:22px;cursor:pointer}
+.lobster-calendar-tabs{display:flex;gap:8px;overflow-x:auto;margin:18px 0;padding-bottom:5px}
+.lobster-calendar-tabs button{white-space:nowrap;border:1px solid #275477;border-radius:999px;padding:9px 14px;color:#c8e3f5;background:#102944;cursor:pointer}
+.lobster-calendar-tabs button.selected{background:#168be0;border-color:#58bdf9;color:white}
+.lobster-week-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.lobster-week-day{min-width:0;border:1px solid #2c608c;border-radius:12px;background:#0b2440;padding:10px}
+.lobster-week-day h3{text-align:center;margin:0 0 12px;color:#fff;font-size:20px}
+.lobster-week-day h3 small{font-size:13px;color:#9cc4e4}
+.lobster-week-event{background:#f1f7ff;color:#152e46;border-radius:10px;padding:11px;margin:9px 0;overflow-wrap:anywhere}
+.lobster-week-event.high{background:#ffe9ec;border-left:4px solid #e33f58}
+.lobster-week-meta{display:flex;align-items:center;justify-content:space-between;gap:3px;font-size:11px;margin-bottom:8px}
+.lobster-week-meta b{color:#e14a29}
+.lobster-week-event>strong{display:block;font-size:14px;line-height:1.5}
+.lobster-week-event>small{display:block;font-size:11px;color:#3e7093;margin-top:7px}
+.lobster-week-event p{font-size:11px;line-height:1.5;color:#4d6278;margin:7px 0 0}
+.lobster-week-empty{font-size:12px;color:#98b5cb}
+.lobster-week-bottom{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.lobster-week-bottom>div{border:1px solid #28597d;background:#092038;border-radius:12px;padding:16px}
+.lobster-week-bottom h3{color:#58c4ff;margin:0 0 12px}
+.lobster-week-bottom p{margin:9px 0;line-height:1.6;font-size:13px}
+.lobster-week-bottom p span{display:block;color:#9dc4df}
+.lobster-week-disclaimer{font-size:11px;color:#9bb9d0;margin:14px 0 0;line-height:1.6}
+@media(max-width:900px){.lobster-week-days{grid-template-columns:repeat(5,minmax(165px,1fr));overflow-x:auto}.lobster-weekly-calendar{overflow:hidden}}
+@media(max-width:640px){
+ .site-shell[data-mobile-tab] > .lobster-weekly-calendar{display:none!important}
+ .site-shell[data-mobile-tab="market"] > .lobster-weekly-calendar{display:block!important}
+ .lobster-weekly-calendar{margin:12px 0;padding:13px;border-radius:14px}
+ .lobster-week-days{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;padding-bottom:10px}
+ .lobster-week-day{flex:0 0 77%;scroll-snap-align:start}
+ .lobster-week-bottom{grid-template-columns:1fr}
+ .lobster-week-nav{width:100%;justify-content:space-between}
+}
