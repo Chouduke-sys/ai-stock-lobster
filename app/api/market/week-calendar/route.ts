@@ -42,7 +42,8 @@ export async function GET(){
    const date=taiwanDay(instant.toISOString());if(date<monday||date>friday)return [];
    const impact=(x.impact??"").toLowerCase();
    if(!["high","medium"].includes(impact))return [];
-   const localized=translate(x.title);if(!/[\\u3400-\\u9fff]/.test(localized))return [];
+   const translated=translate(x.title);if(!/[一-龥]/.test(translated))return [];
+   const localized=x.country==="JPY"?translated.replace(/^美國/,"日本"):x.country==="CNY"?translated.replace(/^美國/,"中國"):translated;
    return [{date,time:taiwanTime(instant.toISOString()),title:localized,level:impact as "high"|"medium",region:x.country==="USD"?"🇺🇸":x.country==="TWD"?"🇹🇼":x.country==="JPY"?"🇯🇵":"🌏",detail:[x.forecast&&"預期 "+x.forecast,x.previous&&"前值 "+x.previous].filter(Boolean).join(" · "),source:"Forex Factory 經濟行事曆"}];
   });
   const company=await companyEvents(monday,friday).catch(()=>[] as Event[]);
