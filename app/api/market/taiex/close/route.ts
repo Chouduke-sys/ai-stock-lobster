@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
+// Avoid build-time prerendering of the closing index; fetch fresh official data at request time.
+export const dynamic="force-dynamic";
 type Row={Date?:string;TAIEX?:string;Change?:string;TradeVolume?:string;TradeValue?:string;Transaction?:string};
 function dateOf(s?:string):string|null {
  if(!s)return null;
