@@ -742,3 +742,20 @@
  .topbar .nav-links{font-size:14px!important;gap:7px!important}
  .topbar .nav-links a{padding:8px 10px;border-radius:9px;background:#132339;border:1px solid #30465f}
 }
+
+/* Keep desktop navigation visible during scrolling, without changing mobile tabs. */
+@media(min-width:641px){
+ .site-shell[data-mobile-tab] > .topbar{
+   position:sticky;top:0;z-index:120;
+   background:rgba(8,15,28,.96);
+   -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+   box-shadow:0 8px 22px rgba(0,0,0,.28);
+ }
+ #desktop-news,#desktop-market,#desktop-index,#desktop-flows,
+ #desktop-sectors,#charts,#membership{
+   scroll-margin-top:120px!important;
+ }
+}
+@media(min-width:641px) and (max-width:1050px){
+ .site-shell[data-mobile-tab] > .topbar{top:0}
+}
