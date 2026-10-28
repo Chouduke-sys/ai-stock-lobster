@@ -81,12 +81,12 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const dayTicks=["09:00","10:30","12:00","13:30"];
  const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
  const valid=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{minute,value:p.value,time:p.time}];}).sort((a,b)=>a.minute-b.minute);
- // Night sessions can contain only a few hours of samples: show the observed time range,
- // not an entire 14-hour axis with most of the plot left blank.
- const rangeStart=session==="night"&&valid.length?Math.max(start,Math.floor(valid[0].minute/30)*30):start;
- const rangeEnd=session==="night"&&valid.length?Math.min(start+duration,Math.max(rangeStart+60,Math.ceil(valid[valid.length-1].minute/30)*30)):start+duration;
+ // Match the daytime index chart's fixed, chronological X-axis geometry.
+ // Night session runs 15:00–05:00 Taiwan time (crosses midnight).
+ const rangeStart=start;
+ const rangeEnd=start+duration;
  const plot=valid.map(p=>({x:(p.minute-rangeStart)/(rangeEnd-rangeStart)*100,value:p.value,time:p.time}));
- const ticks=session==="day"?dayTicks:Array.from({length:5},(_,i)=>{const minute=Math.round((rangeStart+(rangeEnd-rangeStart)*i/4)/15)*15%1440;return String(Math.floor(minute/60)).padStart(2,"0")+":"+String(minute%60).padStart(2,"0");});
+ const ticks=session==="day"?dayTicks:["15:00","18:00","21:00","00:00","03:00","05:00"];
  const values=plot.map(p=>p.value),lo=Math.min(...values),hi=Math.max(...values);
  const pad=values.length?Math.max((hi-lo)*0.10,hi*0.00015,3):100;
  const min=values.length?lo-pad:(base??0)-pad,max=values.length?hi+pad:(base??0)+pad;
