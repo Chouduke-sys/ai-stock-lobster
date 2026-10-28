@@ -191,13 +191,13 @@
   },
   {
     "date": "2026-10-28",
-    "recordedAt": "2026-10-28T08:13:15.598Z",
-    "source": "HiStock（Yahoo 成交金額與日期交叉驗證） / TWSE T86 / MI_INDEX 近週歷史",
+    "recordedAt": "2026-10-28T10:07:57.768Z",
+    "source": "Yahoo 股市（已標示交易日期） / TWSE T86 / MI_INDEX 近週歷史",
     "historicalSessions": 0,
     "groups": [
       {
         "name": "先進封裝／CoWoS",
-        "turnover": 79096100000,
+        "turnover": 78773640000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -211,7 +211,7 @@
       },
       {
         "name": "CCL／銅箔基板",
-        "turnover": 74674500000,
+        "turnover": 73443320000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -225,7 +225,7 @@
       },
       {
         "name": "ABF／IC 載板",
-        "turnover": 58213800000,
+        "turnover": 56941470000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -239,7 +239,7 @@
       },
       {
         "name": "記憶體／DRAM／NAND",
-        "turnover": 53588900000,
+        "turnover": 52557340000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -253,7 +253,7 @@
       },
       {
         "name": "AI 伺服器／組裝",
-        "turnover": 28825800000,
+        "turnover": 27348340000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -263,11 +263,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 5
+        "stockCount": 4
       },
       {
         "name": "散熱／液冷",
-        "turnover": 24920000000,
+        "turnover": 24667990000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -277,11 +277,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 3
       },
       {
         "name": "PCB／高階電路板",
-        "turnover": 24024400000,
+        "turnover": 21749240000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -291,11 +291,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 5
+        "stockCount": 3
       },
       {
         "name": "PCB 上游銅箔／玻纖",
-        "turnover": 20325500000,
+        "turnover": 18757920000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -305,11 +305,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 2
       },
       {
         "name": "AI 電源／BBU",
-        "turnover": 14147000000,
+        "turnover": 13915140000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -319,11 +319,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 2
       },
       {
         "name": "高速網通／CPO",
-        "turnover": 10170100000,
+        "turnover": 9210620000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -333,11 +333,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 3
       },
       {
         "name": "金融",
-        "turnover": 7884800000,
+        "turnover": 5689190000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -347,25 +347,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 5
-      },
-      {
-        "name": "航運",
-        "turnover": 3108700000,
-        "weeklyDelta": null,
-        "weeklyChange": null,
-        "turnoverShare": null,
-        "shareDelta": null,
-        "medianPriceMove": null,
-        "risingSessions": null,
-        "radarStatus": "insufficient",
-        "historyDays": 0,
-        "historyDate": null,
-        "stockCount": 4
+        "stockCount": 3
       },
       {
         "name": "先進封裝設備",
-        "turnover": 2969100000,
+        "turnover": 2029750000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -375,11 +361,11 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 1
       },
       {
-        "name": "重電／電網",
-        "turnover": 1203500000,
+        "name": "航運",
+        "turnover": 1573590000,
         "weeklyDelta": null,
         "weeklyChange": null,
         "turnoverShare": null,
@@ -389,7 +375,7 @@
         "radarStatus": "insufficient",
         "historyDays": 0,
         "historyDate": null,
-        "stockCount": 4
+        "stockCount": 1
       }
     ]
   }
