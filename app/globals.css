@@ -773,3 +773,13 @@
   line-height:1.35!important;
  }
 }
+
+/* Two news tabs use a fixed two-column JSX grid; labels adapt by viewport. */
+.news-important-mobile-label{display:none}
+.news-important-desktop-label{display:inline}
+@media(max-width:640px){
+ .news-tab-buttons{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;width:100%!important}
+ .news-tab-buttons > button{display:flex!important;min-width:0!important;width:100%!important;max-width:100%!important;padding:10px 4px!important;font-size:12px!important;justify-content:center;align-items:center;text-align:center}
+ .news-important-mobile-label{display:inline!important}
+ .news-important-desktop-label{display:none!important}
+}
