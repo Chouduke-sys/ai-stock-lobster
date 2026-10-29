@@ -2,7 +2,14 @@ import {NextResponse} from "next/server";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 type Quote={label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string;trend5d:number[];trendDates:string[]};
-type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;chartPreviousClose?:number;previousClose?:number;regularMarketTime?:number};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
+type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;regularMarketTime?:number;exchangeTimezoneName?:string};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
+// Yahoo chartPreviousClose can refer to the start of the requested range rather than
+// the previous trading session. Use dated daily closes instead for daily % moves.
+function exchangeDate(timestamp:number,timeZone:string):string{
+ try{
+  return new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(timestamp*1000));
+ }catch{return new Date(timestamp*1000).toISOString().slice(0,10);}
+}
 async function getQuote(label:string,symbol:string):Promise<Quote>{
  const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
@@ -14,9 +21,20 @@ async function getQuote(label:string,symbol:string):Promise<Quote>{
   const meta=result?.meta;
   const closes=result?.indicators?.quote?.[0]?.close??[];
   const timestamps=result?.timestamp??[];
-  const history=closes.flatMap((close,i)=>typeof close==="number"&&Number.isFinite(close)&&close>0&&typeof timestamps[i]==="number"?[{value:close,date:new Date(timestamps[i]*1000).toISOString().slice(0,10)}]:[]).slice(-5);
-  const value=meta?.regularMarketPrice,prev=meta?.chartPreviousClose??meta?.previousClose;
-  return {...empty,value:typeof value==="number"?value:null,changePct:typeof value==="number"&&typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:history.map(p=>p.value),trendDates:history.map(p=>p.date)};
+  const timeZone=meta?.exchangeTimezoneName||"UTC";
+  const history=closes.flatMap((close,i)=>typeof close==="number"&&Number.isFinite(close)&&close>0&&typeof timestamps[i]==="number"?[{value:close,date:exchangeDate(timestamps[i],timeZone)}]:[]).slice(-5);
+  const value=meta?.regularMarketPrice;
+  const quoteDate=typeof meta?.regularMarketTime==="number"?exchangeDate(meta.regularMarketTime,timeZone):null;
+  const latest=history.at(-1);
+  // If the chart includes the quote's trading session, compare with the prior
+  // session; if the chart stops before it, the last close is the prior session.
+  // Missing/misaligned sessions produce null, never a fabricated percentage.
+  const gapDays=latest&&quoteDate?(Date.parse(quoteDate+"T00:00:00Z")-Date.parse(latest.date+"T00:00:00Z"))/86400000:null;
+  const previousClose=latest&&quoteDate&&latest.date===quoteDate?history.at(-2)?.value:
+    latest&&gapDays!==null&&gapDays>0&&gapDays<=4?latest.value:null;
+  const changePct=typeof value==="number"&&Number.isFinite(value)&&value>0&&
+    typeof previousClose==="number"&&previousClose>0?(value/previousClose-1)*100:null;
+  return {...empty,value:typeof value==="number"?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:history.map(p=>p.value),trendDates:history.map(p=>p.date)};
  }catch{return empty;}
 }
 export async function GET(){
