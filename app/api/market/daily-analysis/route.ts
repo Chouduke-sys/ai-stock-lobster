@@ -34,7 +34,15 @@ async function getQuote(label:string,symbol:string):Promise<Quote>{
     latest&&gapDays!==null&&gapDays>0&&gapDays<=4?latest.value:null;
   const changePct=typeof value==="number"&&Number.isFinite(value)&&value>0&&
     typeof previousClose==="number"&&previousClose>0?(value/previousClose-1)*100:null;
-  return {...empty,value:typeof value==="number"?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:history.map(p=>p.value),trendDates:history.map(p=>p.date)};
+  // Yahoo may publish the latest regular-market quote before its daily chart
+  // includes that session (observed for Nikkei/KOSPI). Include the same-symbol,
+  // exchange-dated quote as a provisional last trend point, never as a fabricated
+  // historical close. Keep the change calculation anchored to the real prior close.
+  const quoteIsValid=typeof value==="number"&&Number.isFinite(value)&&value>0;
+  const trend=quoteIsValid&&quoteDate&&latest&&gapDays!==null&&gapDays>0&&gapDays<=4
+    ?[...history,{date:quoteDate,value}].slice(-5)
+    :history;
+  return {...empty,value:quoteIsValid?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:trend.map(p=>p.value),trendDates:trend.map(p=>p.date)};
  }catch{return empty;}
 }
 export async function GET(){
