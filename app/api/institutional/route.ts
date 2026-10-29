@@ -27,9 +27,23 @@ function previousWeekdayDate():string{
  do{d.setUTCDate(d.getUTCDate()-1);}while(d.getUTCDay()===0||d.getUTCDay()===6);
  return d.toISOString().slice(0,10);
 }
-async function fetchTwse():Promise<MarketData|null>{
+// Anchor T86 to the latest VERIFIED TWSE closing session, not the calendar date.
+// A previous-day T86 must never be silently returned after today's close is published.
+async function confirmedCloseDate():Promise<string|null>{
+ const month=today().slice(0,7).replace("-","")+"01";
+ try{
+  const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:180},signal:AbortSignal.timeout(3500)});
+  if(!response.ok)return null;
+  const body=await response.json() as {stat?:string;fields?:string[];data?:string[][]};
+  if(body.stat!=="OK"||!Array.isArray(body.fields)||!Array.isArray(body.data))return null;
+  const di=body.fields.findIndex(x=>x.includes("日期"));
+  if(di<0)return null;
+  const dates=body.data.map(row=>parseDate(row[di])).filter((d):d is string=>!!d&&d<=today()).sort();
+  return dates.at(-1)??null;
+ }catch{return null;}
+}
+async function fetchTwse(minDate:string):Promise<MarketData|null>{
  const start=new Date(today()+"T12:00:00+08:00");
- const minDate=previousWeekdayDate();
  for(let i=0;i<8;i++){
   const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
   // Never fall back behind the most recent expected weekday session.
@@ -49,7 +63,18 @@ async function fetchTwse():Promise<MarketData|null>{
      return response.ok?await response.json() as unknown:null;
     }catch{return null;}
    }));
-   const body=candidates.find(v=>v&&typeof v==="object"&&!Array.isArray(v)&&(v as Obj).stat==="OK");
+   let body=candidates.find(v=>v&&typeof v==="object"&&!Array.isArray(v)&&(v as Obj).stat==="OK");
+   // Retry the confirmed trading session without cache when official hosts
+   // intermittently fail; do not substitute an older trading day's ranking.
+   if(!body&&d===minDate){
+    const retry=await Promise.all(urls.map(async endpoint=>{
+     try{
+      const response=await fetch(endpoint,{cache:"no-store",signal:AbortSignal.timeout(3500)});
+      return response.ok?await response.json() as unknown:null;
+     }catch{return null;}
+    }));
+    body=retry.find(v=>v&&typeof v==="object"&&!Array.isArray(v)&&(v as Obj).stat==="OK");
+   }
    if(!body||typeof body!=="object"||Array.isArray(body))continue;
    const r=body as Obj;
    if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))continue;
@@ -80,9 +105,9 @@ let lastGoodTwseAt=0;
 let pendingTwse:Promise<MarketData|null>|null=null;
 async function twse():Promise<MarketData|null>{
  const now=Date.now();
- const minDate=previousWeekdayDate();
+ const minDate=await confirmedCloseDate()??previousWeekdayDate();
  if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<120000)return lastGoodTwse;
- if(!pendingTwse)pendingTwse=fetchTwse().finally(()=>{pendingTwse=null;});
+ if(!pendingTwse)pendingTwse=fetchTwse(minDate).finally(()=>{pendingTwse=null;});
  const fresh=await pendingTwse;
  if(fresh){lastGoodTwse=fresh;lastGoodTwseAt=Date.now();return fresh;}
  if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<900000)return lastGoodTwse;
