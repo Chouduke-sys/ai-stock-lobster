@@ -92,7 +92,7 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const start=session==="day"?540:900,duration=session==="day"?270:840;
  const dayTicks=["09:00","10:30","12:00","13:30"];
  const minuteOf=(time:string)=>{const m=time.match(/(\d{2}):(\d{2})$/);if(!m)return null;let n=Number(m[1])*60+Number(m[2]);if(session==="night"&&n<900)n+=1440;return n;};
- const valid=points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[{minute,value:p.value,time:p.time}];}).sort((a,b)=>a.minute-b.minute);
+ const valid=Array.from(new Map(points.flatMap(p=>{const minute=minuteOf(p.time);return minute===null||minute<start||minute>start+duration||!Number.isFinite(p.value)?[]:[[minute,{minute,value:p.value,time:p.time}] as const];})).values()).sort((a,b)=>a.minute-b.minute);
  // Match the daytime index chart's fixed, chronological X-axis geometry.
  // Night session runs 15:00–05:00 Taiwan time (crosses midnight).
  const rangeStart=start;
@@ -130,7 +130,7 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
     {session==="night"?nightLines.map((group,i)=><polyline key={i} points={group.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ")} fill="none" stroke="#fb725b" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>):plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={y(plot[0].value)} r="1.4" fill="#fb725b"/>:null}
     {session==="night"&&nightSparse?plot.map((p,i)=><circle key={i} cx={p.x} cy={y(p.value)} r=".8" fill="#fb725b"/>):null}
     {last&&plot.length>1&&!nightSparse?<circle cx={last.x} cy={y(last.value)} r="1.1" fill="#fb725b" stroke="#fff" strokeWidth=".25"/>:null}
-   </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}{nightSparse&&plot.length>0&&<span className="axis-waiting" style={{top:8,bottom:"auto",fontSize:11}}>夜盤分鐘資料不足，僅顯示已取得報價點</span>}</div>
+   </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}{nightSparse&&plot.length>0&&<span className="axis-waiting" style={{top:8,bottom:"auto",fontSize:11}}>夜盤歷史分鐘資料不足；已排除同分鐘重複報價，無法繪製完整走勢</span>}</div>
    <div className="index-points-y">{labels.map((v,i)=><span key={i}>{precise(v)}</span>)}</div>
   </div>
   <p className="footnote" style={{margin:"5px 0 0"}}>{last?"最後取樣 "+last.time.replace("T"," ")+" · "+precise(last.value)+" 點":"等待有效行情"} · 縱軸保留小數兩位，僅顯示來源實際提供的精度</p>
