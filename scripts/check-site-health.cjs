@@ -3,7 +3,9 @@ const BASE=(process.env.SITE_URL||"https://ai-stock-lobster.vercel.app").replace
 const cases=[
  ["首頁","/", "html"],
  ["成交金額 Top10／產業資金熱度","/api/market/ai-flow","flow"],
- ["法人籌碼","/api/institutional?market=twse&investor=all&side=buy","institutional"],
+ ["上市法人籌碼","/api/institutional?market=twse&investor=all&side=buy","institutional"],
+ ["上櫃法人籌碼","/api/institutional?market=tpex&investor=all&side=buy","institutional"],
+ ["上市上櫃法人合併","/api/institutional?market=all&investor=all&side=buy","institutional"],
  ["加權指數盤中","/api/market/taiex","index"],
  ["加權指數收盤","/api/market/taiex/close","close"],
  ["台指期夜盤","/api/market/taiex/night","night"],
@@ -28,8 +30,15 @@ async function check([name,path,kind]){
  try{
   const started=Date.now();
   response=await fetch(BASE+path,{signal:AbortSignal.timeout(19000),headers:{Accept:"application/json,text/html"}});
+  let raw=await response.text();
+  // Official institutional feeds sometimes return a transient 503; retry once
+  // before reporting a persistent failure, without changing or inventing data.
+  if(kind==="institutional"&&response.status===503){
+   await new Promise(resolve=>setTimeout(resolve,400));
+   response=await fetch(BASE+path,{signal:AbortSignal.timeout(19000),headers:{Accept:"application/json,text/html"}});
+   raw=await response.text();
+  }
   elapsed=Date.now()-started;
-  const raw=await response.text();
   try{body=JSON.parse(raw);}catch{body={raw:raw.slice(0,400)};}
   const status=response.status;
   const summary={name,path,http:status,latencyMs:elapsed,status:body?.status??null,date:body?.asOf??body?.dataDate??body?.date??null};
@@ -108,7 +117,8 @@ async function probeProviders(){
  // Cross-check data dates against the confirmed TWSE close date, not the calendar
  // date: this avoids false alarms on holidays while detecting transient T86 regressions.
  const closeResult=results.find(x=>x.path==="/api/market/taiex/close");
- const institutionalResult=results.find(x=>x.path.startsWith("/api/institutional?"));
+ const institutionalResults=results.filter(x=>x.path.startsWith("/api/institutional?"));
+ for(const institutionalResult of institutionalResults){
  if(closeResult?.http===200&&institutionalResult?.http===200&&
     validDate(closeResult.date)&&validDate(institutionalResult.date)&&
     institutionalResult.date<closeResult.date){
@@ -119,9 +129,10 @@ async function probeProviders(){
   const priorWeekday=prior.toISOString().slice(0,10);
   const oldRegression=institutionalResult.date<priorWeekday;
   const grace=closeResult.date===today&&minute<18*60;
-  if(oldRegression||!grace)issue("法人籌碼",oldRegression||!grace?"error":"warning",
+  if(oldRegression||!grace)issue(institutionalResult.name,oldRegression||!grace?"error":"warning",
    "資料日 "+institutionalResult.date+" 落後加權收盤日 "+closeResult.date+
-   (oldRegression?"（超過前一平日，疑似日期回退）":"（當日 T86 尚未更新）"));
+   (oldRegression?"（超過前一平日，疑似日期回退）":"（當日法人資料尚未更新）"));
+ }
  }
  console.log(JSON.stringify({checkedAt:new Date().toISOString(),taipeiDate:today,results,providerResults,failures:fail,warnings:warn},null,2));
  if(fail.length){console.error("FAIL: "+fail.length+" critical health checks");process.exitCode=1;}
