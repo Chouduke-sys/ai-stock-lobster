@@ -37,7 +37,7 @@ async function check([name,path,kind]){
   if(kind==="html"){if(!response.ok||!raw.toLowerCase().includes("<html")||raw.length<500)issue(name,"error","首頁無法正常顯示");return;}
   if(kind==="auth"){if(status===401){issue(name,"warning","需要登入，無法驗證會員內文");return;}if(!response.ok||body?.status!=="ok")issue(name,"error","HTTP "+status+"／"+body?.status);return;}
   if(kind==="index"){if(status===409&&!(["Mon","Tue","Wed","Thu","Fri"].includes(day)&&minute>=540&&minute<=810))return;if(!response.ok||body?.status!=="ok")issue(name,"warning","非正常回應 HTTP "+status);return;}
-  if(kind==="night"){if(status===409&&!nightOpen)return;if(nightOpen&&(!response.ok||body?.status!=="ok"))issue(name,"error","夜盤時段無有效報價 HTTP "+status+" "+(body?.status||""));return;}
+  if(kind==="night"){summary.source=body?.dataSource??null;summary.quoteTime=body?.quoteTime??null;summary.delaySeconds=body?.delaySeconds??null;if(status===409&&!nightOpen)return;if(nightOpen&&(!response.ok||body?.status!=="ok"))issue(name,"error","夜盤時段無有效報價 HTTP "+status+" "+(body?.status||""));return;}
   if(kind==="sources"&&response.ok&&body?.status==="degraded"){issue(name,"warning","部分上游來源異常");return;}
   if(!response.ok||body?.status!=="ok"){issue(name,"error","HTTP "+status+" "+(body?.status||""));return;}
   if(kind==="flow"){
@@ -51,14 +51,20 @@ async function check([name,path,kind]){
    summary.groups=body.groups?.length;
   }
   if(kind==="institutional"){
+   summary.rows=body.rows?.length??0;
+   summary.source=body.dataSource??null;
    if(!Array.isArray(body.rows)||body.rows.length<3)issue(name,"error","法人資料不足");
    if(!validDate(body.dataDate)||stale(body.dataDate))issue(name,"warning","法人資料日期異常 "+body.dataDate);
   }
   if(kind==="close"&&(!validDate(body.date)||stale(body.date)))issue(name,"warning","收盤資料日期過舊 "+body.date);
+  if(kind==="global"){summary.quotes=body.quotes?.length??0;summary.source=body.source??null;}
   if(kind==="global"&&(!Array.isArray(body.quotes)||body.quotes.filter(x=>typeof x.value==="number").length<3))issue(name,"error","全球市場有效報價不足3筆");
+  if(kind==="news")summary.news=body.news?.length??0;
   if(kind==="news"&&(!Array.isArray(body.news)||body.news.length<5))issue(name,"error","富途新聞不足5筆");
+  if(kind==="vix"){summary.source=body.source??null;summary.quoteTime=body.quoteTime??null;}
   if(kind==="vix"&&!(typeof body.value==="number"&&body.value>0))issue(name,"error","VIX 無有效數值");
   if(kind==="leaderNews"){
+   summary.items=body.items?.length??0;
    if(!Array.isArray(body.items)||body.items.length===0)issue(name,"warning","個股新聞暫無最近72小時的有效文章");
    else if(body.items.some(x=>!x.publishedAt||!Number.isFinite(Date.parse(x.publishedAt))||Date.now()-Date.parse(x.publishedAt)>72*3600000))issue(name,"warning","個股新聞含超過72小時或未標日期的文章");
   }
@@ -113,7 +119,7 @@ async function probeProviders(){
   const priorWeekday=prior.toISOString().slice(0,10);
   const oldRegression=institutionalResult.date<priorWeekday;
   const grace=closeResult.date===today&&minute<18*60;
-  if(oldRegression||!grace)issue("法人籌碼","warning",
+  if(oldRegression||!grace)issue("法人籌碼",oldRegression||!grace?"error":"warning",
    "資料日 "+institutionalResult.date+" 落後加權收盤日 "+closeResult.date+
    (oldRegression?"（超過前一平日，疑似日期回退）":"（當日 T86 尚未更新）"));
  }
