@@ -38,6 +38,13 @@
         "sentiment": "bearish"
       }
     ],
-    "outcome": null
+    "outcome": {
+      "indexClose": 46368.33,
+      "changePct": -1.4186069354305826,
+      "actual": "bearish",
+      "correct": false,
+      "verifiedAt": "2026-10-29T09:15:03.154Z",
+      "source": "TWSE FMTQIK"
+    }
   }
 ]
