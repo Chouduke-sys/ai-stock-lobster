@@ -31,6 +31,19 @@ async function yahooToday(){
  }
  return null;
 }
+// An absent intraday quote outside cash-market hours is expected, not an upstream outage.
+function missingIntradayQuote(message: string) {
+  const now = new Date();
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Taipei", weekday: "short" }).format(now);
+  const hourMinute = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
+  const [hour, minute] = hourMinute.split(":").map(Number);
+  const tradingHours = ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(weekday) && hour * 60 + minute >= 540 && hour * 60 + minute <= 810;
+  return NextResponse.json(
+    { status: tradingHours ? "unavailable" : "not_available_today", error: message, isRealtime: false },
+    { status: tradingHours ? 503 : 409, headers: { "Cache-Control": "no-store" } }
+  );
+}
+
 export async function GET() {
   try {
     const response = await fetch("https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0", {
@@ -39,11 +52,11 @@ export async function GET() {
     if (!response.ok) {const fallback=await yahooToday();if(fallback)return fallback;throw new Error("Source unavailable");}
     const result = await response.json() as MisResponse;
     const row = result.msgArray?.find(r => r.c === "t00");
-    if (!row) return await yahooToday()??NextResponse.json({ error: "加權指數盤中資料尚未提供" }, { status: 503 });
+    if (!row) return await yahooToday()??missingIntradayQuote("加權指數盤中資料尚未提供");
     const date = row.d && /^\d{8}$/.test(row.d) ? `${row.d.slice(0,4)}-${row.d.slice(4,6)}-${row.d.slice(6,8)}` : null;
     if (date !== today()) return await yahooToday()??NextResponse.json({ status: "not_available_today", error: "尚無今天的加權指數盤中資料（或今日休市）", dataDate: date }, { status: 409 });
     const value = num(row.z), reference = num(row.y);
-    if (value === null) return await yahooToday()??NextResponse.json({ error: "加權指數尚未有今日成交值" }, { status: 503 });
+    if (value === null) return await yahooToday()??missingIntradayQuote("加權指數尚未有今日成交值");
     const change = reference === null ? null : Math.round((value - reference) * 100) / 100;
     const changePercent = reference && change !== null ? Math.round(change / reference * 10000) / 100 : null;
     const quoteTime = row.t && /^\d{2}:\d{2}:\d{2}$/.test(row.t) ? `${date}T${row.t}+08:00` : null;
