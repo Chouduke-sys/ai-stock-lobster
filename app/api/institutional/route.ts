@@ -22,10 +22,19 @@ function today(){
  const get=(t:string)=>p.find(x=>x.type===t)?.value??"";
  return get("year")+"-"+get("month")+"-"+get("day");
 }
-async function twse():Promise<MarketData|null>{
+function previousWeekdayDate():string{
+ const d=new Date(today()+"T00:00:00Z");
+ do{d.setUTCDate(d.getUTCDate()-1);}while(d.getUTCDay()===0||d.getUTCDay()===6);
+ return d.toISOString().slice(0,10);
+}
+async function fetchTwse():Promise<MarketData|null>{
  const start=new Date(today()+"T12:00:00+08:00");
+ const minDate=previousWeekdayDate();
  for(let i=0;i<8;i++){
   const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
+  // Never fall back behind the most recent expected weekday session.
+  // On an exchange holiday, a temporary 503 is safer than a stale ranking.
+  if(d<minDate)break;
   const url="https://www.twse.com.tw/rwd/zh/fund/T86?date="+d.replace(/-/g,"")+"&selectType=ALL&response=json";
   try{
    // T86 for recent sessions can intermittently fail or lag on one host.
@@ -60,6 +69,21 @@ async function twse():Promise<MarketData|null>{
    if(rows.length&&date===d)return {date,rows,source:"TWSE T86"};
   }catch{continue;}
  }
+ return null;
+}
+// Reuse the last verified dataset briefly on warm instances when TWSE is
+// intermittently unreachable. Never reuse data from before the prior weekday.
+let lastGoodTwse:MarketData|null=null;
+let lastGoodTwseAt=0;
+let pendingTwse:Promise<MarketData|null>|null=null;
+async function twse():Promise<MarketData|null>{
+ const now=Date.now();
+ const minDate=previousWeekdayDate();
+ if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<120000)return lastGoodTwse;
+ if(!pendingTwse)pendingTwse=fetchTwse().finally(()=>{pendingTwse=null;});
+ const fresh=await pendingTwse;
+ if(fresh){lastGoodTwse=fresh;lastGoodTwseAt=Date.now();return fresh;}
+ if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<900000)return lastGoodTwse;
  return null;
 }
 async function tpex():Promise<MarketData|null>{
