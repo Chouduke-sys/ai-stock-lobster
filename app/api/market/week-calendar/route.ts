@@ -67,8 +67,8 @@ export async function GET(){
   if(!Array.isArray(raw))throw Error("行事曆格式異常");
   const macroEvents:Event[]=raw.flatMap(x=>{
    if(!x.title||!x.date||!["USD","TWD","CNY","JPY"].includes(x.country??""))return [];
-   // Japan: show CPI releases only; exclude BOJ decisions, statements, outlooks and press conferences.
-   if(x.country==="JPY"&&!/\bCPI\b|Consumer Price Index/i.test(x.title))return [];
+   // Japan: show CPI and BOJ rate decisions only; exclude statements, outlooks and press conferences.
+   if(x.country==="JPY"&&!/\bCPI\b|Consumer Price Index|BOJ Policy Rate|Bank of Japan.*(?:Rate Decision|Interest Rate)/i.test(x.title))return [];
    const instant=new Date(x.date);if(!Number.isFinite(instant.getTime()))return [];
    const date=taiwanDay(instant.toISOString());if(date<monday||date>friday)return [];
    const impact=(x.impact??"").toLowerCase();
