@@ -28,8 +28,10 @@ async function twse():Promise<MarketData|null>{
   const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
   const url="https://www.twse.com.tw/rwd/zh/fund/T86?date="+d.replace(/-/g,"")+"&selectType=ALL&response=json";
   try{
-   // Today's T86 may intermittently fail or be cached as unavailable. Probe both public hosts.
-   const urls=i===0?[url,url.replace("www.twse.com.tw","wwwc.twse.com.tw")]:[url];
+   // T86 for recent sessions can intermittently fail or lag on one host.
+   // Probe both official hosts for the latest three candidate dates, and accept
+   // a response only when its verified trading date matches the requested date.
+   const urls=i<3?[url,url.replace("www.twse.com.tw","wwwc.twse.com.tw")]:[url];
    const candidates=await Promise.all(urls.map(async endpoint=>{
     try{
      const response=await fetch(endpoint,{cache:"no-store",signal:AbortSignal.timeout(4500)});
