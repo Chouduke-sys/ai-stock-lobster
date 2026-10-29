@@ -58,6 +58,9 @@ async function check([name,path,kind]){
    summary.source=body.source;
    summary.leaders=body.volumeLeaders?.length;
    summary.groups=body.groups?.length;
+   summary.historySessions=body.historicalSessions??null;
+   summary.historyStatus=body.historyStatus??null;
+   summary.coverage=body.coverage??null;
   }
   if(kind==="institutional"){
    summary.rows=body.rows?.length??0;
@@ -66,7 +69,23 @@ async function check([name,path,kind]){
    if(!validDate(body.dataDate)||stale(body.dataDate))issue(name,"warning","法人資料日期異常 "+body.dataDate);
   }
   if(kind==="close"&&(!validDate(body.date)||stale(body.date)))issue(name,"warning","收盤資料日期過舊 "+body.date);
-  if(kind==="global"){summary.quotes=body.quotes?.length??0;summary.source=body.source??null;}
+  if(kind==="global"){
+   summary.quotes=body.quotes?.length??0;summary.source=body.source??null;
+   // A daily change must agree with the previous dated close when the
+   // current quote and last trend point share the same UTC trading date.
+   // Skip unmatched sessions rather than infer dates across exchanges.
+   const misaligned=(body.quotes??[]).filter(q=>{
+    if(!Array.isArray(q.trend5d)||q.trend5d.length<2||
+       !Array.isArray(q.trendDates)||!q.time||
+       q.trendDates.at(-1)!==String(q.time).slice(0,10)||
+       typeof q.value!=="number"||typeof q.changePct!=="number")return false;
+    const prior=q.trend5d.at(-2);
+    return typeof prior==="number"&&prior>0&&
+      Math.abs((q.value/prior-1)*100-q.changePct)>0.35;
+   }).map(q=>q.symbol);
+   summary.misalignedQuotes=misaligned;
+   if(misaligned.length)issue(name,"error","日漲跌幅與前一交易日收盤價不一致："+misaligned.join(", "));
+  }
   if(kind==="global"&&(!Array.isArray(body.quotes)||body.quotes.filter(x=>typeof x.value==="number").length<3))issue(name,"error","全球市場有效報價不足3筆");
   if(kind==="news")summary.news=body.news?.length??0;
   if(kind==="news"&&(!Array.isArray(body.news)||body.news.length<5))issue(name,"error","富途新聞不足5筆");
