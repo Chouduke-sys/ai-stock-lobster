@@ -104,6 +104,19 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
  const min=values.length?lo-pad:(base??0)-pad,max=values.length?hi+pad:(base??0)+pad;
  const y=(v:number)=>(max-v)/(max-min)*100;
  const poly=plot.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ");
+ // Never draw a continuous night-session line across missing minute data.
+ // A handful of quotes spanning hours must not look like a real intraday trend.
+ const nightSegments:{x:number;value:number;minute:number}[][]=[];
+ if(session==="night"){
+  for(const p of valid){
+   const previous=nightSegments[nightSegments.length-1];
+   if(!previous||p.minute-previous[previous.length-1].minute>10)nightSegments.push([]);
+   nightSegments[nightSegments.length-1].push({x:(p.minute-rangeStart)/(rangeEnd-rangeStart)*100,value:p.value,minute:p.minute});
+  }
+ }
+ const nightLines=nightSegments.filter(group=>group.length>=2);
+ const nightLineCount=nightLines.reduce((sum,group)=>sum+group.length,0);
+ const nightSparse=session==="night"&&(valid.length<6||nightLineCount<6);
  const labels=Array.from({length:5},(_,i)=>max-(max-min)*i/4);
  const precise=(v:number)=>v.toLocaleString("zh-TW",{minimumFractionDigits:2,maximumFractionDigits:2});
  const last=plot.length?plot[plot.length-1]:null;
@@ -114,9 +127,10 @@ function HourChart({points,base,session="day"}:{points:Point[];base:number|null;
     {labels.map((_,i)=><line key={i} x1="0" x2="100" y1={i*25} y2={i*25} stroke="#34455b" strokeDasharray="1 3" strokeWidth=".35" vectorEffect="non-scaling-stroke"/>)}
     {base!=null&&base>=min&&base<=max?<line x1="0" x2="100" y1={y(base)} y2={y(base)} stroke="#d9ad55" strokeDasharray="2 2" strokeWidth=".5" vectorEffect="non-scaling-stroke"/>:null}
     {last&&plot.length>1?<line x1="0" x2="100" y1={y(last.value)} y2={y(last.value)} stroke="#7fa5c6" strokeDasharray="1 2" strokeWidth=".3" vectorEffect="non-scaling-stroke"/>:null}
-    {plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={y(plot[0].value)} r="1.4" fill="#fb725b"/>:null}
-    {last&&plot.length>1?<circle cx={last.x} cy={y(last.value)} r="1.1" fill="#fb725b" stroke="#fff" strokeWidth=".25"/>:null}
-   </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}</div>
+    {session==="night"?nightLines.map((group,i)=><polyline key={i} points={group.map(p=>p.x.toFixed(2)+","+y(p.value).toFixed(2)).join(" ")} fill="none" stroke="#fb725b" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>):plot.length>1?<polyline points={poly} fill="none" stroke="#fb725b" strokeWidth="1.8" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>:plot.length===1?<circle cx={plot[0].x} cy={y(plot[0].value)} r="1.4" fill="#fb725b"/>:null}
+    {session==="night"&&nightSparse?plot.map((p,i)=><circle key={i} cx={p.x} cy={y(p.value)} r=".8" fill="#fb725b"/>):null}
+    {last&&plot.length>1&&!nightSparse?<circle cx={last.x} cy={y(last.value)} r="1.1" fill="#fb725b" stroke="#fff" strokeWidth=".25"/>:null}
+   </svg>{!plot.length&&<span className="axis-waiting">尚無有效走勢資料</span>}{nightSparse&&plot.length>0&&<span className="axis-waiting" style={{top:8,bottom:"auto",fontSize:11}}>夜盤分鐘資料不足，僅顯示已取得報價點</span>}</div>
    <div className="index-points-y">{labels.map((v,i)=><span key={i}>{precise(v)}</span>)}</div>
   </div>
   <p className="footnote" style={{margin:"5px 0 0"}}>{last?"最後取樣 "+last.time.replace("T"," ")+" · "+precise(last.value)+" 點":"等待有效行情"} · 縱軸保留小數兩位，僅顯示來源實際提供的精度</p>
