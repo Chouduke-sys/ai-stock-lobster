@@ -1,1 +1,43 @@
-[]
+[
+  {
+    "date": "2026-10-29",
+    "createdAt": "2026-10-29T01:37:38.514Z",
+    "prediction": "neutral",
+    "predictionLabel": "加權中性",
+    "signals": [
+      {
+        "title": "美股與期貨",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "外資與投信",
+        "sentiment": "bullish"
+      },
+      {
+        "title": "融資融券",
+        "sentiment": "bullish"
+      },
+      {
+        "title": "期貨與選擇權",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "匯率與利率",
+        "sentiment": "bullish"
+      },
+      {
+        "title": "VIX 市場情緒",
+        "sentiment": "bullish"
+      },
+      {
+        "title": "技術面與量能",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "重大政策與科技",
+        "sentiment": "bearish"
+      }
+    ],
+    "outcome": null
+  }
+]
