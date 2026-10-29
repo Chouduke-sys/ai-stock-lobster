@@ -40,6 +40,24 @@ async function companyEvents(monday:string,friday:string):Promise<Event[]>{
  }
  return events;
 }
+
+// US mega-cap earnings: company-announced dates only, converted to Taiwan time.
+// The watchlist includes the major US market-cap leaders; unconfirmed dates are omitted.
+const usMegaCapWatchlist=["NVDA","AAPL","MSFT","GOOGL","AMZN","META","AVGO","TSLA","BRK.B","WMT"];
+const confirmedUsEarnings:{symbol:string;name:string;instant:string;source:string}[]=[
+ {symbol:"GOOGL",name:"Alphabet／Google",instant:"2026-10-28T16:30:00-04:00",source:"https://abc.xyz/investor/"},
+ {symbol:"MSFT",name:"Microsoft 微軟",instant:"2026-10-28T17:30:00-04:00",source:"https://www.microsoft.com/en-us/Investor"},
+ {symbol:"AMZN",name:"Amazon 亞馬遜",instant:"2026-10-29T17:00:00-04:00",source:"https://ir.aboutamazon.com/"},
+ {symbol:"AAPL",name:"Apple 蘋果",instant:"2026-11-02T17:00:00-05:00",source:"https://investor.apple.com/"}
+];
+function usEarningsEvents(monday:string,friday:string):Event[]{
+ return confirmedUsEarnings.flatMap(e=>{
+  if(!usMegaCapWatchlist.includes(e.symbol))return [];
+  const instant=new Date(e.instant);const date=taiwanDay(instant.toISOString());
+  if(date<monday||date>friday)return [];
+  return [{date,time:taiwanTime(instant.toISOString()),title:e.name+" 財報／法說會",level:"high" as const,region:"🇺🇸",detail:e.symbol+" · 美國公布時間換算為台灣時間 · 公司已公告",source:e.source}];
+ });
+}
 export async function GET(){
  const {monday,friday}=weekBounds();
  try{
@@ -58,7 +76,7 @@ export async function GET(){
    return [{date,time:taiwanTime(instant.toISOString()),title:localized,level:impact as "high"|"medium",region:x.country==="USD"?"🇺🇸":x.country==="TWD"?"🇹🇼":x.country==="JPY"?"🇯🇵":"🌏",detail:[x.forecast&&"預期 "+x.forecast,x.previous&&"前值 "+x.previous].filter(Boolean).join(" · "),source:"Forex Factory 經濟行事曆"}];
   });
   const company=await companyEvents(monday,friday).catch(()=>[] as Event[]);
-  const events=[...macroEvents,...company].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-  return NextResponse.json({status:"ok",monday,friday,events,notice:"僅顯示已取得來源的公告；台灣重點企業法說會依公開公告彙整；無法確認日期者不顯示。",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=1800"}});
+  const events=[...macroEvents,...company,...usEarningsEvents(monday,friday)].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  return NextResponse.json({status:"ok",monday,friday,events,notice:"追蹤美國大型市值公司財報（以已確認公告日期為準），換算台灣時間；未確認日期不顯示。",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=1800"}});
  }catch(e){return NextResponse.json({status:"unavailable",monday,friday,events:[],error:e instanceof Error?e.message:"來源暫不可用"},{status:503});}
 }
