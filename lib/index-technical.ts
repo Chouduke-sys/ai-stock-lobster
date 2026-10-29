@@ -24,6 +24,17 @@ async function latestTwseClose():Promise<{date:string;close:number}|null>{
 export async function getIndexTechnical():Promise<TechnicalSignal>{
  const fallback:TechnicalSignal={body:"技術指標暫未取得可驗證行情，請以交易所公告為準。",sentiment:"neutral",verdict:"技術數據待更新",valid:false,date:null};
  const official=await latestTwseClose();
+ const taipeiNow=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
+ const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const weekday=taipeiNow.getDay();
+ const expected=new Date(today+"T00:00:00+08:00");
+ // Before the cash close, the latest completed session is a previous weekday.
+ const back=weekday===0?2:weekday===1?3:weekday===6?1:1;
+ expected.setUTCDate(expected.getUTCDate()-back);
+ const expectedDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(expected);
+ // Holidays may push the official trading session further back; do not accept
+ // a Yahoo bar older than the most recent verified TWSE trading date.
+ const requiredDate=official?.date??expectedDate;
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
    const response=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=6mo",{next:{revalidate:300},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
@@ -43,6 +54,8 @@ export async function getIndexTechnical():Promise<TechnicalSignal>{
     yahooLast.close=official.close;
    }
    const latest=bars[bars.length-1];
+   const latestDate=new Date(latest.t*1000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
+   if(latestDate<requiredDate)continue;
    const age=Date.now()-latest.t*1000;
    if(age< -86400000||age>6*86400000)continue;
    const ma=(n:number)=>bars.slice(-n).reduce((a,b)=>a+b.close,0)/n;
