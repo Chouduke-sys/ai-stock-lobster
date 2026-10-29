@@ -106,7 +106,16 @@ async function probeProviders(){
  if(closeResult?.http===200&&institutionalResult?.http===200&&
     validDate(closeResult.date)&&validDate(institutionalResult.date)&&
     institutionalResult.date<closeResult.date){
-  issue("法人籌碼","warning","資料日 "+institutionalResult.date+" 落後已確認的加權收盤日 "+closeResult.date+"（可能為 T86 暫時回退）");
+  // TWSE T86 can legitimately publish after the index close. During the
+  // same-day release window, flag only regressions older than the prior weekday.
+  const prior=new Date(closeResult.date+"T00:00:00Z");
+  do{prior.setUTCDate(prior.getUTCDate()-1);}while(prior.getUTCDay()===0||prior.getUTCDay()===6);
+  const priorWeekday=prior.toISOString().slice(0,10);
+  const oldRegression=institutionalResult.date<priorWeekday;
+  const grace=closeResult.date===today&&minute<18*60;
+  if(oldRegression||!grace)issue("法人籌碼","warning",
+   "資料日 "+institutionalResult.date+" 落後加權收盤日 "+closeResult.date+
+   (oldRegression?"（超過前一平日，疑似日期回退）":"（當日 T86 尚未更新）"));
  }
  console.log(JSON.stringify({checkedAt:new Date().toISOString(),taipeiDate:today,results,providerResults,failures:fail,warnings:warn},null,2));
  if(fail.length){console.error("FAIL: "+fail.length+" critical health checks");process.exitCode=1;}
