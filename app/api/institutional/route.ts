@@ -43,7 +43,9 @@ async function fetchTwse():Promise<MarketData|null>{
    const urls=i<3?[url,url.replace("www.twse.com.tw","wwwc.twse.com.tw")]:[url];
    const candidates=await Promise.all(urls.map(async endpoint=>{
     try{
-     const response=await fetch(endpoint,{cache:"no-store",signal:AbortSignal.timeout(4500)});
+     // Cache upstream responses briefly across serverless instances to reduce T86 throttling.
+     // Every accepted payload is still checked against its requested trading date.
+     const response=await fetch(endpoint,{next:{revalidate:120},signal:AbortSignal.timeout(4500)});
      return response.ok?await response.json() as unknown:null;
     }catch{return null;}
    }));
