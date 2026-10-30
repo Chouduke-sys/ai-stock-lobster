@@ -71,6 +71,9 @@ async function check([name,path,kind]){
   if(kind==="close"&&(!validDate(body.date)||stale(body.date)))issue(name,"warning","收盤資料日期過舊 "+body.date);
   if(kind==="global"){
    summary.quotes=body.quotes?.length??0;summary.source=body.source??null;
+   summary.trendPoints=(body.quotes??[]).map(q=>({symbol:q.symbol,points:q.trend5d?.length??0,lastDate:q.trendDates?.at(-1)??null}));
+   summary.missingDailyChange=(body.quotes??[]).filter(q=>typeof q.value==="number"&&q.changePct===null).map(q=>q.symbol);
+   if(summary.missingDailyChange.length)issue(name,"warning","缺少可驗證的前一交易日收盤價，暫不計算日漲跌幅："+summary.missingDailyChange.join(", "));
    // A daily change must agree with the previous dated close when the
    // current quote and last trend point share the same UTC trading date.
    // Skip unmatched sessions rather than infer dates across exchanges.
