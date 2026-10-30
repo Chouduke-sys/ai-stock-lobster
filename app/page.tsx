@@ -25,7 +25,7 @@ type HistoryRow = { date:string; open:number; high:number; low:number; close:num
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
 type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type CloseResult={status:string;date:string;value:number;change:number|null;tradeVolume:number|null;tradeValue:number|null;transactions:number|null;dataSource:string};
-type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;isClosed?:boolean};
+type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;change?:number|null;changePercent?:number|null;referencePrice?:number|null;isClosed?:boolean};
 type StockResult = {
   status: string;
   symbol: string;
@@ -825,10 +825,15 @@ useEffect(()=>{
             <p className="footnote">目前行情來源只提供當日分鐘資料，尚未串接跨交易日歷史分鐘資料；不以單日資料假裝二日或三日走勢。</p>
             <p className="footnote">可先切回「即時」或「當日」查看最後有效行情。</p>
           </div>}
-          {showTaiwanNight&&<details style={{marginTop:12}}><summary style={{cursor:"pointer",fontWeight:700}}>台指期夜盤走勢（展開查看）</summary>
-            <div className="sparkline"><HourChart points={nightChartPoints} base={nightChartPoints[0]?.value??null} session="night"/></div>
-            <p className="footnote">{nightChartPoints.length?"最近更新："+nightChartPoints[nightChartPoints.length-1].time.replace("T"," ")+" · "+formatPrice(nightChartPoints[nightChartPoints.length-1].value)+" 點":"尚無有效夜盤走勢資料"} · 收盤後保留最後有效資料 · {nightHistorySource||nightError||"行情可能延遲"}</p>
-          </details>}
+          {showTaiwanNight&&<div style={{marginTop:12,padding:16,border:"1px solid #64748b55",borderRadius:12}} aria-label="台指期夜盤即時行情">
+            <strong style={{fontSize:18}}>台指期夜盤 · 最新報價</strong>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:14,marginTop:12}}>
+              <div><small>最新點數</small><strong style={{display:"block",fontSize:26}}>{formatPrice(night?.price)}</strong></div>
+              <div><small>漲跌點數</small><strong style={{display:"block",fontSize:24,color:night?.change==null?"#94a3b8":night.change>=0?"#fb7969":"#42c4a5"}}>{night?.change==null?"—":(night.change>0?"+":"")+formatPrice(night.change)+" 點"}</strong></div>
+              <div><small>漲跌幅</small><strong style={{display:"block",fontSize:24,color:night?.changePercent==null?"#94a3b8":night.changePercent>=0?"#fb7969":"#42c4a5"}}>{night?.changePercent==null?"—":(night.changePercent>0?"+":"")+night.changePercent.toFixed(2)+"%"}</strong></div>
+            </div>
+            <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(night.delaySeconds)+" · "+night.dataSource:nightError||"正在讀取夜盤報價"}。{night?.change==null||night?.changePercent==null?"行情來源未提供可驗證的漲跌基準，暫不顯示漲跌數值。":"漲跌依行情來源提供的參考價計算。"}不以不完整取樣繪製夜盤走勢圖。</p>
+          </div>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
         </div>
