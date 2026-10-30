@@ -13,7 +13,7 @@ function exchangeDate(timestamp:number,timeZone:string):string{
 async function getQuote(label:string,symbol:string):Promise<Quote>{
  const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
-  const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=5d";
+  // Five trading sessions can span more than five calendar days (weekends, holidays,\n  // or an upstream delayed daily candle). Request a supported one-month window,\n  // then keep only the latest five verified, exchange-dated points below.\n  const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=1mo";
   const response=await fetch(url,{next:{revalidate:15},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
   if(!response.ok)return empty;
   const body=await response.json() as ChartResponse;
