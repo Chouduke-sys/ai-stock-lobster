@@ -64,6 +64,19 @@ function isReadableChinese(n:News):boolean{
  if(/(?:login|signin|sign-in|register|subscribe|premium|paywall)/i.test(n.url))return false;
  return true;
 }
+// Rank market-moving news ahead of generic technology coverage; retain recency within tiers.
+function newsPriority(n:News):number{
+ const t=n.title+" "+(n.summary??"");
+ const ai=/(AI|人工智慧|生成式|輝達|NVIDIA|黃仁勳|台積電|TSMC|半導體|晶片|GPU|HBM|先進封裝|CoWoS|AI伺服器|AI 伺服器|資料中心|OpenAI|超微|AMD|博通|Broadcom|微軟|Microsoft|Google|Alphabet|亞馬遜|Amazon|Meta)/i;
+ const aiImpact=/(財報|財測|營收|獲利|訂單|資本支出|擴產|產能|供應鏈|禁令|出口管制|重大|突破|上修|下修|投資|法說|需求|晶片|AI|人工智慧)/i;
+ const usMacro=/(美國|美政府|白宮|川普|特朗普|Trump|聯準會|美聯儲|Fed|FOMC|鮑爾|Powell|商務部|財政部|勞工部)/i;
+ const macroEvent=/(CPI|PCE|非農|就業|失業率|通膨|消費者物價|生產者物價|PPI|GDP|利率決議|降息|升息|利率|關稅|出口管制|經濟數據|零售銷售|ISM|PMI|政策|制裁|預算|債務上限)/i;
+ const war=/(戰爭|開戰|軍事衝突|空襲|飛彈|導彈|交火|攻擊|入侵|停火|戰事|地緣政治|封鎖|荷姆茲|霍爾木茲|俄烏|烏克蘭|以色列|伊朗|中東衝突)/i;
+ if(ai.test(t)&&aiImpact.test(t))return 4;
+ if(usMacro.test(t)&&macroEvent.test(t))return 3;
+ if(war.test(t))return 2;
+ return 1;
+}
 export async function GET(){
  try{
   const endpoint=process.env.FUTU_NEWS_API_URL||"https://ai-news-search.futunn.com/news_search";
@@ -85,7 +98,7 @@ export async function GET(){
   }));
   const seen=new Set<string>();
   const news=batches.flat().filter(isReadableChinese).filter(n=>{const key=newsKey(n.title);if(seen.has(n.url)||seen.has(key))return false;seen.add(n.url);seen.add(key);return true;})
-   .sort((a,b)=>(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,45);
+   .sort((a,b)=>newsPriority(b)-newsPriority(a)||(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,45);
   if(!news.length)throw Error("No verified Futu news");
   const important=/川普|特朗普|Trump|鮑爾|Powell|聯準會|美聯儲|Fed\b|FOMC|央行總裁|總統發言|財政部長|黃仁勳|Jensen Huang|台積電|金管會|中央銀行|台灣央行|台灣科技|台灣金融|關稅|利率決策/i;
   const importantNews=news.filter(n=>important.test(n.title+" "+(n.summary??""))).slice(0,20);
