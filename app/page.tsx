@@ -341,6 +341,9 @@ useEffect(()=>{
   const minuteHistory=useIntradayHistory(symbol);
   const displayedStockPoints=Array.from(new Map<string,IntradayPoint>([...minuteHistory.points,...stockPoints].filter(p=>p.date===parts(new Date().toISOString()).date&&Number.isFinite(p.price)).map(p=>[p.time,p] as const)).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const [search, setSearch] = useState("");
+  const [stockMatches,setStockMatches]=useState<{symbol:string;name:string;market:string}[]>([]);
+  const [stockSearching,setStockSearching]=useState(false);
+  useEffect(()=>{const q=search.trim();if(!q||/^\\d{4,6}$/.test(q)){setStockMatches([]);return;}const controller=new AbortController();const timer=setTimeout(async()=>{setStockSearching(true);try{const r=await fetch("/api/stocks/search?q="+encodeURIComponent(q),{signal:controller.signal});const d=await r.json();if(!controller.signal.aborted)setStockMatches(Array.isArray(d.stocks)?d.stocks:[]);}catch{if(!controller.signal.aborted)setStockMatches([]);}finally{if(!controller.signal.aborted)setStockSearching(false);}},250);return()=>{clearTimeout(timer);controller.abort();};},[search]);
   const [news, setNews] = useState<NewsRow[]>([]);
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [weekCalendar,setWeekCalendar]=useState<{monday:string;friday:string;events:{date:string;time:string;title:string;level:string;region:string;detail:string}[];status:string}|null>(null);
@@ -648,14 +651,21 @@ useEffect(()=>{
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
 
-  function lookupStock() {
-    const value = search.trim();
-    if (!/^\d{4,6}$/.test(value)) {
-      setMessage("請輸入 4 至 6 位數字股票代號。");
-      return;
-    }
-    setSymbol(value);
-    setMessage("");
+  async function lookupStock() {
+    const value=search.trim();
+    if(/^\d{4,6}$/.test(value)){setSymbol(value);setStockMatches([]);setMessage("");return;}
+    if(!value){setMessage("請輸入股票代號、公司名稱或簡稱。");return;}
+    setStockSearching(true);
+    try{
+      const response=await fetch("/api/stocks/search?q="+encodeURIComponent(value));
+      const data=await response.json();
+      const matches=(data.stocks??[]) as {symbol:string;name:string;market:string}[];
+      setStockMatches(matches);
+      if(matches.length===1){setSymbol(matches[0].symbol);setSearch(matches[0].name);setStockMatches([]);setMessage("");}
+      else if(matches.length>1)setMessage("找到多家公司，請選擇正確的股票。");
+      else setMessage("找不到符合的上市或上櫃公司，請確認名稱或代號。");
+    }catch{setMessage("股票名稱搜尋暫時無法使用，請改用股票代號。");}
+    finally{setStockSearching(false);}
   }
 
   const [mobileTab,setMobileTab]=useState<"news"|"market"|"sectors"|"index"|"flows"|"charts"|"account">("news");
@@ -940,7 +950,7 @@ useEffect(()=>{
 
       <section className="section" id="charts">
         <div className="section-heading"><div><div className="eyebrow">TECHNICAL ANALYSIS</div><h2>個股行情查詢</h2><p>盤中報價每 5 秒查詢；以有效成交價累積當日走勢，並非完整官方分時資料。</p></div><CandlestickChart size={26} className="heading-icon"/></div>
-        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="輸入股票代號，例如 2330" onKeyDown={e => e.key === "Enter" && lookupStock()}/><button onClick={lookupStock}>查詢</button></div><span className="tag tag-amber">盤中走勢 · 5 秒查詢</span></div>
+        <div className="chart-toolbar"><div className="search-box"><Search size={17}/><div style={{position:"relative",flex:1,minWidth:0}}><input value={search} onChange={e => {setSearch(e.target.value);setMessage("");}} placeholder="輸入代號、公司名稱或簡稱，如台積電" onKeyDown={e => e.key === "Enter" && void lookupStock()} style={{width:"100%"}} aria-label="搜尋股票代號或名稱"/>{stockMatches.length>0&&<div style={{position:"absolute",zIndex:30,top:"100%",left:0,right:0,background:"#17263a",border:"1px solid #475569",borderRadius:8,maxHeight:260,overflowY:"auto",boxShadow:"0 10px 22px #0008"}}>{stockMatches.map(item=><button key={item.symbol} type="button" onClick={()=>{setSymbol(item.symbol);setSearch(item.name);setStockMatches([]);setMessage("");}} style={{display:"block",width:"100%",padding:"10px 12px",textAlign:"left",color:"#f8fafc",background:"transparent",border:0,borderBottom:"1px solid #334155",cursor:"pointer"}}>{item.name} ({item.symbol}) · {item.market==="TWSE"?"上市":"上櫃"}</button>)}</div>}</div><button onClick={()=>void lookupStock()} disabled={stockSearching}>{stockSearching?"搜尋中":"查詢"}</button></div><span className="tag tag-amber">盤中走勢 · 5 秒查詢</span></div>
         <div className="chart-card"><div className="chart-title"><div><strong>{symbol}{stockData?.name ? ` · ${stockData.name}` : ""}</strong><span> · 盤中報價</span></div><span className="tag tag-amber">{stockData ? (loadingQuote ? "盤中行情 · 更新中" : quoteError ? "沿用前次報價" : "盤中行情（測試）") : loadingQuote ? "查詢中" : "尚無資料"}</span></div>
         {stockData ? (
           <>
