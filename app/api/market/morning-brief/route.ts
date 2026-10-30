@@ -30,7 +30,9 @@ async function quote([label,symbol]:[string,string]):Promise<Q>{
    // Never present a previous session's futures percentage as the current move.
    if(age< -300000||age>(future?12:96)*3600000)continue;
    const value=lastIndex>=0?closes[lastIndex]:meta?.regularMarketPrice;
-   const prev=meta?.previousClose??meta?.chartPreviousClose;
+   // For daily indices, use the prior completed daily bar when available. Yahoo meta.previousClose can refer to a different session.
+   const dailyBars=closes.map((close,i)=>({close,time:timestamps[i]})).filter((bar):bar is {close:number;time:number}=>typeof bar.close==="number"&&Number.isFinite(bar.close)&&bar.close>0&&typeof bar.time==="number");
+   const prev=(!future&&dailyBars.length>=2)?dailyBars[dailyBars.length-2].close:(meta?.previousClose??meta?.chartPreviousClose);
    if(typeof value!=="number"||!Number.isFinite(value)||value<=0)continue;
    return {label,symbol,value,changePct:typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:new Date(lastTime*1000).toISOString()};
   }catch{}
