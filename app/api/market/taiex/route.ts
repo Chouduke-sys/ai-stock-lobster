@@ -68,6 +68,6 @@ export async function GET() {
       fetchedAt: new Date().toISOString(), recent: []
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return await yahooToday()??NextResponse.json({ error: "加權指數盤中資料連線失敗" }, { status: 502 });
+    return await yahooToday()??missingIntradayQuote("加權指數盤中資料連線失敗");
   }
 }
