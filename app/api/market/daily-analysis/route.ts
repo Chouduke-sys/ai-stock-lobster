@@ -10,6 +10,15 @@ function exchangeDate(timestamp:number,timeZone:string):string{
   return new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(timestamp*1000));
  }catch{return new Date(timestamp*1000).toISOString().slice(0,10);}
 }
+// A missing weekday candle must not turn a two-day move into a "daily" move.
+// Exchange holidays may conservatively yield null until a dated prior close exists.
+function weekdaysBetween(from:string,to:string):number|null{
+ const start=Date.parse(from+"T00:00:00Z"),end=Date.parse(to+"T00:00:00Z");
+ if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start||end-start>31*86400000)return null;
+ let count=0;
+ for(let t=start+86400000;t<=end;t+=86400000){const d=new Date(t).getUTCDay();if(d!==0&&d!==6)count++;}
+ return count;
+}
 async function getQuote(label:string,symbol:string):Promise<Quote>{
  const empty={label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
@@ -33,8 +42,10 @@ async function getQuote(label:string,symbol:string):Promise<Quote>{
   // session; if the chart stops before it, the last close is the prior session.
   // Missing/misaligned sessions produce null, never a fabricated percentage.
   const gapDays=latest&&quoteDate?(Date.parse(quoteDate+"T00:00:00Z")-Date.parse(latest.date+"T00:00:00Z"))/86400000:null;
-  const previousClose=latest&&quoteDate&&latest.date===quoteDate?history.at(-2)?.value:
-    latest&&gapDays!==null&&gapDays>0&&gapDays<=4?latest.value:null;
+  const prior=history.at(-2);
+  const previousClose=latest&&quoteDate&&latest.date===quoteDate
+    ?prior&&weekdaysBetween(prior.date,quoteDate)===1?prior.value:null
+    :latest&&quoteDate&&weekdaysBetween(latest.date,quoteDate)===1?latest.value:null;
   const changePct=typeof value==="number"&&Number.isFinite(value)&&value>0&&
     typeof previousClose==="number"&&previousClose>0?(value/previousClose-1)*100:null;
   // Yahoo may publish the latest regular-market quote before its daily chart
