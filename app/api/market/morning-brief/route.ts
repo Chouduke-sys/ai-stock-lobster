@@ -299,7 +299,7 @@ export async function GET(request:Request){
   :riskScore<=-3?{low:20,high:30,reason:"多項風險訊號偏空，優先保留現金"}
   :riskScore<=-1?{low:30,high:50,reason:"市場風險偏高，避免過度曝險"}
   :{low:40,high:60,reason:"多空訊號混合，維持中性配置"};
- const allocationAdvice="今日建議股票總倉位 "+allocation.low+"%～"+allocation.high+"%，保留現金 "+(100-allocation.high)+"%～"+(100-allocation.low)+"%；"+allocation.reason+"。倉位以帳戶淨資產計算，含融資部位的股票市值也須計入；盤前屬情境建議，開盤後依量價及風險調整，不是保證報酬。";
+ const allocationAdvice="今日建議股票總倉位 "+allocation.low+"%～"+allocation.high+"%，保留現金 "+(100-allocation.high)+"%～"+(100-allocation.low)+"%；"+allocation.reason+"。倉位以帳戶淨資產計算，含融資部位的股票市值也須計入；盤前屬情境建議，開盤後依量價及風險調整。重點觀察：①前一交易日高低點與跳空缺口是否守住；②開盤後成交量能否配合方向；③台指期夜盤、費半與美股科技股是否同步。跌破關鍵低點且放量時降低曝險；守住支撐並放量站回短期均線時才考慮提高倉位。成交金額須與近20個交易日同期或全日均量比較，不能僅憑單日金額宣稱創新低。個別企業財報影響須以實際公布及盤後反應驗證，不是保證報酬。";
  const optionRatio=validatedWantgoo;
  const optionVolume=optionRatio?.volume??validatedFutures?.putCallVolume??null;
  const optionOi=optionRatio?.oi??validatedFutures?.putCallOpenInterest??null;
