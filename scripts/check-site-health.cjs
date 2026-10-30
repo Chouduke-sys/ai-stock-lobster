@@ -135,6 +135,18 @@ async function probeProviders(){
 }
 (async()=>{
  const providerResults=await probeProviders();
+ // A provider returning HTTP 200 with zero parsed quotes is not a successful
+ // cross-check. Warn without declaring the upstream website offline.
+ for(const p of providerResults.filter(x=>x.name==="HiStock"||x.name==="Yahoo 股市")){
+  const count=p.name==="HiStock"?p.validQuotes:p.parsedQuotes;
+  if(p.error||p.http!==200)issue(p.name,"warning","來源查詢失敗："+(p.error||"HTTP "+p.http));
+  else if(count===0)issue(p.name,"warning","來源 HTTP 200，但未解析到有效行情；本次無法以此來源交叉驗證");
+ }
+ const comparison=providerResults.find(x=>x.name==="HiStock/Yahoo 成交金額交叉比對");
+ const histock=providerResults.find(x=>x.name==="HiStock");
+ const yahoo=providerResults.find(x=>x.name==="Yahoo 股市");
+ if(histock?.validQuotes>0&&yahoo?.parsedQuotes>0&&comparison?.matched===0)
+  issue("HiStock/Yahoo 成交金額交叉比對","warning","雙方均有行情，但沒有可比對的共同股票；請檢查解析及交易日期");
  await Promise.all(cases.map(check));
  // Cross-check data dates against the confirmed TWSE close date, not the calendar
  // date: this avoids false alarms on holidays while detecting transient T86 regressions.
