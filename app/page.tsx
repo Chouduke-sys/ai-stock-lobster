@@ -37,6 +37,19 @@ type StockResult = {
   isRealtime: boolean;
   delaySeconds?: number | null;
 };
+function newsBadges(title:string,summary:string|null):{label:string;color:string}[]{
+ const t=title+" "+(summary??"");
+ const tags:{label:string;color:string}[]=[];
+ const ai=/(AI|人工智慧|生成式|輝達|NVIDIA|台積電|TSMC|半導體|晶片|GPU|HBM|CoWoS|先進封裝|AI伺服器|資料中心|OpenAI|AMD|博通)/i.test(t);
+ const us=/(美國|美政府|白宮|川普|特朗普|Trump|聯準會|美聯儲|Fed|FOMC|鮑爾|Powell|商務部|財政部|勞工部)/i.test(t)&&/(CPI|PCE|非農|就業|失業率|通膨|物價|PPI|GDP|利率|降息|升息|關稅|出口管制|經濟數據|零售銷售|ISM|PMI|政策|制裁)/i.test(t);
+ const war=/(戰爭|開戰|軍事衝突|空襲|飛彈|導彈|交火|入侵|停火|戰事|地緣政治|封鎖|俄烏|烏克蘭|以色列|伊朗|中東衝突)/i.test(t);
+ const impact=/(重大|突發|緊急|宣布|宣佈|決議|財報|財測|上修|下修|禁令|制裁|空襲|開戰|非農|CPI|PCE|FOMC|利率決議|關稅)/i.test(t);
+ if(impact&&(ai||us||war))tags.push({label:"🔥 重大",color:"#fecaca"});
+ if(ai)tags.push({label:"🤖 AI 科技",color:"#bfdbfe"});
+ if(us)tags.push({label:"🇺🇸 美國經濟",color:"#fde68a"});
+ if(war)tags.push({label:"🌍 地緣政治",color:"#ddd6fe"});
+ return tags.slice(0,3);
+}
 const formatPrice = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("zh-TW", { maximumFractionDigits: 2 });
 const ageLabel = (s: number | null | undefined) => s == null ? "報價時間未確認" : s < 60 ? `距報價 ${s} 秒` : `距報價 ${Math.floor(s / 60)} 分鐘`;
 const formatVolume = (value: number | null | undefined) => value == null ? "—" : Math.round(value).toLocaleString("zh-TW");
@@ -733,7 +746,7 @@ useEffect(()=>{
             {(newsTab==="all"?news:importantNews).slice(0,24).map((item,i)=><a key={item.url} href={item.url} target="_blank" rel="noopener noreferrer" style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 0",borderBottom:"1px solid #64748b33",color:"inherit",textDecoration:"none"}}>
               {newsTab==="all" && (item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:92,height:68,flexShrink:0,objectFit:"cover",borderRadius:8,background:"#1e293b"}} onError={e=>{e.currentTarget.style.display="none";}}/> : <div aria-hidden="true" style={{width:92,height:68,flexShrink:0,borderRadius:8,background:"#182437",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8"}}><Newspaper size={24}/></div>)}
               <div style={{minWidth:0,flex:1}}>
-                <div style={{fontSize:17,fontWeight:650,lineHeight:1.6}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:5}}>{newsBadges(item.title,item.summary).map(tag=><span key={tag.label} style={{fontSize:11,fontWeight:750,color:tag.color,border:"1px solid #475569",borderRadius:5,padding:"2px 6px",background:"#1e293b"}}>{tag.label}</span>)}</div><div style={{fontSize:17,fontWeight:650,lineHeight:1.6}}><span style={{color:"#fb725b",marginRight:8}}>{String(i+1).padStart(2,"0")}</span>{item.title}</div>
                 {item.summary && <p style={{fontSize:14,lineHeight:1.65,color:"#cbd5e1",margin:"5px 0 0",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{item.summary}</p>}
                 <small style={{color:"#94a3b8",display:"block",marginTop:7,fontSize:13}}>{item.source} · {item.publishedAt ? new Date(item.publishedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}):"發布時間未提供"}</small>
               </div>
