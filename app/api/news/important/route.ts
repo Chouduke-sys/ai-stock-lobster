@@ -69,6 +69,7 @@ export async function GET(){
   }catch{return [] as Item[];}
  }));
  const seen=new Set<string>();
- const news=batches.flat().filter(isImportantStatement).filter(item=>{const title=item.title.replace(/\\s+[-–—]\\s+[^-–—]+$/,"").trim();const chinese=(title.match(/[\\u3400-\\u9fff]/g)||[]).length;if(chinese<4)return false;const key=title.toLowerCase().replace(/[\\s\\p{P}\\p{S}]/gu,"").slice(0,90);if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>Date.parse(b.publishedAt??"1970")-Date.parse(a.publishedAt??"1970")).slice(0,40);
+ const cutoff=Date.now()-72*60*60*1000;
+ const news=batches.flat().filter(item=>{const timestamp=item.publishedAt?Date.parse(item.publishedAt):NaN;return Number.isFinite(timestamp)&&timestamp>=cutoff&&timestamp<=Date.now()+5*60*1000;}).filter(isImportantStatement).filter(item=>{const title=item.title.replace(/\\s+[-–—]\\s+[^-–—]+$/,"").trim();const chinese=(title.match(/[\\u3400-\\u9fff]/g)||[]).length;if(chinese<4)return false;const key=title.toLowerCase().replace(/[\\s\\p{P}\\p{S}]/gu,"").slice(0,90);if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>Date.parse(b.publishedAt??"1970")-Date.parse(a.publishedAt??"1970")).slice(0,40);
  return NextResponse.json({status:news.length?"ok":"unavailable",news,source:"Google 新聞 RSS（多家媒體轉載，非官方發言逐字稿）",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=180, stale-while-revalidate=180"}});
 }
