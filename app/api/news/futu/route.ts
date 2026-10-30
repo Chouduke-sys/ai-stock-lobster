@@ -54,6 +54,12 @@ function parseNews(raw:unknown):News[]{
   return [{title:plainText(title),url:url.href,publishedAt:parseTime(pick(r,["publish_time","publishTime","published_at","publishedAt","time","date","created_at"])),source:typeof source==="string"?source:"富途牛牛",imageUrl,summary}];
  });
 }
+// Only show articles published within the last rolling 72 hours. Missing or future timestamps are excluded.
+function isRecentNews(n:{publishedAt:string|null},now=Date.now()):boolean{
+ if(!n.publishedAt)return false;
+ const time=Date.parse(n.publishedAt);
+ return Number.isFinite(time)&&time<=now+5*60*1000&&time>=now-72*60*60*1000;
+}
 function newsKey(title:string):string{
  return title.toLowerCase().replace(/\s*[-–—|｜]\s*(富途牛牛|futunn|moomoo|鉅亨網|工商時報|經濟日報|聯合新聞網|中央社).*$/i,"").replace(new RegExp(String.raw`[\s\p{P}\p{S}]`,"gu"),"").slice(0,90);
 }
@@ -97,7 +103,7 @@ export async function GET(){
    }catch{return [];}
   }));
   const seen=new Set<string>();
-  const news=batches.flat().filter(isReadableChinese).filter(n=>{const key=newsKey(n.title);if(seen.has(n.url)||seen.has(key))return false;seen.add(n.url);seen.add(key);return true;})
+  const news=batches.flat().filter(isReadableChinese).filter(n=>isRecentNews(n)).filter(n=>{const key=newsKey(n.title);if(seen.has(n.url)||seen.has(key))return false;seen.add(n.url);seen.add(key);return true;})
    .sort((a,b)=>newsPriority(b)-newsPriority(a)||(b.publishedAt?Date.parse(b.publishedAt):0)-(a.publishedAt?Date.parse(a.publishedAt):0)).slice(0,45);
   if(!news.length)throw Error("No verified Futu news");
   const important=/川普|特朗普|Trump|鮑爾|Powell|聯準會|美聯儲|Fed\b|FOMC|央行總裁|總統發言|財政部長|黃仁勳|Jensen Huang|台積電|金管會|中央銀行|台灣央行|台灣科技|台灣金融|關稅|利率決策/i;
