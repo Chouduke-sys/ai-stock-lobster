@@ -802,3 +802,129 @@
   word-break:normal!important;overflow-wrap:normal!important;
  }
 }
+
+
+/* Desktop visual system: inspired by premium dark financial workspaces.
+   Desktop only: preserve mobile navigation and layouts. */
+@media (min-width:1051px) {
+ :root {
+  --bg:#050e20;
+  --panel:#0b1931;
+  --panel2:#10223d;
+  --line:#233c5d;
+  --text:#edf5ff;
+  --muted:#8ca6c6;
+  --blue:#4b98ef;
+  --amber:#dba958;
+ }
+ body {
+  background:
+   radial-gradient(ellipse 85% 48% at 50% -18%,rgba(31,91,169,.24),transparent 72%),
+   linear-gradient(180deg,#061329 0%,#050d1d 55%,#050a16 100%);
+  background-attachment:fixed;
+ }
+ .site-shell[data-mobile-tab] {
+  max-width:1740px;
+  padding:0 clamp(24px,3vw,56px) 48px;
+  column-gap:18px;
+  row-gap:18px;
+ }
+ .site-shell[data-mobile-tab] > .topbar {
+  min-height:80px;
+  padding:10px 22px;
+  margin:12px 0 4px;
+  border:1px solid rgba(93,137,194,.22);
+  border-radius:16px;
+  background:rgba(9,22,43,.94);
+  box-shadow:0 12px 40px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.035);
+ }
+ .topbar .nav-links {gap:5px!important;font-size:12px!important;letter-spacing:0}
+ .topbar .nav-links a {
+  border:1px solid transparent;
+  background:transparent;
+  color:#a4bad4;
+  padding:10px 12px;
+  border-radius:9px;
+  font-weight:600;
+ }
+ .topbar .nav-links a:first-child {
+  color:#f5c36b;
+  background:rgba(208,157,76,.13);
+  border-color:rgba(208,157,76,.25);
+ }
+ .topbar .nav-links a:hover,.topbar .nav-links a:focus-visible {
+  background:#182e4d;border-color:#36577c;color:#fff;transform:none;
+ }
+ .site-shell[data-mobile-tab] > .hero.hero-balanced,
+ .site-shell[data-mobile-tab] > .morning-brief,
+ .site-shell[data-mobile-tab] > .sector-rotation-member,
+ .site-shell[data-mobile-tab] > .membership,
+ .site-shell[data-mobile-tab] > .section,
+ .site-shell[data-mobile-tab] > .market-analysis-wide,
+ .site-shell[data-mobile-tab] > .institutional-side-by-side {
+  border:1px solid rgba(91,131,181,.22);
+  border-radius:16px;
+  background:linear-gradient(145deg,rgba(14,30,55,.96),rgba(8,19,38,.97));
+  box-shadow:0 12px 38px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.025);
+  padding:clamp(18px,1.8vw,30px);
+  min-width:0;
+ }
+ .site-shell[data-mobile-tab] > .hero.hero-balanced {
+  align-content:start;
+  gap:20px;
+ }
+ .site-shell[data-mobile-tab] .hero-visual,
+ .site-shell[data-mobile-tab] .stat-card,
+ .site-shell[data-mobile-tab] .chart-card,
+ .site-shell[data-mobile-tab] .news-card,
+ .site-shell[data-mobile-tab] .weekly-calendar-day,
+ .site-shell[data-mobile-tab] .sector-radar-panel {
+  background:linear-gradient(155deg,#102440,#0b1930);
+  border:1px solid rgba(92,139,199,.25);
+  border-radius:12px;
+  box-shadow:inset 0 1px rgba(255,255,255,.025);
+ }
+ .site-shell[data-mobile-tab] .stat-card {padding:18px}
+ .site-shell[data-mobile-tab] .stat-card strong {
+  font-size:clamp(23px,2vw,32px);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.035em;
+ }
+ .site-shell[data-mobile-tab] .stat-label,
+ .site-shell[data-mobile-tab] .section-heading p {color:#9db2cf}
+ .site-shell[data-mobile-tab] .section-heading {margin-bottom:20px}
+ .site-shell[data-mobile-tab] .section-heading h2 {font-size:clamp(20px,1.7vw,26px);font-weight:700}
+ .site-shell[data-mobile-tab] .eyebrow {color:#d4aa66}
+ .site-shell[data-mobile-tab] .tag-amber {
+  background:rgba(197,143,61,.13);border-color:rgba(197,143,61,.32);color:#f5c879;
+ }
+ .site-shell[data-mobile-tab] .btn-primary {
+  background:linear-gradient(135deg,#dca856,#b77d36);color:#09172a;
+  box-shadow:0 4px 18px rgba(209,152,63,.16);
+ }
+ .site-shell[data-mobile-tab] .btn-primary:hover {background:#f0bc6d}
+ .site-shell[data-mobile-tab] .btn-outline {
+  background:#10233f;border-color:#385579;color:#dceaff;
+ }
+ .site-shell[data-mobile-tab] .table-wrap {border-color:#29415e}
+ .site-shell[data-mobile-tab] th {background:#122641;color:#a7bcd6}
+ .site-shell[data-mobile-tab] td {border-color:#203752}
+ .site-shell[data-mobile-tab] tr:hover td {background:#162b48}
+ .site-shell[data-mobile-tab] .chart-card,
+ .site-shell[data-mobile-tab] .hero-visual {box-shadow:0 14px 30px rgba(0,0,0,.15)}
+ .site-shell[data-mobile-tab] .sparkline {background:#08172d}
+ .site-shell[data-mobile-tab] .weekly-calendar-grid {gap:8px}
+ .site-shell[data-mobile-tab] .weekly-calendar-event {border-radius:9px}
+ .site-shell[data-mobile-tab] .membership {
+  border-color:rgba(204,158,80,.32);
+  background:linear-gradient(120deg,#18283e,#111d34);
+ }
+ .site-shell[data-mobile-tab] :is(button,a,input,select):focus-visible {
+  outline:2px solid #e3b365;outline-offset:3px;
+ }
+}
+@media (min-width:1051px) and (max-width:1280px) {
+ .site-shell[data-mobile-tab] {padding-inline:20px;column-gap:14px}
+ .site-shell[data-mobile-tab] > .topbar {padding-inline:12px}
+ .topbar .nav-links a {padding:8px 7px;font-size:11px}
+}
