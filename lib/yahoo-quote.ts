@@ -24,7 +24,7 @@ export async function getQuote(label:string,symbol:string):Promise<Quote>{
   // or an upstream delayed daily candle). Request a supported one-month window,
   // then keep only the latest five verified, exchange-dated points below.
   const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=1mo";
-  const response=await fetch(url,{next:{revalidate:15},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
+  const response=await fetch(url,{next:{revalidate:5},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
   if(!response.ok)return empty;
   const body=await response.json() as ChartResponse;
   const result=body.chart?.result?.[0];

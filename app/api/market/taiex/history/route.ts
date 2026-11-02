@@ -1,3 +1,4 @@
+export const dynamic="force-dynamic";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 type Row = { Date?: string; TAIEX?: string };
@@ -18,7 +19,7 @@ const parseDate = (value?:string):string|null => {
 export async function GET() {
   try {
     const response=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/FMTQIK",{
-      next:{revalidate:3600},signal:AbortSignal.timeout(10000)
+      next:{revalidate:60},signal:AbortSignal.timeout(10000)
     });
     if(!response.ok)throw Error("Index history unavailable");
     const body:unknown=await response.json();

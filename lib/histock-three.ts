@@ -13,7 +13,7 @@ function dateOf(raw:string):string|null{
 }
 export async function fetchHiStockThree():Promise<HiStockThree|null>{
  try{
-  const res=await fetch("https://histock.tw/stock/three.aspx",{next:{revalidate:60},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://histock.tw/stock/three.aspx",{next:{revalidate:15},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const tables=extractHtmlTables(await res.text());
   const institution=tables.find(t=>t.headers.some(h=>h.includes("外資"))&&t.headers.some(h=>h.includes("投信"))&&t.headers.some(h=>h.includes("總計"))&&t.rows.some(r=>dateOf(r[0]??"")));

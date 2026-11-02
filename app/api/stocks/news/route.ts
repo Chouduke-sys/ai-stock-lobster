@@ -16,7 +16,7 @@ export async function GET(request:NextRequest){
   try{
    const query=encodeURIComponent(term+" when:7d");
    const url="https://news.google.com/rss/search?q="+query+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant";
-   const response=await fetch(url,{next:{revalidate:300},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (compatible; AIStockLobster/1.0)"}});
+   const response=await fetch(url,{next:{revalidate:60},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (compatible; AIStockLobster/1.0)"}});
    if(!response.ok)return;
    const xml=await response.text();
    for(const item of xml.match(/<item>[\s\S]*?<\/item>/gi)??[]){

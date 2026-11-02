@@ -38,7 +38,7 @@ function select(bars:Bar[],end:number){
 async function load(lastCompletedDate:string):Promise<Bar[]>{
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
-   const r=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=5y",{next:{revalidate:21600},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0"}});
+   const r=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=5y",{next:{revalidate:60},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0"}});
    if(!r.ok)continue;
    const data=await r.json() as {chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
    const series=data.chart?.result?.[0],timestamps=series?.timestamp??[],closes=series?.indicators?.quote?.[0]?.close??[];

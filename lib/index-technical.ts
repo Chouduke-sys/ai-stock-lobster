@@ -37,7 +37,7 @@ export async function getIndexTechnical(lastCompletedDate:string):Promise<Techni
  const requiredDate=lastCompletedDate;
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
-   const response=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=6mo",{next:{revalidate:300},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
+   const response=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=6mo",{next:{revalidate:15},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
    if(!response.ok)continue;
    const json=await response.json() as Chart;
    const result=json.chart?.result?.[0],q=result?.indicators?.quote?.[0];

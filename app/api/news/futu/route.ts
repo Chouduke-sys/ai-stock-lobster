@@ -1,3 +1,4 @@
+export const dynamic="force-dynamic";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 type News={title:string;url:string;publishedAt:string|null;source:string;imageUrl:string|null;summary:string|null};
@@ -97,7 +98,7 @@ export async function GET(){
     url.searchParams.set("news_type","1");
     url.searchParams.set("lang","zh-HK");
     url.searchParams.set("sort_type","2");
-    const response=await fetch(url.toString(),{next:{revalidate:300},signal:AbortSignal.timeout(8500),headers:{"Accept":"application/json","User-Agent":"futunn-news-search/0.0.2 (Skill)"}});
+    const response=await fetch(url.toString(),{next:{revalidate:60},signal:AbortSignal.timeout(8500),headers:{"Accept":"application/json","User-Agent":"futunn-news-search/0.0.2 (Skill)"}});
     if(!response.ok)return [];
     return parseNews(await response.json());
    }catch{return [];}
