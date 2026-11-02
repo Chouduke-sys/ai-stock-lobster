@@ -406,6 +406,18 @@ useEffect(()=>{
   const [nightPoints,setNightPoints]=useState<Point[]>([]);
   const [nightHistory,setNightHistory]=useState<Point[]>([]);
   const [nightHistorySource,setNightHistorySource]=useState("");
+  // Night-session move is measured against the first available minute near
+  // the 15:00 open, not the previous day close or the TAIEX index.
+  const nightSessionKey=night?.quoteTime?(()=>{
+    const p=parts(night.quoteTime);
+    return p.hour<5?parts(new Date(Date.parse(night.quoteTime)-86400000).toISOString()).date:p.date;
+  })():null;
+  const nightOpeningPoint=nightSessionKey?nightHistory
+    .filter(p=>p.session===nightSessionKey&&p.time.slice(11)>="15:00"&&p.time.slice(11)<="15:06"&&Number.isFinite(p.value)&&p.value>0)
+    .sort((a,b)=>a.time.localeCompare(b.time))[0]:undefined;
+  const nightOpenChange=night?.price!=null&&nightOpeningPoint?night.price-nightOpeningPoint.value:null;
+  const nightOpenPercent=nightOpenChange!=null&&nightOpeningPoint?nightOpenChange/nightOpeningPoint.value*100:null;
+
   useEffect(()=>{
     const controller=new AbortController();
     async function refreshNightHistory(){
@@ -822,9 +834,10 @@ useEffect(()=>{
             <strong style={{fontSize:18}}>台指期夜盤 · 最新報價</strong>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:14,marginTop:12}}>
               <div><small>最新點數</small><strong style={{display:"block",fontSize:26}}>{formatPrice(night?.price)}</strong></div>
-              <div><small>漲跌點數</small><strong style={{display:"block",fontSize:24,color:night?.change==null?"#94a3b8":night.change>=0?"#fb7969":"#42c4a5"}}>{night?.change==null?"—":(night.change>0?"+":"")+formatPrice(night.change)+" 點"}</strong></div>
-              <div><small>漲跌幅</small><strong style={{display:"block",fontSize:24,color:night?.changePercent==null?"#94a3b8":night.changePercent>=0?"#fb7969":"#42c4a5"}}>{night?.changePercent==null?"—":(night.changePercent>0?"+":"")+night.changePercent.toFixed(2)+"%"}</strong></div>
+              <div><small>相對夜盤開盤漲跌點數</small><strong style={{display:"block",fontSize:24,color:nightOpenChange==null?"#94a3b8":nightOpenChange>=0?"#fb7969":"#42c4a5"}}>{nightOpenChange==null?"—":(nightOpenChange>0?"+":"")+formatPrice(nightOpenChange)+" 點"}</strong></div>
+              <div><small>相對夜盤開盤漲跌幅</small><strong style={{display:"block",fontSize:24,color:nightOpenPercent==null?"#94a3b8":nightOpenPercent>=0?"#fb7969":"#42c4a5"}}>{nightOpenPercent==null?"—":(nightOpenPercent>0?"+":"")+nightOpenPercent.toFixed(2)+"%"}</strong></div>
             </div>
+            <p className="footnote">{nightOpeningPoint?"開盤基準："+formatPrice(nightOpeningPoint.value)+" 點（"+nightOpeningPoint.time+" 首筆分鐘價）；與目前價格比較，非交易所官方開盤價。":"缺少本交易日 15:00～15:05 開盤分鐘行情，暫不估算漲跌。"} 夜盤開盤漲跌與一般前收盤漲跌定義不同。</p>
             {!night&&nightData&&<p role="status" className="footnote">最近成功報價：{formatPrice(nightData.price)} 點 · {new Date(nightData.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · 更新失敗或已過期，非目前有效報價。</p>}
              <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(Math.max(0,Math.floor((clockNow-Date.parse(night.quoteTime))/1000)))+" · "+night.dataSource:nightError||(nightData?"前次報價已過期，等待更新":"正在讀取夜盤報價")}。{night?.change==null||night?.changePercent==null?"行情來源未提供可驗證的漲跌基準，暫不顯示漲跌數值。":"漲跌依行情來源提供的參考價計算。"}不以不完整取樣繪製夜盤走勢圖。</p>
           </div>}
