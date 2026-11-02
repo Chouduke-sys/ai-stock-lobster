@@ -34,12 +34,17 @@ test('summary export includes provenance and never claims generated AI predictio
 });
 function route(session,globals={}){
  let queries=0;
- const api=load('app/api/pro/research/route.ts',{'next/server':response,'next-auth':{getServerSession:async()=>session},'../../../../lib/auth':{authOptions:{}},'../../../../lib/pro-data':{proResearch:async(symbol,lookback)=>{queries++;return {symbol,lookback};}}},globals);
+ const api=load('app/api/pro/research/route.ts',{'next/server':response,'next-auth':{getServerSession:async()=>{if(session instanceof Error)throw session;return session;}},'../../../../lib/auth':{authOptions:{}},'../../../../lib/pro-data':{proResearch:async(symbol,lookback)=>{queries++;return {symbol,lookback};}}},globals);
  return {api,count:()=>queries};
 }
 test('Pro data denies anonymous users before fetching and is never publicly cached',async()=>{
  const {api,count}=route(null);const r=await api.GET(new Request('https://site.test/api/pro/research?symbol=2330'));
  assert.equal(r.status,401);assert.equal(count(),0);assert.equal(r.headers['Cache-Control'],'private, no-store');assert.equal(r.headers.Vary,'Cookie');
+});
+test('missing authentication configuration fails closed with a useful service status',async()=>{
+ const {api,count}=route(new Error('Missing secret'));
+ const result=await api.GET(new Request('https://site.test/api/pro/research'));
+ assert.equal(result.status,503);assert.equal(count(),0);assert.equal(result.headers['Cache-Control'],'private, no-store');
 });
 test('all signed-in members can preview without paid entitlement; invalid symbols/windows are rejected',async()=>{
  const {api,count}=route({user:{email:'member@example.invalid'}});

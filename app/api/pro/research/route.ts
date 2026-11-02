@@ -6,7 +6,9 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const headers={"Cache-Control":"private, no-store","Vary":"Cookie"};
 export async function GET(request:Request){
- const session=await getServerSession(authOptions);
+ let session;
+ try{session=await getServerSession(authOptions);}
+ catch{return NextResponse.json({error:"會員驗證服務暫時無法使用，請稍後再試。"},{status:503,headers});}
  if(!session?.user?.email)return NextResponse.json({error:"請先登入會員，再開啟 Pro 免費體驗。"},{status:401,headers});
  const params=new URL(request.url).searchParams;
  const symbol=params.get("symbol")??"2330",lookback=Number(params.get("window")??5);
