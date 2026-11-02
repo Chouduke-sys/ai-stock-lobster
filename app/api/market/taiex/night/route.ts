@@ -23,12 +23,26 @@ async function publicNightQuote(now:Date){
    const html=await response.text();
    const text=html.replace(new RegExp("<[^>]+>","g")," ").replace(new RegExp("&nbsp;","g")," ").replace(new RegExp("\\s+","g")," ");
    const priceMatch=text.match(new RegExp("成交\\s*([0-9,]+)"));
+   // Yahoo's public fallback previously returned only the price. Extract a
+   // reference close or a clearly labelled change; never infer from TAIEX.
+   const signedNumber=(value:string)=>Number(value.replaceAll(",","").replace("＋","+").replace("－","-").replace("−","-"));
+   const referenceMatch=text.match(/(?:昨收|前收|參考價|參考價格)\\s*[:：]?\\s*([0-9,]+(?:\\.[0-9]+)?)/);
+   const changeMatch=text.match(/(?:漲跌|漲跌點數)\\s*[:：]?\\s*([+＋\\-－−]?[0-9,]+(?:\\.[0-9]+)?)/);
+   const percentMatch=text.match(/(?:漲跌幅|漲跌百分比)\\s*[:：]?\\s*([+＋\\-－−]?[0-9,]+(?:\\.[0-9]+)?)\\s*%/);
    const dateMatch=text.match(new RegExp("(20[0-9]{2})[/-]([0-9]{1,2})[/-]([0-9]{1,2})\\s+([0-9]{1,2}):([0-9]{2})"));
    if(text.includes("台指期近一")&&priceMatch&&dateMatch){
     const price=Number(priceMatch[1].replaceAll(",",""));
     const timestamp=new Date(Date.UTC(Number(dateMatch[1]),Number(dateMatch[2])-1,Number(dateMatch[3]),Number(dateMatch[4])-8,Number(dateMatch[5])));
     const age=Math.round((now.getTime()-timestamp.getTime())/1000);
-    if(price>0&&Number.isFinite(age)&&age>=-60&&age<=120)return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,contract:"近一（月份未驗證）",contractVerified:false,quality:"degraded",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁，可能延遲）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
+    if(price>0&&Number.isFinite(age)&&age>=-60&&age<=120){
+     const referenceCandidate=referenceMatch?signedNumber(referenceMatch[1]):null;
+     const reference=referenceCandidate!==null&&Number.isFinite(referenceCandidate)&&referenceCandidate>0&&Math.abs(price/reference-1)<0.15?referenceCandidate:null;
+     const directChange=changeMatch?signedNumber(changeMatch[1]):null;
+     const directPercent=percentMatch?signedNumber(percentMatch[1]):null;
+     const change=reference!==null?price-reference:directChange!==null&&Number.isFinite(directChange)&&Math.abs(directChange/price)<0.15?directChange:null;
+     const changePercent=reference!==null&&change!==null?change/reference*100:directPercent!==null&&Number.isFinite(directPercent)&&Math.abs(directPercent)<15?directPercent:change!==null&&price-change>0?change/(price-change)*100:null;
+     return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,change,changePercent,referencePrice:reference,contract:"近一（月份未驗證）",contractVerified:false,quality:"degraded",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁，可能延遲）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
+    }
    }
   }
  }catch{}
