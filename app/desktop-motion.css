@@ -1,0 +1,61 @@
+/* Progressive enhancement: mobile never allocates animated background layers. */
+.desktop-atmosphere { display:none }
+@media (min-width:1051px) {
+  body { background:#050d1e; }
+  .desktop-atmosphere {
+    display:block;position:fixed;inset:0;z-index:0;overflow:hidden;
+    pointer-events:none;contain:strict;
+    background:linear-gradient(155deg,#081b35,#050d1e 65%,#09172c);
+  }
+  .desktop-atmosphere > div {position:absolute;inset:-40px 0 -560px;}
+  .atmosphere-depth {
+    background:radial-gradient(ellipse 65% 34% at 6% 26%,#174c8066,transparent 80%),
+      radial-gradient(ellipse 60% 32% at 96% 64%,#14427188,transparent 78%);
+  }
+  .atmosphere-grid {
+    opacity:.32;
+    background:linear-gradient(115deg,transparent 32%,#3d78aa40 32.1%,transparent 32.3%),
+      repeating-linear-gradient(0deg,transparent 0 119px,#6b9dcc20 120px),
+      repeating-linear-gradient(90deg,transparent 0 119px,#6b9dcc20 120px);
+    mask-image:linear-gradient(90deg,#000,transparent 38%,transparent 62%,#000);
+  }
+  .atmosphere-gold {
+    background:radial-gradient(ellipse 44% 21% at 88% 25%,#d6a65826,transparent 75%),
+      radial-gradient(ellipse 30% 22% at 3% 66%,#dfae5320,transparent 75%);
+  }
+  /* Never transform or contain the shell: sticky and fixed children keep their viewport. */
+  .site-shell[data-mobile-tab] {position:relative;z-index:1;}
+  .site-shell[data-mobile-tab] > :is(.section,.morning-brief,.sector-rotation-member,.hero.hero-balanced) {
+    background:linear-gradient(145deg,#0e1e37ed,#081326eb);
+    border-color:#6884aa33;
+    box-shadow:0 16px 44px #0003,inset 0 1px #e4efff07;
+  }
+  .site-shell .section-heading h2 {letter-spacing:-.025em;}
+  .site-shell .eyebrow {letter-spacing:.17em;}
+  .site-shell .stat-card {border-top-color:#c9a66066;}
+}
+@media (min-width:1051px) and (prefers-reduced-motion:no-preference) {
+  .desktop-atmosphere > div {will-change:transform;}
+  .reveal-surface {transition:opacity .65s ease,transform .65s cubic-bezier(.2,.7,.2,1);}
+  .reveal-pending {opacity:0;transform:translate3d(0,18px,0);}
+  .reveal-pending:focus-within {opacity:1;transform:none;}
+}
+@media (min-width:1051px) and (hover:hover) and (prefers-reduced-motion:no-preference) {
+  .site-shell :is(.stat-card,.news-card,.sector-radar-panel) {
+    transition:transform .24s ease,opacity .65s ease,border-color .24s ease,box-shadow .24s ease;
+  }
+  .site-shell :is(.stat-card,.news-card,.sector-radar-panel):not(.reveal-pending):hover {
+    transform:translateY(-3px);border-color:#c9a66080;
+    box-shadow:0 12px 28px #0004,inset 0 1px #edc77d18;
+  }
+  .site-shell .btn {transition:transform .2s ease,background .2s ease,box-shadow .2s ease;}
+  .site-shell .btn:hover {transform:translateY(-1px);}
+}
+@media (prefers-reduced-motion:reduce) {
+  html {scroll-behavior:auto!important;}
+  .site-shell *, .site-shell *::before, .site-shell *::after {
+    animation:none!important;transition:none!important;
+  }
+  .desktop-atmosphere > div,.site-shell .reveal-surface {transform:none!important;}
+  .site-shell .reveal-pending {opacity:1!important;}
+}
