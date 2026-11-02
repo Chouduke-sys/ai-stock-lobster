@@ -8,7 +8,7 @@ function number(v:unknown):number|null{if(typeof v!=="string"&&typeof v!=="numbe
 async function fetchDay(date:string):Promise<FetchResult>{
  try{
   const url="https://www.twse.com.tw/rwd/zh/fund/T86?response=json&selectType=ALL&date="+date.replace(/-/g,"");
-  const res=await fetch(url,{next:{revalidate:900},signal:AbortSignal.timeout(6500)});
+  const res=await fetch(url,{next:{revalidate:15},signal:AbortSignal.timeout(6500)});
   if(!res.ok)return {day:null,reason:"HTTP "+res.status};
   const raw:unknown=await res.json();if(!raw||typeof raw!=="object"||Array.isArray(raw))return {day:null,reason:"非預期回應格式"};
   const r=raw as Record<string,unknown>;if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))return {day:null,reason:String(r.stat??"缺少資料欄位")};

@@ -1,3 +1,4 @@
+import {taiwanCalendar} from "../../../lib/trading-calendar";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 type Obj=Record<string,unknown>;
@@ -32,7 +33,7 @@ function previousWeekdayDate():string{
 async function confirmedCloseDate():Promise<string|null>{
  const month=today().slice(0,7).replace("-","")+"01";
  try{
-  const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:180},signal:AbortSignal.timeout(3500)});
+  const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(3500)});
   if(!response.ok)return null;
   const body=await response.json() as {stat?:string;fields?:string[];data?:string[][]};
   if(body.stat!=="OK"||!Array.isArray(body.fields)||!Array.isArray(body.data))return null;
@@ -59,7 +60,7 @@ async function fetchTwse(minDate:string):Promise<MarketData|null>{
     try{
      // Cache upstream responses briefly across serverless instances to reduce T86 throttling.
      // Every accepted payload is still checked against its requested trading date.
-     const response=await fetch(endpoint,{next:{revalidate:120},signal:AbortSignal.timeout(4500)});
+     const response=await fetch(endpoint,{next:{revalidate:15},signal:AbortSignal.timeout(4500)});
      return response.ok?await response.json() as unknown:null;
     }catch{return null;}
    }));
@@ -105,17 +106,18 @@ let lastGoodTwseAt=0;
 let pendingTwse:Promise<MarketData|null>|null=null;
 async function twse():Promise<MarketData|null>{
  const now=Date.now();
- const minDate=await confirmedCloseDate()??previousWeekdayDate();
- if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<120000)return lastGoodTwse;
+ const minDate=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
+  if(!minDate)return null;
+ if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<15000)return lastGoodTwse;
  if(!pendingTwse)pendingTwse=fetchTwse(minDate).finally(()=>{pendingTwse=null;});
  const fresh=await pendingTwse;
  if(fresh){lastGoodTwse=fresh;lastGoodTwseAt=Date.now();return fresh;}
- if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<900000)return lastGoodTwse;
+ // Do not hide an outage behind a cached success response; the UI retains the dated last good result.
  return null;
 }
 async function tpex():Promise<MarketData|null>{
  try{
-  const response=await fetch("https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading",{next:{revalidate:300},signal:AbortSignal.timeout(9000)});
+  const response=await fetch("https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading",{next:{revalidate:15},signal:AbortSignal.timeout(9000)});
   if(!response.ok)return null;
   const body:unknown=await response.json();if(!Array.isArray(body))return null;
   const rows:Item[]=[];let date:string|null=null;
@@ -135,7 +137,8 @@ async function tpex():Promise<MarketData|null>{
    if(foreign===null||trust===null||dealer===null||total===null||Math.abs(foreign+trust+dealer-total)>1)continue;
    rows.push({symbol,name:String(pick(r,["CompanyName","SecuritiesCompanyName","SecuritiesName","Name","證券名稱"])??symbol),market:"tpex",foreign,trust,dealer,total});
   }
-  return date&&rows.length?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
+  const expected=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
+   return date&&rows.length&&expected&&date>=expected&&date<=today()?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
  }catch{return null;}
 }
 export async function GET(request:Request){

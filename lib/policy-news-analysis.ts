@@ -13,7 +13,7 @@ export async function getPolicySignals():Promise<{items:PolicySignal[];score:num
  const results=await Promise.all(themes.map(async theme=>{
   try{
    const url="https://news.google.com/rss/search?q="+encodeURIComponent(theme.query+" when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant";
-   const response=await fetch(url,{next:{revalidate:900},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0"}});
+   const response=await fetch(url,{next:{revalidate:60},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0"}});
    if(!response.ok)return null;
    const rss=await response.text();
    for(const match of Array.from(rss.matchAll(/<item>([\s\S]*?)<\/item>/gi)).slice(0,12)){

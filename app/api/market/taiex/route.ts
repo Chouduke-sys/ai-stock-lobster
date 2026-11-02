@@ -1,3 +1,5 @@
+import {taiwanCalendar} from "../../../../lib/trading-calendar";
+import {dailyChange} from "../../../../lib/market-data";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,9 +25,11 @@ async function yahooToday(){
     const quoteTime=new Date(timestamps[i]*1000).toISOString();
     const local=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(quoteTime));
     if(local!==today())break;
-    const previous=item?.meta?.chartPreviousClose??item?.meta?.previousClose;
-    const change=typeof previous==="number"?Math.round((value-previous)*100)/100:null;
-    return NextResponse.json({status:"ok",name:"臺灣加權股價指數",date:local,value,change,changePercent:change!==null&&previous?Math.round(change/previous*10000)/100:null,quoteTime,delaySeconds:Math.max(0,Math.round((Date.now()-timestamps[i]*1000)/1000)),delayDescription:"Yahoo Finance 分鐘歷史行情（可能延遲）",dataSource:"Yahoo Finance ^TWII（備援）",isRealtime:false,fetchedAt:new Date().toISOString(),recent:[]},{headers:{"Cache-Control":"no-store"}});
+    const calendar=await taiwanCalendar();
+    const comparison=calendar.referenceDate?dailyChange(value,calendar.referenceClose,calendar.referenceDate):null;
+    const change=comparison?Math.round(comparison.change*100)/100:null;
+    const previous=comparison?.referencePrice??null;
+    return NextResponse.json({status:"ok",name:"臺灣加權股價指數",date:local,value,referenceDate:comparison?.referenceDate??null,referencePrice:previous,change,changePercent:change!==null&&previous?Math.round(change/previous*10000)/100:null,quoteTime,delaySeconds:Math.max(0,Math.round((Date.now()-timestamps[i]*1000)/1000)),delayDescription:"Yahoo Finance 分鐘歷史行情（可能延遲）",dataSource:"Yahoo Finance ^TWII（備援）",isRealtime:false,fetchedAt:new Date().toISOString(),recent:[]},{headers:{"Cache-Control":"no-store"}});
    }
   }catch{}
  }

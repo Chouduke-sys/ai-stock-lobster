@@ -12,6 +12,9 @@ on:
         options: [morning, close]
 permissions:
   contents: write
+concurrency:
+  group: daily-market-archive
+  cancel-in-progress: false
 jobs:
   archive:
     runs-on: ubuntu-latest
@@ -26,8 +29,7 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           if [ -z "$MODE" ]; then
-            HOUR=$(TZ=Asia/Taipei date +%H)
-            if [ "$HOUR" -lt 12 ]; then MODE=morning; else MODE=close; fi
+            if [ "${{ github.event.schedule }}" = "45 0 * * 1-5" ]; then MODE=morning; else MODE=close; fi
           fi
           node scripts/archive-daily-review.cjs "$MODE"
       - name: Commit verified archive

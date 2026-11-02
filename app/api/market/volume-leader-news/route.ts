@@ -55,10 +55,10 @@ export async function GET(request:Request){
   try{
    const query='"'+stock.name+'" when:3d';
    const url="https://news.google.com/rss/search?q="+encodeURIComponent(query)+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant";
-   const response=await fetch(url,{next:{revalidate:600},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0"}});
+   const response=await fetch(url,{next:{revalidate:60},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0"}});
    if(!response.ok)return null;
    return fromGoogle(await response.text(),stock);
   }catch{return null;}
  }));
- return NextResponse.json({status:"ok",items:items.filter((x):x is Item=>x!==null),asOf:new Date().toISOString(),note:"只顯示最近72小時有發布日期的個股新聞；無符合條件的文章時不以舊行情頁面充數。"},{headers:{"Cache-Control":"public, s-maxage=600, stale-while-revalidate=300"}});
+ return NextResponse.json({status:"ok",items:items.filter((x):x is Item=>x!==null),asOf:new Date().toISOString(),note:"只顯示最近72小時有發布日期的個股新聞；無符合條件的文章時不以舊行情頁面充數。"},{headers:{"Cache-Control":"public, s-maxage=15"}});
 }

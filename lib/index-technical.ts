@@ -1,6 +1,6 @@
 export type TechnicalSignal={body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string;valid:boolean;date:string|null};
 type Chart={chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[];high?:(number|null)[];low?:(number|null)[];volume?:(number|null)[]}>};meta?:{regularMarketPrice?:number;regularMarketTime?:number}}>}};
-async function latestTwseClose():Promise<{date:string;close:number}|null>{
+async function latestTwseClose(lastCompletedDate:string):Promise<{date:string;close:number}|null>{
  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
  const [year,month]=today.split("-");
  for(const offset of [0,-1]){
@@ -15,15 +15,15 @@ async function latestTwseClose():Promise<{date:string;close:number}|null>{
     const match=String(row[0]??"").match(/^(\d{3})\/(\d{2})\/(\d{2})$/);
     const close=Number(String(row[4]??"").replace(/,/g,""));
     return match&&Number.isFinite(close)&&close>0?[{date:(Number(match[1])+1911)+"-"+match[2]+"-"+match[3],close}]:[];
-   }).filter(row=>row.date<=today);
+   }).filter(row=>row.date<=lastCompletedDate);
    if(rows.length)return rows[rows.length-1];
   }catch{}
  }
  return null;
 }
-export async function getIndexTechnical():Promise<TechnicalSignal>{
+export async function getIndexTechnical(lastCompletedDate:string):Promise<TechnicalSignal>{
  const fallback:TechnicalSignal={body:"技術指標暫未取得可驗證行情，請以交易所公告為準。",sentiment:"neutral",verdict:"技術數據待更新",valid:false,date:null};
- const official=await latestTwseClose();
+ const official=await latestTwseClose(lastCompletedDate);
  const taipeiNow=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
  const weekday=taipeiNow.getDay();
@@ -34,16 +34,18 @@ export async function getIndexTechnical():Promise<TechnicalSignal>{
  const expectedDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(expected);
  // Holidays may push the official trading session further back; do not accept
  // a Yahoo bar older than the most recent verified TWSE trading date.
- const requiredDate=official?.date??expectedDate;
+ const requiredDate=lastCompletedDate;
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
-   const response=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=6mo",{next:{revalidate:300},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
+   const response=await fetch("https://"+host+"/v8/finance/chart/%5ETWII?interval=1d&range=6mo",{next:{revalidate:15},signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
    if(!response.ok)continue;
    const json=await response.json() as Chart;
    const result=json.chart?.result?.[0],q=result?.indicators?.quote?.[0];
    if(!result?.timestamp||!q?.close||!q.volume)continue;
    const bars=result.timestamp.flatMap((t,i)=>{const close=q.close?.[i],volume=q.volume?.[i];return typeof close==="number"&&close>0&&typeof volume==="number"&&volume>=0?[{t,close,volume}]:[];});
-   if(bars.length<65)continue;
+   const completed=bars.filter(bar=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(bar.t*1000))<=lastCompletedDate);
+    bars.splice(0,bars.length,...completed);
+    if(bars.length<65)continue;
    const yahooLast=bars[bars.length-1];
    const yahooDate=new Date(yahooLast.t*1000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
    let officialOverride=false;
@@ -55,9 +57,9 @@ export async function getIndexTechnical():Promise<TechnicalSignal>{
    }
    const latest=bars[bars.length-1];
    const latestDate=new Date(latest.t*1000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
-   if(latestDate<requiredDate)continue;
+   if(latestDate!==requiredDate)continue;
    const age=Date.now()-latest.t*1000;
-   if(age< -86400000||age>6*86400000)continue;
+   if(age< -86400000||age>14*86400000)continue;
    const ma=(n:number)=>bars.slice(-n).reduce((a,b)=>a+b.close,0)/n;
    const ma5=ma(5),ma20=ma(20),ma60=ma(60);
    const changes=bars.slice(-15).map((v,i,arr)=>i? v.close-arr[i-1].close:0).slice(1);

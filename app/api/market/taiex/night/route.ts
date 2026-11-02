@@ -1,3 +1,5 @@
+import {taiwanCalendar} from "../../../../../lib/trading-calendar";
+import {taipeiMinute} from "../../../../../lib/market-data";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -10,11 +12,11 @@ function session(now:Date){
  return ((day==="Mon"||day==="Tue"||day==="Wed"||day==="Thu"||day==="Fri")&&t>=900)
   || ((day==="Tue"||day==="Wed"||day==="Thu"||day==="Fri"||day==="Sat")&&t<300);
 }
-export async function GET(){
- const now=new Date();
- if(!session(now))return NextResponse.json({status:"closed",error:"目前非台指期夜盤交易時段（週一至週五 15:00～次日 05:00，休市日除外）",isRealtime:false},{status:409,headers:{"Cache-Control":"no-store"}});
-
- // Yahoo 公開頁面備援：僅使用頁面可確認的成交價及報價時間。
+async function publicNightQuote(now:Date){
+ const start=taipeiMinute(now)<300?new Date(now.getTime()-86400000):now;
+ const calendar=await taiwanCalendar(start);
+ if(calendar.isTradingDay!==true)return null;
+ // Last-resort public feed; never preempt a configured licensed provider.
  try {
   const response=await fetch("https://tw.stock.yahoo.com/future/WTX%26",{cache:"no-store",signal:AbortSignal.timeout(6000),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW"}});
   if(response.ok){
@@ -26,16 +28,23 @@ export async function GET(){
     const price=Number(priceMatch[1].replaceAll(",",""));
     const timestamp=new Date(Date.UTC(Number(dateMatch[1]),Number(dateMatch[2])-1,Number(dateMatch[3]),Number(dateMatch[4])-8,Number(dateMatch[5])));
     const age=Math.round((now.getTime()-timestamp.getTime())/1000);
-    if(price>0&&Number.isFinite(age)&&age>=-60&&age<=1800)return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,contract:"近一",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁，可能延遲）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
+    if(price>0&&Number.isFinite(age)&&age>=-60&&age<=120)return NextResponse.json({status:"ok",name:"台指期近一（Yahoo 股市）",price,contract:"近一（月份未驗證）",contractVerified:false,quality:"degraded",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(age,0),dataSource:"Yahoo 股市 WTX&（公開網頁，可能延遲）",isRealtime:false},{headers:{"Cache-Control":"no-store"}});
    }
   }
  }catch{}
+
+ return null;
+}
+export async function GET(){
+ const now=new Date();
+ if(!session(now))return NextResponse.json({status:"closed",error:"目前非台指期夜盤交易時段（週一至週五 15:00～次日 05:00，休市日除外）",isRealtime:false},{status:409,headers:{"Cache-Control":"no-store"}});
+
  const feeds=[
   {name:"主要授權行情",url:process.env.TAIFEX_NIGHT_QUOTE_URL,key:process.env.TAIFEX_NIGHT_API_KEY},
   {name:"富途行情橋接",url:process.env.FUTU_NIGHT_QUOTE_URL,key:process.env.FUTU_NIGHT_API_KEY},
   {name:"備援授權行情",url:process.env.FALLBACK_NIGHT_QUOTE_URL,key:process.env.FALLBACK_NIGHT_API_KEY}
  ].filter(feed=>!!feed.url);
- if(!feeds.length)return NextResponse.json({status:"not_configured",error:"尚未設定台指期夜盤授權行情來源；可設定主要、富途 OpenD 橋接或備援行情 API",isRealtime:false},{status:503,headers:{"Cache-Control":"no-store"}});
+ if(!feeds.length)return await publicNightQuote(now)??NextResponse.json({status:"not_configured",error:"尚未設定台指期夜盤授權行情來源；可設定主要、富途 OpenD 橋接或備援行情 API",isRealtime:false},{status:503,headers:{"Cache-Control":"no-store"}});
  const errors:string[]=[];
  for(const feed of feeds){
   try{
@@ -49,13 +58,13 @@ export async function GET(){
    const price=typeof data.price==="number"?data.price:NaN;
    const timestamp=typeof data.quoteTime==="string"?new Date(data.quoteTime):new Date(NaN);
    const age=Math.round((now.getTime()-timestamp.getTime())/1000);
-   if(!Number.isFinite(price)||price<=0||!Number.isFinite(age)||age< -30||age>120||data.symbol!=="TX"||typeof data.contract!=="string"||!/^\d{6}$/.test(data.contract))throw Error("報價無效或超過120秒");
-   const reference=typeof data.referencePrice==="number"&&data.referencePrice>0?data.referencePrice:null;
+   if(!Number.isFinite(price)||price<=0||!Number.isFinite(age)||age< -30||age>120||data.symbol!=="TX"||typeof data.contract!=="string"||(!/^\d{4}(?:0[1-9]|1[0-2])$/.test(data.contract)||data.contract<new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit"}).format(now).replace("-","")))throw Error("報價無效或超過120秒");
+   const reference=typeof data.referencePrice==="number"&&Number.isFinite(data.referencePrice)&&data.referencePrice>0?data.referencePrice:null;
    const change=reference!==null?price-reference:typeof data.change==="number"&&Number.isFinite(data.change)?data.change:null;
    const changePercent=reference!==null&&change!==null?change/reference*100:typeof data.changePercent==="number"&&Number.isFinite(data.changePercent)?data.changePercent:null;
-   return NextResponse.json({status:"ok",name:"臺股期貨夜盤（TX）",price,change,changePercent,referencePrice:reference,contract:data.contract,quoteTime:timestamp.toISOString(),delaySeconds:Math.max(0,age),dataSource:typeof data.source==="string"?data.source:feed.name,isRealtime:age<=15},{headers:{"Cache-Control":"no-store"}});
+   return NextResponse.json({status:"ok",name:"臺股期貨夜盤（TX）",price,change,changePercent,referencePrice:reference,contract:data.contract,contractVerified:true,quality:"verified",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(0,age),dataSource:typeof data.source==="string"?data.source:feed.name,isRealtime:age<=15},{headers:{"Cache-Control":"no-store"}});
   }catch(e){errors.push(feed.name+": "+(e instanceof Error?e.message:"連線失敗"));}
  }
- return NextResponse.json({status:"unavailable",error:"所有已設定夜盤行情來源暫不可用",providersTried:errors.map(x=>x.split(":")[0]),isRealtime:false},{status:502,headers:{"Cache-Control":"no-store"}});
+ return await publicNightQuote(now)??NextResponse.json({status:"unavailable",error:"所有已設定夜盤行情來源暫不可用",providersTried:errors.map(x=>x.split(":")[0]),isRealtime:false},{status:502,headers:{"Cache-Control":"no-store"}});
 
 }
