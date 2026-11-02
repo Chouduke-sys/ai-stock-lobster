@@ -1,6 +1,8 @@
 import lobsterIcon from "../ai_stock_lobster_icon.png";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./fintech-motion.css";
+import FintechMotion from "./components/FintechMotion";
 
 export const metadata: Metadata = {
   title: "AI股市龍蝦｜台股法人與全球市場研究平台",
@@ -15,5 +17,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#080f1d", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-Hant-TW"><body>{children}</body></html>;
+  return <html lang="zh-Hant-TW"><body><FintechMotion />{children}</body></html>;
 }

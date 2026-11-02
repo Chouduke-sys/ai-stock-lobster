@@ -1,0 +1,15 @@
+/* Fintech motion v1: progressive, scroll-triggered entrance without affecting quotes. */
+@media (prefers-reduced-motion: no-preference) {
+  .fintech-motion-ready {
+    opacity: 0.96;
+    transform: translate3d(0, 16px, 0);
+    transition: opacity 420ms ease-out, transform 420ms cubic-bezier(.2,.75,.2,1);
+  }
+  .fintech-motion-ready.fintech-motion-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fintech-motion-ready { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
