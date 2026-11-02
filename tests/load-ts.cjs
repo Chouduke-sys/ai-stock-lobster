@@ -11,6 +11,7 @@ function load(relative,overrides={},globals={}){
   if(Object.prototype.hasOwnProperty.call(overrides,id))return overrides[id];
   if(id.startsWith(".")){
    const absolute=path.resolve(path.dirname(filename),id);
+   if(absolute.endsWith(".json"))return JSON.parse(fs.readFileSync(absolute,"utf8"));
    return load(path.relative(path.resolve(__dirname,".."),absolute.endsWith(".ts")?absolute:absolute+".ts"),overrides,globals);
   }
   return require(id);
