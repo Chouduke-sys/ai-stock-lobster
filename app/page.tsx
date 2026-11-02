@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import DesktopAtmosphere from "./components/DesktopAtmosphere";
 import {pollVisible,REFRESH_MS} from "../lib/live-polling";
 import {signalCounts,taipeiDate} from "../lib/market-data";
 import {useIntradayHistory} from "../lib/useIntradayHistory";
@@ -680,7 +681,7 @@ useEffect(()=>{
   const nightChartPoints=Array.from(new Map<string,Point>([...nightHistory,...nightPoints].filter(p=>p.session===nightSessionKey(new Date())).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   return (
-    <main className="site-shell" data-mobile-tab={mobileTab}>
+    <><DesktopAtmosphere /><main className="site-shell" data-mobile-tab={mobileTab}>
       <header className="topbar">
         <a className="brand" href="#" aria-label="AI股市龍蝦首頁">
           <span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span>
@@ -1000,6 +1001,6 @@ useEffect(()=>{
       </nav>
 
       <footer><a className="brand footer-brand" href="#"><span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span><span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE</small></span></a><p>本網站為開發測試版。盤中行情與歷史技術分析均為測試功能；上櫃、新聞、部分法人資料及 AI 分析尚未完整串接，內容不構成投資建議。</p><span>© {new Date().getFullYear()} AI股市龍蝦</span></footer>
-    </main>
+    </main></>
   );
 }
