@@ -13,3 +13,4 @@
 .sector-rotation-row > div:nth-child(2){align-items:flex-end;text-align:right;min-width:0}
 @media(min-width:1051px){.site-shell[data-mobile-tab] > .sector-rotation-member[aria-label="會員產業資金輪動觀察"] .sector-rotation-row{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;align-items:start!important}}
 @media(max-width:440px){.sector-rotation-row > div:nth-child(2){align-items:flex-start;text-align:left}}
+.member-switch-actions{display:grid;gap:8px;margin:18px 0 4px}.modal-card .member-switch-actions .btn{margin:0;width:100%}.site-shell[data-mobile-tab] > .modal-card{z-index:150;max-height:calc(100dvh - 120px);overflow-y:auto}
