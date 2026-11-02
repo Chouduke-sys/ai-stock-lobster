@@ -1,3 +1,4 @@
+import {finmindPublication} from "../../../../lib/finmind";
 import {fetchHiStockThree} from "../../../../lib/histock-three";
 import {taiwanCalendar} from "../../../../lib/trading-calendar";
 import {NextResponse} from "next/server";
@@ -5,7 +6,9 @@ export const runtime="nodejs";
 export const dynamic="force-dynamic";
 export async function GET(){
  try{
-  const [institutional,calendar]=await Promise.all([fetchHiStockThree(),taiwanCalendar()]);
+  const calendar=await taiwanCalendar();
+  const [histock,fin]=await Promise.all([fetchHiStockThree(),finmindPublication("institutional",[calendar.date,...(calendar.referenceDate?[calendar.referenceDate]:[])])]);
+  const institutional=[histock,fin&&"foreignYi" in fin?fin:null].filter((row):row is NonNullable<typeof histock>=>row!==null).sort((a,b)=>b.date.localeCompare(a.date))[0]??null;
   if(!calendar.referenceDate||!institutional||institutional.date<calendar.referenceDate||institutional.date>calendar.date)
    return NextResponse.json({status:"unavailable",error:"法人資料日期未通過驗證，暫不顯示舊資料或未標日期的表格",dataDate:institutional?.date??null},{status:503,headers:{"Cache-Control":"no-store"}});
   return NextResponse.json({status:"ok",institutional:[],institutionalTotals:null,

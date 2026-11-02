@@ -466,6 +466,9 @@ useEffect(()=>{
   const [fiveLoading,setFiveLoading]=useState(false);
   const [rankError, setRankError] = useState("");
   const [rankDate, setRankDate] = useState("");
+  const [rankSource,setRankSource]=useState("");
+  const [rankNote,setRankNote]=useState("");
+  const [rankPending,setRankPending]=useState(false);
   const [loadingRank, setLoadingRank] = useState(true);
 
 
@@ -476,7 +479,7 @@ useEffect(()=>{
 
   useEffect(() => {
     const controller = new AbortController();
-    setRankRows([]);setRankDate("");
+    setRankRows([]);setRankDate("");setRankSource("");setRankNote("");setRankPending(false);
     async function loadRanks() {
       setLoadingRank(true); setRankError("");
       try {
@@ -484,7 +487,7 @@ useEffect(()=>{
         const response = await fetch(`/api/institutional?${params}`,{signal:controller.signal});
         const data = await response.json();
         if(!response.ok || data.status!=="ok")throw new Error(data.error || "法人排行暫無資料");
-        if(!controller.signal.aborted){setRankRows(data.rows);setRankDate(data.dataDate);}
+        if(!controller.signal.aborted){setRankRows(data.rows);setRankDate(data.dataDate);setRankSource(data.dataSource??"");setRankNote(data.note??"");setRankPending(data.publicationPending===true);}
       }catch(e){if(!controller.signal.aborted)setRankError(e instanceof Error?e.message:"法人排行讀取失敗");}
       finally{if(!controller.signal.aborted)setLoadingRank(false);}
     }
@@ -929,7 +932,7 @@ useEffect(()=>{
         <div className="table-wrap"><table><thead><tr><th>排名</th><th>股票</th><th>代號</th><th>淨買賣超（股）</th><th>資料狀態</th></tr></thead><tbody>
           {rows.map((r, i) => <tr key={`${rankSide}-${i}`}><td><span className="rank-number">{i + 1}</span></td><td className="stock-name">{r.name}</td><td>{r.symbol}</td><td>{formatVolume(r.netShares)}</td><td>{r.market==="twse"?"上市 TWSE":"上櫃 TPEx"}</td></tr>)}
         </tbody></table></div>
-        <p className="footnote"><CircleHelp size={14}/> {loadingRank ? "正在讀取法人日報…" : rankError || `資料日期 ${rankDate}；依淨買賣超股數排序，單位為股；盤後公布，非即時。`}</p>
+        <p className="footnote"><CircleHelp size={14}/> {loadingRank ? "正在讀取法人日報…" : rankError || `資料日期 ${rankDate}；來源：${rankSource}；依淨買賣超排序，單位為股。${rankNote}${rankPending?" 最新一期尚待來源公布，保留上一期日期。":""}`}</p>
       </section>
 
       <section className="section institutional-panel" id="five-day-institutional">

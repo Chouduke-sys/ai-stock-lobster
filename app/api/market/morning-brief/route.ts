@@ -1,3 +1,4 @@
+import {finmindPublication} from "../../../../lib/finmind";
 import {parseTwseMargin} from "../../../../lib/twse-margin";
 import {parseTaifexPositioning} from "../../../../lib/taifex-positioning";
 import {getQuote} from "../../../../lib/yahoo-quote";
@@ -83,20 +84,26 @@ async function histockMargin():Promise<HiStockMargin|null>{
 }
 async function latestMargin(referenceDate:string,fallbackDate?:string):Promise<MarginData|null>{
  const dates=[...new Set([referenceDate,fallbackDate].filter((date):date is string=>Boolean(date)))];
- const official=await Promise.all(dates.map(async date=>{
+ const [fin,histock,yahoo]=await Promise.all([finmindPublication("margin",dates),histockMargin(),yahooMargin()]);
+ const publicRows=[histock,yahoo].filter((row):row is MarginData=>row!==null&&dates.includes(row.date));
+ if(fin&&"financingBalance" in fin)publicRows.push(fin);
+ const selected=publicRows.sort((a,b)=>b.date.localeCompare(a.date))[0];
+ if(selected)return selected;
+ for(const date of dates){
   try{
-   const res=await fetch("https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+date.replace(/-/g,"")+"&selectType=MS&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(6500)});
-   return res.ok?parseTwseMargin(await res.json(),date):null;
-  }catch{return null;}
- }));
- const latestOfficial=official.find(item=>item!==null);
- // A dated last publication remains useful until the new session's figures arrive.
- if(latestOfficial?.date===referenceDate)return latestOfficial;
- const alternatives=(await Promise.all([histockMargin(),yahooMargin()])).filter((item):item is MarginData=>item!==null&&dates.includes(item.date));
- return [...official.filter((item):item is MarginData=>item!==null),...alternatives].sort((a,b)=>b.date.localeCompare(a.date))[0]??null;
+   const res=await fetch("https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+date.replace(/-/g,"")+"&selectType=MS&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(4500)});
+   const parsed=res.ok?parseTwseMargin(await res.json(),date):null;
+   if(parsed)return parsed;
+  }catch{}
+ }
+ return null;
 }
 async function institutionalPublication(referenceDate:string,fallbackDate?:string){
  const dates=[...new Set([referenceDate,fallbackDate].filter((date):date is string=>Boolean(date)))];
+ const publicTotal=await finmindPublication("institutional",dates);
+ if(publicTotal&&"foreignYi" in publicTotal)return {stat:"OK",date:publicTotal.date,source:publicTotal.source,data:[
+  ["外資",publicTotal.foreignYi*1e8],["投信",publicTotal.trustYi*1e8],["自營商",publicTotal.dealerYi*1e8]
+ ]};
  const results=await Promise.all(dates.map(async date=>{
   try{
    const r=await fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+date.replace(/-/g,"")+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(6500)});
@@ -135,11 +142,16 @@ function field(row:Record<string,unknown>,terms:string[]):unknown{
  return key===undefined?undefined:row[key];
 }
 async function latestFuturesOptions(referenceDate:string,fallbackDate?:string):Promise<FuturesOptions|null>{
+ const publicFuture=await finmindPublication("futures",[referenceDate,...(fallbackDate?[fallbackDate]:[])]);
  const [ratios,institutions]=await Promise.all([
   taifexRows("PutCallRatio"),
   taifexRows("MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
  ]);
- return parseTaifexPositioning(ratios,institutions,referenceDate)??(fallbackDate?parseTaifexPositioning(ratios,institutions,fallbackDate):null);
+ const official=parseTaifexPositioning(ratios,institutions,referenceDate)??(fallbackDate?parseTaifexPositioning(ratios,institutions,fallbackDate):null);
+ if(publicFuture&&"foreignTxNet" in publicFuture&&(!official||publicFuture.date>=official.date))return {...publicFuture,
+  putCallVolume:official?.date===publicFuture.date?official.putCallVolume:null,
+  putCallOpenInterest:official?.date===publicFuture.date?official.putCallOpenInterest:null};
+ return official;
 }
 async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;source:string}|null>{
  try{
