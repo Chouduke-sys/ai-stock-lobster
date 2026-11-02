@@ -11,7 +11,8 @@ export async function GET(){
   const raw=await r.json() as RecordDay[];
   if(!Array.isArray(raw))throw Error("archive malformed");
   const verified=raw.filter(validSnapshot);
+  const legacy=raw.filter(record=>!validSnapshot(record));
   const accuracy=(count:number)=>reviewMetrics(verified,count);
-  return NextResponse.json({status:"ok",latest:verified.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10),legacyExcluded:raw.length-verified.length,metrics:{days30:accuracy(30),days90:accuracy(90)},method:"08:30～08:59 內封存且雜湊驗證通過的盤前快照，與當日證交所正式收盤指數比較；30／90 指最近已驗證交易紀錄數；漲跌幅超過 ±0.15% 判為多／空，其餘中性。排除舊格式與逾時快照，不回填歷史預測。",source:"GitHub versioned archive / TWSE FMTQIK"},{headers:{"Cache-Control":"public, s-maxage=5"}});
+  return NextResponse.json({status:"ok",latest:verified.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10),legacyRecent:legacy.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).map(record=>({date:record.date,predictionLabel:record.predictionLabel??"未記錄",outcome:record.outcome?{changePct:record.outcome.changePct,actual:record.outcome.actual}:null})),legacyExcluded:raw.length-verified.length,metrics:{days30:accuracy(30),days90:accuracy(90)},method:"08:30～08:59 內封存且雜湊驗證通過的盤前快照，與當日證交所正式收盤指數比較；30／90 指最近已驗證交易紀錄數；漲跌幅超過 ±0.15% 判為多／空，其餘中性。排除舊格式與逾時快照，不回填歷史預測。",source:"GitHub versioned archive / TWSE FMTQIK"},{headers:{"Cache-Control":"public, s-maxage=5"}});
  }catch{return NextResponse.json({status:"unavailable",error:"歷史盤前快照尚未建立或無法讀取"},{status:503});}
 }
