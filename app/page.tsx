@@ -976,8 +976,14 @@ useEffect(()=>{
       </section>
 
 
-      <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
-        {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
+      <section className="membership pro-membership" id="membership" aria-label="AI 股市龍蝦 Pro 會員方案">
+        <div className="pro-membership-intro"><div className="eyebrow">LOBSTER PRO · 進階市場研究</div><h2>從看見行情，到看懂資金正在往哪裡走。</h2><p>以每日盤前研究、產業資金輪動與可驗證的盤後檢討，建立更完整的市場觀察流程。</p><span className="tag tag-amber">Pro 會員功能建置中 · 尚未開放收費</span></div>
+        <div className="pro-plan-grid">
+          <article className="pro-plan-card"><span className="pro-plan-kicker">FREE · 基礎版</span><h3>免費會員</h3><div className="pro-plan-price">NT$0 <small>/ 永久免費</small></div><p>每天快速掌握市場脈動。</p><ul><li>台股加權指數與台指期夜盤</li><li>全球市場、VIX 與財經快訊</li><li>三大法人與市場基本籌碼</li><li>基本盤前市場摘要</li></ul><button className="btn btn-outline" type="button" onClick={()=>setShowLogin(true)}>{member?"已登入免費會員":"免費登入"}</button></article>
+          <article className="pro-plan-card pro-plan-featured"><span className="pro-plan-kicker">PRO · 深度研究</span><h3>龍蝦 Pro</h3><div className="pro-plan-price">NT$199 <small>/ 月</small></div><p>年繳規劃 NT$1,990，平均每月約 NT$166。</p><ul><li>九大因子 AI 深度盤前報告</li><li>產業資金集中與退燒雷達</li><li>AI 盤後檢討與歷史預測驗證</li><li>30／90 日分析紀錄與風險追蹤</li><li>個人化觀察清單與提醒（規劃中）</li></ul><button className="btn btn-primary" type="button" onClick={()=>setShowPlan(!showPlan)} aria-expanded={showPlan}>{showPlan?"收起開通說明":"查看 Pro 開通進度"} <ArrowUpRight size={16}/></button></article>
+        </div>
+        {showPlan&&<div className="pro-plan-status" role="status"><strong>Pro 尚未開放付款或試用。</strong><p>目前正在建置付費權限、付款驗證、7 天試用與到期管理。功能正式上線前，既有已登入會員可繼續使用目前開放的研究功能；不會提前扣款。</p></div>}
+        <p className="pro-plan-disclaimer">資料與分析僅供研究參考，不保證投資報酬。成交金額熱度不等於資金淨流入；歷史命中率須有足夠已驗證樣本才會公開。</p>
       </section>
 
 
