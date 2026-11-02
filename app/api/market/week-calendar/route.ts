@@ -58,6 +58,21 @@ function usEarningsEvents(monday:string,friday:string):Event[]{
   return [{date,time:taiwanTime(instant.toISOString()),title:e.name+" 財報／法說會",level:"high" as const,region:"🇺🇸",detail:e.symbol+" · 美國公布時間換算為台灣時間 · 公司已公告",source:e.source}];
  });
 }
+// Market-moving scheduled political events must be tracked separately from macro feeds.
+const verifiedMajorEvents:Event[]=[
+ {date:"2026-11-03",time:"美國當地時間",title:"美國期中選舉（國會改選）",level:"high",region:"🇺🇸",detail:"高波動關注｜國會控制權、關稅與科技政策預期；台灣時間 11/4 持續關注開票",source:"https://www.fec.gov/introduction-campaign-finance/election-results-and-voting-information/"}
+];
+function isRelevantMacro(title:string,country:string):boolean{
+ if(/JOLTS|Job Openings|職缺|Consumer Confidence|消費者信心|Flash Manufacturing|Flash Services|初領失業|Initial Jobless Claims|Building Permits|Housing Starts|Crude Oil Inventories/i.test(title))return false;
+ if(country==="JPY")return /\bCPI\b|Consumer Price Index|BOJ Policy Rate|Bank of Japan.*(?:Rate Decision|Interest Rate)/i.test(title);
+ if(country!=="USD"&&country!=="TWD")return false;
+ return /Federal Funds Rate|Federal Funds Target Rate|FOMC Statement|FOMC Press Conference|CPI|Consumer Price Index|Core PCE|PCE Price|Non-Farm Employment|Nonfarm Payroll|Unemployment Rate|GDP|PPI|Producer Price|ISM Manufacturing PMI|Retail Sales|利率決議|台灣.*(?:CPI|GDP|利率)/i.test(title);
+}
+function mergeEvents(monday:string,friday:string,macro:Event[],company:Event[]):Event[]{
+ const scheduled=verifiedMajorEvents.filter(e=>e.date>=monday&&e.date<=friday);
+ return [...scheduled,...macro,...company,...usEarningsEvents(monday,friday)]
+  .sort((a,b)=>a.date.localeCompare(b.date)||(a.level==="high"?0:1)-(b.level==="high"?0:1)||a.time.localeCompare(b.time));
+}
 export async function GET(){
  const {monday,friday}=weekBounds();
  try{
@@ -66,19 +81,19 @@ export async function GET(){
   const raw=await res.json() as {title?:string;country?:string;date?:string;impact?:string;forecast?:string;previous?:string}[];
   if(!Array.isArray(raw))throw Error("行事曆格式異常");
   const macroEvents:Event[]=raw.flatMap(x=>{
-   if(!x.title||!x.date||!["USD","TWD","CNY","JPY"].includes(x.country??""))return [];
+   if(!x.title||!x.date||!["USD","TWD","JPY"].includes(x.country??""))return [];
    // Japan: show CPI and BOJ rate decisions only; exclude statements, outlooks and press conferences.
-   if(x.country==="JPY"&&!/\bCPI\b|Consumer Price Index|BOJ Policy Rate|Bank of Japan.*(?:Rate Decision|Interest Rate)/i.test(x.title))return [];
+   if(!isRelevantMacro(x.title,x.country??""))return [];
    const instant=new Date(x.date);if(!Number.isFinite(instant.getTime()))return [];
    const date=taiwanDay(instant.toISOString());if(date<monday||date>friday)return [];
    const impact=(x.impact??"").toLowerCase();
-   if(!["high","medium"].includes(impact))return [];
+   if(impact!=="high")return [];
    const translated=translate(x.title);if(!/[一-龥]/.test(translated))return [];
    const localized=x.country==="JPY"?translated.replace(/^美國/,"日本"):x.country==="CNY"?translated.replace(/^美國/,"中國"):translated;
    return [{date,time:taiwanTime(instant.toISOString()),title:localized,level:impact as "high"|"medium",region:x.country==="USD"?"🇺🇸":x.country==="TWD"?"🇹🇼":x.country==="JPY"?"🇯🇵":"🌏",detail:[x.forecast&&"預期 "+x.forecast,x.previous&&"前值 "+x.previous].filter(Boolean).join(" · "),source:"Forex Factory 經濟行事曆"}];
   });
   const company=await companyEvents(monday,friday).catch(()=>[] as Event[]);
-  const events=[...macroEvents,...company,...usEarningsEvents(monday,friday)].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
-  return NextResponse.json({status:"ok",monday,friday,events,notice:"追蹤美國大型市值公司財報（以已確認公告日期為準），換算台灣時間；未確認日期不顯示。",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=1800"}});
+  const events=mergeEvents(monday,friday,macroEvents,company);
+  return NextResponse.json({status:"ok",monday,friday,events,notice:"僅收錄重大市場事件、核心經濟數據、已確認大型企業財報及重點法說；美國選舉依官方日期，開票時間不預測。",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=1800"}});
  }catch(e){return NextResponse.json({status:"unavailable",monday,friday,events:[],error:e instanceof Error?e.message:"來源暫不可用"},{status:503});}
 }
