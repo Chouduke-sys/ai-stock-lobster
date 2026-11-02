@@ -1,3 +1,9 @@
+import {parseTwseMargin} from "../../../../lib/twse-margin";
+import {parseTaifexPositioning} from "../../../../lib/taifex-positioning";
+import {getQuote} from "../../../../lib/yahoo-quote";
+import {taiwanCalendar} from "../../../../lib/trading-calendar";
+import {captureWindow,strictNumber,taipeiDate,isQuoteFresh} from "../../../../lib/market-data";
+import {loadMorningSnapshot} from "../../../../lib/morning-snapshot";
 import {fetchHiStockThree} from "../../../../lib/histock-three";
 import {getIndexTechnical} from "../../../../lib/index-technical";
 import {assessAllocation, type Direction} from "../../../../lib/market-risk-score";
@@ -12,32 +18,8 @@ export const dynamic="force-dynamic";
 type Q={label:string;symbol:string;value:number|null;changePct:number|null;time:string|null};
 const symbols:[string,string][]=[["台指期近月","TX=F"],["標普500期貨","ES=F"],["那斯達克100期貨","NQ=F"],["費城半導體","^SOX"],["那斯達克指數","^IXIC"],["美元／新台幣","TWD=X"],["美元指數","DX-Y.NYB"],["VIX","^VIX"],["美國10年公債殖利率","^TNX"]];
 async function quote([label,symbol]:[string,string]):Promise<Q>{
- const empty={label,symbol,value:null,changePct:null,time:null};
- const future=symbol==="ES=F"||symbol==="NQ=F"||symbol==="TX=F";
- for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
-  try{
-   const interval=future?"5m":"1d",range=future?"2d":"5d";
-   const res=await fetch("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval="+interval+"&range="+range,{next:{revalidate:future?60:300},signal:AbortSignal.timeout(4500),headers:{"User-Agent":"Mozilla/5.0","Accept":"application/json"}});
-   if(!res.ok)continue;
-   const data=await res.json() as {chart?:{result?:Array<{meta?:{regularMarketPrice?:number;previousClose?:number;chartPreviousClose?:number;regularMarketTime?:number};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
-   const result=data.chart?.result?.[0],meta=result?.meta;
-   const timestamps=result?.timestamp??[],closes=result?.indicators?.quote?.[0]?.close??[];
-   let lastIndex=-1;
-   for(let i=0;i<timestamps.length;i++)if(typeof closes[i]==="number"&&Number.isFinite(closes[i])&&closes[i]!>0)lastIndex=i;
-   const lastTime=lastIndex>=0?timestamps[lastIndex]:meta?.regularMarketTime;
-   if(typeof lastTime!=="number")continue;
-   const age=Date.now()-lastTime*1000;
-   // Never present a previous session's futures percentage as the current move.
-   if(age< -300000||age>(future?12:96)*3600000)continue;
-   const value=lastIndex>=0?closes[lastIndex]:meta?.regularMarketPrice;
-   // For daily indices, use the prior completed daily bar when available. Yahoo meta.previousClose can refer to a different session.
-   const dailyBars=closes.map((close,i)=>({close,time:timestamps[i]})).filter((bar):bar is {close:number;time:number}=>typeof bar.close==="number"&&Number.isFinite(bar.close)&&bar.close>0&&typeof bar.time==="number");
-   const prev=(!future&&dailyBars.length>=2)?dailyBars[dailyBars.length-2].close:(meta?.previousClose??meta?.chartPreviousClose);
-   if(typeof value!=="number"||!Number.isFinite(value)||value<=0)continue;
-   return {label,symbol,value,changePct:typeof prev==="number"&&prev>0?(value/prev-1)*100:null,time:new Date(lastTime*1000).toISOString()};
-  }catch{}
- }
- return empty;
+ const q=await getQuote(label,symbol);
+ return q;
 }
 function taipeiParts(){
  const p=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
@@ -45,14 +27,14 @@ function taipeiParts(){
  return {date:v("year")+"-"+v("month")+"-"+v("day"),minute:Number(v("hour"))*60+Number(v("minute"))};
 }
 type MarginData={date:string;financingBalance:number|null;financingChange:number|null;shortBalance:number|null;shortChange:number|null;source:string};
-function numeric(raw:unknown):number|null{const n=Number(String(raw??"").replace(/,/g,"").replace(/[^0-9.-]/g,""));return Number.isFinite(n)&&String(raw??"").trim()!==""?n:null;}
+function numeric(raw:unknown):number|null{return strictNumber(raw);}
 async function yahooMargin():Promise<MarginData|null>{
  try{
   const res=await fetch("https://tw.stock.yahoo.com/margin-balance",{next:{revalidate:180},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const plain=html.replace(new RegExp("<[^>]+>","g")," ").replace(new RegExp("&nbsp;|&#160;","g")," ").replace(/\s+/g," ");
-  const pattern=new RegExp("(20[0-9]{2})/([0-9]{1,2})/([0-9]{1,2})\\\\s+([+-]?[0-9,]+(?:\\\\.[0-9]+)?)\\\\s+([0-9,]+(?:\\\\.[0-9]+)?)\\\\s+([+-]?[0-9,]+)\\\\s+([0-9,]+)\\\\s+([0-9.]+)%","g");
+  const pattern=new RegExp("(20[0-9]{2})/([0-9]{1,2})/([0-9]{1,2})\\s+([+-]?[0-9,]+(?:\\.[0-9]+)?)\\s+([0-9,]+(?:\\.[0-9]+)?)\\s+([+-]?[0-9,]+)\\s+([0-9,]+)\\s+([0-9.]+)%","g");
   const matches:Array<RegExpExecArray>=[];let match:RegExpExecArray|null;while((match=pattern.exec(plain))!==null){matches.push(match);if(match[0].length===0)pattern.lastIndex++;}
   if(!matches.length)return null;
   const m=matches.sort((a,b)=>b[1].localeCompare(a[1])||Number(b[2])-Number(a[2])||Number(b[3])-Number(a[3]))[0];
@@ -99,41 +81,13 @@ async function histockMargin():Promise<HiStockMargin|null>{
   return {...latest,borrowBalance:null,borrowChange:null,source:"HiStock 上市融資融券近三十日行情（融資億元；融券張）"};
  }catch{return null;}
 }
-async function latestMargin():Promise<MarginData|null>{
- const [histock,yahoo]=await Promise.all([histockMargin(),yahooMargin()]);
- const candidates=[histock,yahoo].filter((item):item is MarginData=>item!==null).sort((a,b)=>b.date.localeCompare(a.date));
- if(candidates.length)return candidates[0];
- const today=new Date();
- const taipei=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(today);
- const anchor=new Date(taipei+"T00:00:00+08:00");
- for(let offset=0;offset<9;offset++){
-  const d=new Date(anchor.getTime()-offset*86400000);
-  const date=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
-  const compactDate=date.replace(/-/g,"");
-  try{
-   const url="https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+compactDate+"&selectType=MS&response=json";
-   const res=await fetch(url,{next:{revalidate:900},signal:AbortSignal.timeout(4500)});
-   if(!res.ok)continue;
-   const payload=await res.json() as {stat?:string;tables?:Array<{fields?:string[];data?:string[][];title?:string}>;fields?:string[];data?:string[][]};
-   const tables=payload.tables?.length?payload.tables:[{fields:payload.fields,data:payload.data,title:""}];
-   for(const table of tables){
-    const fields=table.fields??[],rows=table.data??[];
-    if(!rows.length)continue;
-    const normalized=fields.map(x=>x.replace(/<[^>]*>/g,"").replace(/\s/g,""));
-    const financingBalanceIndex=normalized.findIndex(x=>/融資/.test(x)&&/餘額/.test(x));
-    const shortBalanceIndex=normalized.findIndex(x=>/融券/.test(x)&&/餘額/.test(x));
-    const financingChangeIndex=normalized.findIndex(x=>/融資/.test(x)&&/增減|差額/.test(x));
-    const shortChangeIndex=normalized.findIndex(x=>/融券/.test(x)&&/增減|差額/.test(x));
-    const row=rows.find(x=>/合計|總計/.test(String(x[0]??"")))??(rows.length===1?rows[0]:null);
-    if(!row||financingBalanceIndex<0||shortBalanceIndex<0)continue;
-    const financingBalance=numeric(row[financingBalanceIndex]);
-    const shortBalance=numeric(row[shortBalanceIndex]);
-    if(financingBalance===null||shortBalance===null)continue;
-    return {date,financingBalance,financingChange:financingChangeIndex>=0?numeric(row[financingChangeIndex]):null,shortBalance,shortChange:shortChangeIndex>=0?numeric(row[shortChangeIndex]):null,source:"臺灣證券交易所 MI_MARGN"};
-   }
-  }catch{}
- }
- return null;
+async function latestMargin(referenceDate:string):Promise<MarginData|null>{
+ try{
+  const res=await fetch("https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+referenceDate.replace(/-/g,"")+"&selectType=MS&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(6500)});
+  if(res.ok){const official=parseTwseMargin(await res.json(),referenceDate);if(official)return official;}
+ }catch{}
+ const candidates=(await Promise.all([histockMargin(),yahooMargin()])).filter((item):item is MarginData=>item!==null);
+ return candidates.find(item=>item.date===referenceDate)??null;
 }
 
 type FuturesOptions={date:string;foreignTxNet:number|null;putCallVolume:number|null;putCallOpenInterest:number|null;source:string};
@@ -163,35 +117,12 @@ function field(row:Record<string,unknown>,terms:string[]):unknown{
  const key=Object.keys(row).find(k=>terms.every(t=>k.toLowerCase().includes(t.toLowerCase())));
  return key===undefined?undefined:row[key];
 }
-async function latestFuturesOptions():Promise<FuturesOptions|null>{
+async function latestFuturesOptions(referenceDate:string):Promise<FuturesOptions|null>{
  const [ratios,institutions]=await Promise.all([
   taifexRows("PutCallRatio"),
   taifexRows("MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
  ]);
- const dateOf=(r:Record<string,unknown>)=>normalizedDate(field(r,["日期"])??field(r,["Date"]));
- const valid=(r:Record<string,unknown>)=>Boolean(dateOf(r));
- const latestRatio=ratios.filter(valid).sort((a,b)=>(dateOf(b)??"").localeCompare(dateOf(a)??""))[0];
- const ratioDate=latestRatio?dateOf(latestRatio):null;
- const getRatio=(r:Record<string,unknown>,type:"volume"|"oi")=>{
-  const entries=Object.entries(r);
-  const isRatio=(k:string)=>/比率|ratio/i.test(k);
-  const isOpen=(k:string)=>/未平倉|open/i.test(k);
-  const pair=entries.find(([k])=>isRatio(k)&&(type==="oi"?isOpen(k):!isOpen(k)));
-  return pair?numValue(pair[1]):null;
- };
- const volume=latestRatio?getRatio(latestRatio,"volume"):null;
- const oi=latestRatio?getRatio(latestRatio,"oi"):null;
- const foreignRows=institutions.filter(row=>{
-  const values=Object.values(row).map(x=>String(x??""));
-  return values.some(v=>/外資|Foreign/i.test(v))&&values.some(v=>/臺股期貨|台股期貨|臺指期貨|台指期貨|TX/i.test(v));
- }).sort((a,b)=>(dateOf(b)??"").localeCompare(dateOf(a)??""));
- const foreign=foreignRows.find(row=>field(row,["未平倉","淨額"])!==undefined||field(row,["Open","Net"])!==undefined);
- const foreignDate=foreign?dateOf(foreign):null;
- const net=foreign?numValue(field(foreign,["未平倉","淨額"])??field(foreign,["Open","Net"])):null;
- if(!ratioDate&&(!foreignDate||net===null))return null;
- const chosen=ratioDate&&foreignDate?(ratioDate>=foreignDate?ratioDate:foreignDate):(ratioDate??foreignDate)!;
- // Never combine a futures position from one session with option ratios from another.
- return {date:chosen,foreignTxNet:foreignDate===chosen?net:null,putCallVolume:ratioDate===chosen?volume:null,putCallOpenInterest:ratioDate===chosen?oi:null,source:"臺灣期貨交易所 OpenAPI"};
+ return parseTaifexPositioning(ratios,institutions,referenceDate);
 }
 async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;source:string}|null>{
  try{
@@ -219,36 +150,40 @@ function futuresVerdict(foreign:number|null,volume:number|null,oi:number|null):{
  if(score>=2)return {sentiment:"bullish",verdict:"期權籌碼偏多，仍需確認開盤量價",reason:"期貨與選擇權訊號偏正向"};
  return {sentiment:"neutral",verdict:"期權訊號分歧，建議中性觀望",reason:"期貨與選擇權訊號尚未形成一致方向"};
 }
-function priorTaiwanTradingDay(now:Date):string{
- const local=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
- let date=new Date(local+"T12:00:00+08:00");
- for(let i=0;i<7;i++){
-  date=new Date(date.getTime()-86400000);
-  const weekday=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",weekday:"short"}).format(date);
-  if(weekday!=="Sat"&&weekday!=="Sun")return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
- }
- return local;
-}
 export async function GET(request:Request){
  const cronAuthorized=Boolean(process.env.CRON_SECRET)&&request.headers.get("authorization")==="Bearer "+process.env.CRON_SECRET;
  const session=await getServerSession(authOptions);
  if(!session?.user&&!cronAuthorized)return NextResponse.json({status:"unauthorized",error:"請先使用 Google 或 Apple 帳號登入，才能查看每日 08:30 台股盤前分析。"},{status:401,headers:{"Cache-Control":"private, no-store"}});
- const now=taipeiParts(),reportDate=now.date,referenceDate=priorTaiwanTradingDay(new Date());
+ const captureStartedAt=new Date();
+ const now=taipeiParts(),reportDate=now.date;
+ const capture=new URL(request.url).searchParams.get("capture")==="1";
+ if(!capture){
+  try{
+   const record=await loadMorningSnapshot(reportDate);
+   if(!record)return NextResponse.json({status:"not_available",error:"今日尚無已驗證的盤前快照；不以盤中或盤後資料補寫盤前報告。"},{status:503,headers:{"Cache-Control":"private, no-store"}});
+   return NextResponse.json({...record.brief,snapshot:record.snapshot},{headers:{"Cache-Control":"private, no-store"}});
+  }catch{return NextResponse.json({status:"unavailable",error:"盤前封存讀取失敗，請稍後重試。"},{status:503});}
+ }
+ if(!cronAuthorized)return NextResponse.json({status:"forbidden",error:"只有盤前封存排程可產生快照"},{status:403});
+ if(!captureWindow())return NextResponse.json({status:"outside_capture_window",error:"只允許於台北時間 08:30～08:59 產生盤前快照"},{status:409});
+ const calendar=await taiwanCalendar();
+ if(calendar.isTradingDay!==true||!calendar.referenceDate)return NextResponse.json({status:"calendar_unavailable",error:"今日休市或官方交易日無法確認，拒絕產生預測"},{status:409});
+ const referenceDate=calendar.referenceDate;
  const [quotes,twse,news,margin,futuresOptions,wantgooRatio,policySignals,allocationModel,technical,histockThree,sectorFlow]=await Promise.all([
   Promise.all(symbols.map(quote)),
   fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+referenceDate.replace(/-/g,"")+"&response=json",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.json():null).catch(()=>null),
   fetch("https://news.google.com/rss/search?q="+encodeURIComponent("台股 外資 投信 融資 台幣 聯準會 川普 when:2d")+"&hl=zh-TW&gl=TW&ceid=TW:zh-Hant",{next:{revalidate:600},signal:AbortSignal.timeout(6500)}).then(r=>r.ok?r.text():"").catch(()=>""),
-  latestMargin(),
-  latestFuturesOptions(),
+  latestMargin(referenceDate),
+  latestFuturesOptions(referenceDate),
   wantgooPutCall(),
   getPolicySignals(),
-  backtestedAllocation(),
-  getIndexTechnical(),
+  backtestedAllocation(referenceDate),
+  getIndexTechnical(referenceDate),
   fetchHiStockThree(),
-  fetch(new URL("/api/market/ai-flow",request.url),{next:{revalidate:300},signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null) as Promise<{status:string;historyStatus:string;asOfVerified:boolean;groups:{historicalQuality:string;weeklyDelta:number|null;shareDelta:number|null}[]}|null>
+  fetch(new URL("/api/market/ai-flow",request.url),{next:{revalidate:300},signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null) as Promise<{status:string;asOf:string|null;historyStatus:string;asOfVerified:boolean;groups:{historyDate:string|null;historicalQuality:string;weeklyDelta:number|null;shareDelta:number|null}[]}|null>
  ]);
  // Accept today's verified closing figures once published, without losing the prior session's figures.
- const marginReferenceDate=now.minute>=13*60+30?reportDate:referenceDate;
+ const marginReferenceDate=referenceDate;
  const validatedMargin=margin&&(margin.date===referenceDate||margin.date===marginReferenceDate)?margin:null;
  const marginBorrow=validatedMargin&&"borrowBalance" in validatedMargin?validatedMargin as HiStockMargin:null;
  const validatedFutures=futuresOptions&&(futuresOptions.date===referenceDate||futuresOptions.date===marginReferenceDate)?futuresOptions:null;
@@ -263,7 +198,7 @@ export async function GET(request:Request){
  const flow=twse&&typeof twse==="object"?twse as {date?:string;data?:string[][];fields?:string[]}:null;
  const flowDate=normalizedDate(flow?.date);
  const flowRows=Array.isArray(flow?.data)?flow!.data!.slice(0,8).map(row=>row.join("／")).filter(Boolean):[];
- const parseMoney=(value:string)=>{const n=Number(value.replace(/,/g,"").replace(/\s/g,""));return Number.isFinite(n)?n:null;};
+ const parseMoney=(value:string)=>strictNumber(value);
  const investorRows=(flow?.data??[]).flatMap(row=>{const label=String(row[0]??"");if(!/外資|投信|自營商/.test(label))return [];const value=parseMoney(String(row[row.length-1]??""));return value===null?[]:[{label,value}];});
  const verifiedFlow=flowDate===referenceDate||flowDate===marginReferenceDate;
  const foreign=verifiedHiStock?{label:"外資",value:verifiedHiStock.foreignYi*1e8}:verifiedFlow?investorRows.find(row=>/外資/.test(row.label)):undefined,trust=verifiedHiStock?{label:"投信",value:verifiedHiStock.trustYi*1e8}:verifiedFlow?investorRows.find(row=>/投信/.test(row.label)):undefined;
@@ -305,7 +240,7 @@ export async function GET(request:Request){
  const optionRatio=validatedWantgoo;
  const optionVolume=optionRatio?.volume??validatedFutures?.putCallVolume??null;
  const optionOi=optionRatio?.oi??validatedFutures?.putCallOpenInterest??null;
- const foreignFuturesNet=verifiedHiStock?.foreignFuturesNet??validatedFutures?.foreignTxNet??null;
+ const foreignFuturesNet=validatedFutures?.foreignTxNet??null;
  const futuresSignal=futuresVerdict(foreignFuturesNet,optionVolume,optionOi);
  const optionDate=optionRatio?.date??validatedFutures?.date??null;
  const marginInterpretation=validatedMargin?.financingChange==null?"融資增減不足，無法判斷散戶槓桿變化。":validatedMargin.financingChange>0?"融資增加代表槓桿資金升高；若指數同步走強可能是追價，也可能提高回檔時的賣壓，須搭配量價與法人買賣超判斷。":validatedMargin.financingChange<0?"融資減少代表槓桿部位收縮；若股價止跌可能有籌碼沉澱效果，但若價格同步下跌，也可能反映停損或斷頭壓力。":"融資餘額變化不大，暫無明確槓桿方向。";
@@ -323,30 +258,42 @@ export async function GET(request:Request){
   {title:"今日盤前小總結",body:"九項風險因子加權計算中。",sentiment:"neutral" as Direction,verdict:"計算中"}
  ];
  const missing=[!validatedMargin?"融資融券":null,foreignFuturesNet==null?"外資台指期":null,optionVolume===null?"選擇權成交量 P/C":null,optionOi===null?"選擇權未平倉 P/C":null,!foreign||!trust?"法人":null].filter((v):v is string=>v!==null);
- const dataComplete=missing.length===0;
+ let dataComplete=missing.length===0;
  const firstEight=sections.slice(0,8);
  const bullishCount=firstEight.filter(item=>item.sentiment==="bullish").length;
  const bearishCount=firstEight.filter(item=>item.sentiment==="bearish").length;
  const neutralCount=firstEight.length-bullishCount-bearishCount;
  // Only use verified multi-session sector turnover trends; turnover alone is not net inflow.
- const sectorDirection:Direction|null=sectorFlow?.status==="ok"&&sectorFlow.historyStatus==="available"&&sectorFlow.asOfVerified&&sectorFlow.groups?.some(g=>g.historicalQuality==="verified")
-  ?(()=>{const valid=sectorFlow.groups.filter(g=>g.historicalQuality==="verified"&&typeof g.weeklyDelta==="number"&&typeof g.shareDelta==="number");const sum=valid.reduce((n,g)=>n+(g.weeklyDelta>0&&g.shareDelta>0?1:g.weeklyDelta<0&&g.shareDelta<0?-1:0),0);return valid.length<3?null:sum>0?"bullish":sum<0?"bearish":"neutral";})():null;
+ const sectorDirection:Direction|null=sectorFlow?.asOf===referenceDate&&sectorFlow?.status==="ok"&&sectorFlow.historyStatus==="available"&&sectorFlow.asOfVerified&&sectorFlow.groups?.some(g=>g.historicalQuality==="verified")
+  ?(()=>{const valid=sectorFlow.groups.filter(g=>g.historyDate===referenceDate&&g.historicalQuality==="verified"&&typeof g.weeklyDelta==="number"&&typeof g.shareDelta==="number");const sum=valid.reduce((n,g)=>n+(g.weeklyDelta>0&&g.shareDelta>0?1:g.weeklyDelta<0&&g.shareDelta<0?-1:0),0);return valid.length<3?null:sum>0?"bullish":sum<0?"bearish":"neutral";})():null;
  const modelAvailable=allocationModel.allocation!==null;
  const baseAllocation=modelAvailable?Math.max(0,Math.min(90,allocationModel.allocation!)):null;
  const riskAssessment=assessAllocation([
   {name:"大盤技術面與成交量",weight:25,direction:technical.valid?technical.sentiment:null},
   {name:"外資與投信",weight:15,direction:foreign&&trust?sections[1].sentiment as Direction:null},
-  {name:"外資期貨與選擇權",weight:10,direction:foreignFuturesNet!=null&&optionVolume!==null?sections[3].sentiment as Direction:null},
+  {name:"外資期貨與選擇權",weight:10,direction:foreignFuturesNet!=null&&optionVolume!==null&&optionOi!==null?sections[3].sentiment as Direction:null},
   {name:"融資融券",weight:15,direction:validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null?sections[2].sentiment as Direction:null},
   {name:"國際股市與美股期貨",weight:15,direction:us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null?sections[0].sentiment as Direction:null},
   {name:"產業資金輪動",weight:10,direction:sectorDirection},
-  {name:"匯率與利率",weight:5,direction:fx?.changePct!=null?sections[4].sentiment as Direction:null},
+  {name:"匯率與利率",weight:5,direction:fx?.changePct!=null&&by("DX-Y.NYB")?.changePct!=null&&by("^TNX")?.value!=null?sections[4].sentiment as Direction:null},
   {name:"VIX",weight:3,direction:vix?.value!=null?sections[5].sentiment as Direction:null},
   {name:"重大政策",weight:2,direction:policySignals.score!==null?sections[7].sentiment as Direction:null}
  ],baseAllocation);
  const riskCap=riskAssessment.riskCap;
  const recommendedAllocation=riskAssessment.recommendedAllocation;
  const score=riskAssessment.score,coverage=riskAssessment.coverage;
+ const available=[
+  us?.changePct!=null&&tech?.changePct!=null&&semi?.changePct!=null,
+  Boolean(foreign&&trust),
+  validatedMargin?.financingChange!=null&&validatedMargin.shortChange!=null,
+  foreignFuturesNet!==null&&optionVolume!==null&&optionOi!==null,
+  fx?.changePct!=null&&by("DX-Y.NYB")?.changePct!=null&&by("^TNX")?.value!=null, vix?.value!=null,technical.valid,policySignals.score!==null
+ ];
+ const dates=[null,verifiedHiStock?.date??flowDate,validatedMargin?.date??null,optionDate,null,null,technical.date,null];
+
+ for(let i=0;i<8;i++)if(!available[i]&&!missing.includes(sections[i].title))missing.push(sections[i].title);
+ dataComplete=available.every(Boolean)&&sectorDirection!==null;
+ if(sectorDirection===null)missing.push("產業資金輪動");
  const overallDirection:Direction=score===null||coverage<50?"neutral":score>=60?"bullish":score<=40?"bearish":"neutral";
  const overallLabel=coverage<50?"資料覆蓋不足":overallDirection==="bullish"?"加權偏多":overallDirection==="bearish"?"加權偏空":"加權中性";
  const overallStance=overallLabel;
@@ -376,5 +323,5 @@ export async function GET(request:Request){
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:30 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections,allocationBacktest:allocationModel,policyNews:policySignals.items,source:"Yahoo Finance / TWSE / TAIFEX / HiStock / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",modelVersion:"market-integrity-v2",captureStartedAt:captureStartedAt.toISOString(),reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:45 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections:sections.map((section,i)=>({...section,available:i===8?coverage>=50:available[i],dataDate:dates[i]??null})),allocationBacktest:allocationModel,policyNews:policySignals.items,inputs:{margin:validatedMargin,futures:validatedFutures,options:validatedWantgoo,institutional:{date:verifiedHiStock?.date??flowDate,foreign,trust},technical,sectorFlow},source:"Yahoo Finance / TWSE / TAIFEX / HiStock / Wantgoo / Google News RSS",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }

@@ -25,10 +25,8 @@ export async function fetchHiStockThree():Promise<HiStockThree|null>{
   if(!row)return null;
   const date=dateOf(row[0])!,foreignYi=parseMarketNumber(row[fi])!,trustYi=parseMarketNumber(row[ti])!,dealerYi=parseMarketNumber(row[di])!,totalYi=parseMarketNumber(row[total])!;
   if(Math.abs(foreignYi+trustYi+dealerYi-totalYi)>1.5)return null;
-  const futures=tables.find(t=>t!==institution&&t.headers.some(h=>h.includes("外資"))&&t.headers.some(h=>h.includes("投信"))&&t.rows.some(r=>dateOf(r[0]??"")));
-  const futuresRow=futures?.rows.find(r=>dateOf(r[0]??"")===date);
-  const futuresIndex=futures?.headers.findIndex(h=>h.includes("外資"))??-1;
-  const foreignFuturesNet=futuresRow&&futuresIndex>=0?parseMarketNumber(futuresRow[futuresIndex]??""):null;
+  // Futures are parsed only by the explicit TAIFEX contract/count adapter.
+  const foreignFuturesNet=null;
   return {date,foreignYi,trustYi,dealerYi,totalYi,foreignFuturesNet,source:"HiStock 上市三大法人與台指期留倉"};
  }catch{return null;}
 }

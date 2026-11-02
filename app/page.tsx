@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import {signalCounts,taipeiDate} from "../lib/market-data";
 import {useIntradayHistory} from "../lib/useIntradayHistory";
 
 import { useEffect, useState } from "react";
@@ -23,7 +24,7 @@ type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imag
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
 type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
-type TaiexResult = { status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
+type TaiexResult = { quoteTime?:string|null; status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type CloseResult={status:string;date:string;value:number;change:number|null;tradeVolume:number|null;tradeValue:number|null;transactions:number|null;dataSource:string};
 type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;change?:number|null;changePercent?:number|null;referencePrice?:number|null;isClosed?:boolean};
 type StockResult = {
@@ -184,6 +185,8 @@ function MarketMiniTrend({values,label}:{values:number[];label:string}){
  </svg><span className={rising?"market-up":"market-down"}>{rising?"+":""}{change.toFixed(2)}% · {valid.length}日</span></div>;
 }
 export default function Home() {
+  const [clockNow,setClockNow]=useState(()=>Date.now());
+  useEffect(()=>{const timer=setInterval(()=>setClockNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const [member,setMember]=useState<{name?:string|null;email?:string|null}|null>(null);
   const [memberLoading,setMemberLoading]=useState(true);
   const [isAdmin,setIsAdmin]=useState(false);
@@ -233,7 +236,7 @@ export default function Home() {
   const [ftseError,setFtseError]=useState("");
   const [positioning,setPositioning]=useState<{status:string;institutional:{label:string;values:string[]}[];margin:{label:string;values:string[]}[];futures:{label:string;values:string[]}[];retrievedAt:string;liveInstitutional?:{date:string;foreignYi:number;trustYi:number;dealerYi:number;totalYi:number;unit:string;source:string}|null}|null>(null);
   const [positioningError,setPositioningError]=useState("");
-  useEffect(()=>{let active=true;const load=async()=>{try{const res=await fetch("/api/market/taiwan-positioning",{cache:"no-store"});const data=await res.json();if(!res.ok||data.status!=="ok")throw new Error(data.error||"資料暫不可用");if(active){setPositioning(data);setPositioningError("");}}catch(e){if(active)setPositioningError(e instanceof Error?e.message:"資料暫不可用");}};void load();const timer=setInterval(()=>{if(document.visibilityState==="visible")void load();},60000);return()=>{active=false;clearInterval(timer);};},[]);
+  useEffect(()=>{let active=true;const load=async()=>{try{const res=await fetch("/api/market/taiwan-positioning",{cache:"no-store"});const data=await res.json();if(!res.ok||data.status!=="ok")throw new Error(data.error||"資料暫不可用");if(active){setPositioning(data);setPositioningError("");}}catch(e){if(active){setPositioning(null);setPositioningError(e instanceof Error?e.message:"資料暫不可用");}}};void load();const timer=setInterval(()=>{if(document.visibilityState==="visible")void load();},60000);return()=>{active=false;clearInterval(timer);};},[]);
 
   useEffect(()=>{
     let active=true;
@@ -301,7 +304,7 @@ useEffect(()=>{
         const data=await response.json();
         if(!response.ok||data.status!=="ok")throw new Error(data.error||"盤前分析暫不可用");
         if(!controller.signal.aborted){setMorningBrief(data);setMorningBriefError("");}
-      }catch(e){if(!controller.signal.aborted)setMorningBriefError(e instanceof Error?e.message:"盤前分析暫不可用");}
+      }catch(e){if(!controller.signal.aborted){setMorningBrief(null);setMorningBriefError(e instanceof Error?e.message:"盤前分析暫不可用");}}
     }
     if(!memberLoading&&member)void load();const timer=setInterval(()=>{if(member)void load();},60000);
     return ()=>{controller.abort();clearInterval(timer);};
@@ -348,9 +351,10 @@ useEffect(()=>{
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [weekCalendar,setWeekCalendar]=useState<{monday:string;friday:string;events:{date:string;time:string;title:string;level:string;region:string;detail:string}[];status:string}|null>(null);
   useEffect(()=>{let active=true;async function load(){try{const r=await fetch("/api/market/week-calendar");const d=await r.json();if(active)setWeekCalendar(d);}catch{if(active)setWeekCalendar(null);}}void load();const timer=setInterval(()=>void load(),3600000);return()=>{active=false;clearInterval(timer);};},[]);
-  const [morningBrief,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;sections:{title:string;body:string;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
+  const [morningBriefData,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;sections:{title:string;body:string;available?:boolean;dataDate?:string|null;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
-  const [dailyReview,setDailyReview]=useState<{latest:{date:string;prediction:string;predictionLabel:string;outcome:null|{changePct:number;actual:string;correct:boolean}}[];metrics:{days30:{evaluated:number;rate:number|null};days90:{evaluated:number;rate:number|null}};method:string}|null>(null);
+  const morningBrief=morningBriefData?.reportDate===taipeiDate(new Date(clockNow))?morningBriefData:null;
+  const [dailyReview,setDailyReview]=useState<{latest:{date:string;prediction:string;predictionLabel:string;outcome:null|{changePct:number;actual:string;correct:boolean|null}}[];metrics:{days30:{evaluated:number;rate:number|null};days90:{evaluated:number;rate:number|null}};method:string}|null>(null);
   useEffect(()=>{let cancelled=false;fetch("/api/market/daily-review").then(r=>r.ok?r.json():null).then(data=>{if(!cancelled&&data?.status==="ok")setDailyReview(data);}).catch(()=>{});return()=>{cancelled=true;};},[]);
   
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
@@ -405,8 +409,9 @@ useEffect(()=>{
   const [taiexError, setTaiexError] = useState("");
   const [closing, setClosing] = useState<CloseResult|null>(null);
   const [closingError, setClosingError] = useState("");
-  const [night, setNight] = useState<NightResult|null>(null);
+  const [nightData, setNight] = useState<NightResult|null>(null);
   const [nightError, setNightError] = useState("");
+  const night=nightData&&!nightError&&clockNow-Date.parse(nightData.quoteTime)<=120000?nightData:null;
   const [trendRange,setTrendRange]=useState<"live"|"1d"|"2d"|"3d">("live");
   const [dayPoints,setDayPoints]=useState<Point[]>([]);
   const [indexHistory,setIndexHistory]=useState<Point[]>([]);
@@ -579,7 +584,7 @@ useEffect(()=>{
       }
     }
     void loadIndex();
-    const timer = setInterval(() => { if(isTaiexSessionNow())void loadIndex(); }, 1000);
+    const timer = setInterval(() => { if(document.visibilityState==="visible"&&isTaiexSessionNow())void loadIndex(); }, 5000);
     const offHoursTimer=setInterval(()=>{if(!isTaiexSessionNow())void loadIndex();},30000);
     return () => { controller.abort(); clearInterval(timer); clearInterval(offHoursTimer); };
   }, []);
@@ -615,7 +620,7 @@ useEffect(()=>{
       finally{inFlight=false;}
     }
     void loadNight();
-    const timer=setInterval(()=>{void loadNight();},1000);
+    const timer=setInterval(()=>{if(document.visibilityState==="visible")void loadNight();},5000);
     return ()=>{controller.abort();clearInterval(timer);};
   },[]);
 
@@ -645,7 +650,7 @@ useEffect(()=>{
         const data=await response.json();
         if(!response.ok||data.status!=="ok")throw new Error(data.error||"AI 族群資料暫不可用");
         if(!controller.signal.aborted){setAiFlow(data);setAiFlowError("");}
-      }catch(e){if(!controller.signal.aborted)setAiFlowError(e instanceof Error?e.message:"AI 族群資料暫不可用");}
+      }catch(e){if(!controller.signal.aborted){setAiFlow(null);setAiFlowError(e instanceof Error?e.message:"AI 族群資料暫不可用");}}
     }
     void load();const timer=setInterval(()=>{void load();},300000);
     return ()=>{controller.abort();clearInterval(timer);};
@@ -712,8 +717,8 @@ useEffect(()=>{
           <div className="morning-brief-preview-overlay"><LockKeyhole size={30}/><h3>免費會員解鎖每日盤前分析</h3><p>九大板塊分析、利多利空判斷與盤前總結，登入後免費觀看。</p><div className="morning-brief-login-actions">{loginProviders.google&&<button className="btn btn-primary" onClick={()=>{startOAuth("google");}}>使用 Google 登入</button>}{loginProviders.apple&&<button className="btn btn-secondary" onClick={()=>{startOAuth("apple");}}>使用 Apple ID 登入</button>}{!loginProviders.google&&!loginProviders.apple&&<p>Google／Apple 登入尚待管理員完成 OAuth 設定。</p>}</div></div>
         </div>}
         {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
-        {member&&morningBrief?<><div className="morning-brief-summary"><div style={{display:"grid",gap:5,minWidth:0}}><strong>{morningBrief.stance}</strong><small style={{fontSize:12,lineHeight:1.6,color:"#c7d9ed",maxWidth:610}}>{(()=>{const bull=morningBrief.sections.filter(x=>x.sentiment==="bullish").length;const bear=morningBrief.sections.filter(x=>x.sentiment==="bearish").length;const neutral=morningBrief.sections.length-bull-bear;return `九大面向：利多 ${bull}／利空 ${bear}／中性 ${neutral}。${bull>bear?"多方訊號略占優勢，但仍須觀察量能與法人動向。":bear>bull?"空方訊號略占優勢，建議留意開盤後承接與風險控管。":"多空訊號相近，方向尚未明朗，先觀察量能與法人動向。"}${typeof morningBrief.recommendedAllocation==="number"?" 建議倉位上限 "+Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%。":""}`;})()}</small></div><small className="morning-brief-allocation">建議股票總倉水位：{typeof morningBrief.recommendedAllocation==="number"?Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%":"回測資料取得中"}</small><span>分析日期 {morningBrief.reportDate} · 最新計算 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
-        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p></article>)}</div><p className="footnote">{morningBrief.method} · 08:30 後首次請求產生當日分析，之後定期檢查更新；非保證精準在 08:30 主動推送。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
+        {member&&morningBrief?<><div className="morning-brief-summary"><div style={{display:"grid",gap:5,minWidth:0}}><strong>{morningBrief.stance}</strong><small style={{fontSize:12,lineHeight:1.6,color:"#c7d9ed",maxWidth:610}}>{(()=>{const {bullish:bull,bearish:bear,neutral,unavailable}=signalCounts(morningBrief.sections);return `八項獨立分析：利多 ${bull}／利空 ${bear}／中性 ${neutral}／待確認 ${unavailable}。${bull>bear?"多方訊號略占優勢，但仍須觀察量能與法人動向。":bear>bull?"空方訊號略占優勢，建議留意開盤後承接與風險控管。":"多空訊號相近，方向尚未明朗，先觀察量能與法人動向。"}${typeof morningBrief.recommendedAllocation==="number"?" 建議倉位上限 "+Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%。":""}`;})()}</small></div><small className="morning-brief-allocation">建議股票總倉水位：{typeof morningBrief.recommendedAllocation==="number"?Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%":"資料不足，暫不提供數字"}</small><span>分析日期 {morningBrief.reportDate} · 快照產生 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
+        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p>{item.available===false&&<small>資料待確認，不列入有效訊號。</small>}{item.dataDate&&<small>資料日：{item.dataDate}</small>}</article>)}</div><p className="footnote">{morningBrief.method} · 盤前排程於 08:30～08:59 內封存；當日內容固定，不以盤中或盤後資料改寫。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
@@ -732,7 +737,7 @@ useEffect(()=>{
             const deltaYi=delta===null?null:delta/1e8;
             // Absolute TWD turnover change; percentage is not used for status or rank.
             const rotationClass=deltaYi===null?"rotation-unknown":deltaYi>=50?"rotation-fast-in":deltaYi>0?"rotation-slow-in":deltaYi<=-50?"rotation-fast-out":"rotation-slow-out";
-            const rotationLabel=deltaYi===null?"資料不足":deltaYi>=50?"資金快速集中":deltaYi>0?"資金緩慢流入":deltaYi<=-50?"資金快速流出":"資金緩慢流出";
+            const rotationLabel=deltaYi===null?"資料不足":deltaYi>=50?"成交熱度快速增加":deltaYi>0?"成交熱度緩慢增加":deltaYi<=-50?"成交熱度快速減少":"成交熱度緩慢減少";
             return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
               <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
               <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{typeof g.turnoverShare==="number"?"市場成交占比 "+g.turnoverShare.toFixed(1)+"% · ":""}{typeof g.leaderShare==="number"?"最大成分股占族群 "+g.leaderShare.toFixed(0)+"% · ":""}{deltaYi===null?"歷史資料累積中":(deltaYi>0?"+":"")+deltaYi.toFixed(1)+" 億（"+(typeof g.weeklyDelta==="number"?"較近週前幾日均值":"較 "+older?.date)+"）"}</small></div>
@@ -745,7 +750,7 @@ useEffect(()=>{
       </section>
       <section className="section sector-rotation-member" aria-label="會員 AI 盤後檢討">
         <div className="section-heading"><div><div className="eyebrow">AI DAILY REVIEW · 預測績效追蹤</div><h2>AI 盤後檢討</h2><p>保留每日盤前方向快照，與當日證交所正式收盤結果核對，不回填事後預測。</p></div></div>
-        {member?<><div className="sector-radar-grid"><div className="sector-radar-panel"><h3>近 30 個已驗證交易日</h3><strong>{dailyReview?.metrics.days30.rate==null?"累積中":dailyReview.metrics.days30.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days30.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>近 90 個已驗證交易日</h3><strong>{dailyReview?.metrics.days90.rate==null?"累積中":dailyReview.metrics.days90.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days90.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>驗證方式</h3><p>盤前偏多／偏空／中性，對照當日加權指數漲跌；尚未累積的交易日不計入勝率。</p></div></div><div className="sector-radar-panel">{dailyReview?.latest.length?dailyReview.latest.map(day=><div className="sector-radar-entry" key={day.date}><strong>{day.date}　盤前：{day.predictionLabel}</strong><span>{day.outcome?"盤後："+(day.outcome.changePct>=0?"+":"")+day.outcome.changePct.toFixed(2)+"%　"+(day.outcome.correct?"方向符合":"方向未符合"):"盤後結果待驗證"}</span></div>):<p>歷史預測尚未累積。首次排程成功執行後，才會開始顯示可核對的紀錄。</p>}</div><p className="footnote">{dailyReview?.method??"盤前與盤後資料須完成自動封存後才能計算命中率。"} 命中率不代表策略報酬率。</p></>:<p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後查看 AI 盤後檢討與歷史命中率。</p>}
+        {member?<><div className="sector-radar-grid"><div className="sector-radar-panel"><h3>近 30 個已驗證交易日</h3><strong>{dailyReview?.metrics.days30.rate==null?"累積中":dailyReview.metrics.days30.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days30.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>近 90 個已驗證交易日</h3><strong>{dailyReview?.metrics.days90.rate==null?"累積中":dailyReview.metrics.days90.rate.toFixed(1)+"%"}</strong><p>已驗證 {dailyReview?.metrics.days90.evaluated??0} 日</p></div><div className="sector-radar-panel"><h3>驗證方式</h3><p>盤前偏多／偏空／中性，對照當日加權指數漲跌；尚未累積的交易日不計入勝率。</p></div></div><div className="sector-radar-panel">{dailyReview?.latest.length?dailyReview.latest.map(day=><div className="sector-radar-entry" key={day.date}><strong>{day.date}　盤前：{day.predictionLabel}</strong><span>{day.outcome?"盤後："+(day.outcome.changePct>=0?"+":"")+day.outcome.changePct.toFixed(2)+"%　"+(day.outcome.correct===null?"資料不足，未評分":day.outcome.correct?"方向符合":"方向未符合"):"盤後結果待驗證"}</span></div>):<p>歷史預測尚未累積。首次排程成功執行後，才會開始顯示可核對的紀錄。</p>}</div><p className="footnote">{dailyReview?.method??"盤前與盤後資料須完成自動封存後才能計算命中率。"} 命中率不代表策略報酬率。</p></>:<p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後查看 AI 盤後檢討與歷史命中率。</p>}
       </section>
       <section className="hero hero-balanced" id="desktop-news">
         <div className="hero-copy" style={{alignSelf:"stretch",display:"flex",flexDirection:"column",justifyContent:"flex-start",paddingTop:12}}>
@@ -769,7 +774,7 @@ useEffect(()=>{
         <section className="holdings-panel" id="desktop-sectors" aria-label="AI熱門產業概念股-資金成交熱度">
           <div className="holdings-heading"><span>AI熱門產業概念股-資金成交熱度</span><small>CCL／PCB／先進封裝上下游</small></div>
           <div className="holdings-fund-title">今日 AI 供應鏈成交熱度 <span>{aiFlow?.asOf??"讀取中"} · 上市盤後資料</span></div>
-          <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+aiFlow.groups[0].name+"（"+(aiFlow.groups[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
+          <p className="holdings-date">{aiFlow?.groups?.length?"成交金額最高："+[...aiFlow.groups].sort((a,b)=>b.turnover-a.turnover)[0].name+"（"+([...aiFlow.groups].sort((a,b)=>b.turnover-a.turnover)[0].turnover/1e8).toFixed(1)+" 億元）":aiFlowError||"正在讀取證交所成交資料"}。成交金額是資金活躍度，並非買超淨流入。</p>
           {aiFlow?.groups?.slice(0,10).map(g=><div className="holdings-row" key={g.name}>
             <span className="holdings-name">{g.name}<small> {g.chain}</small><small className="sector-companies">代表公司：{g.stocks.map(stock=>stock.name+"（"+stock.symbol+"）").join("、")||"尚無成分股資料"}</small></span>
             <div className="holdings-bar"><i style={{width:(g.turnover/Math.max(aiFlow.groups[0].turnover,1)*100).toFixed(1)+"%"}}/></div>
@@ -781,7 +786,7 @@ useEffect(()=>{
         </div>
         <div className="hero-visual" id="desktop-index">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.delaySeconds)} · 開盤每 1 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)} · 開盤每 5 秒查詢 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>加權指數 · 最近收盤</small>
@@ -791,7 +796,7 @@ useEffect(()=>{
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>臺股期貨 TX · {night?.isClosed?"最近有效夜盤報價（非官方收盤價）":"夜盤"}（不同於加權指數）</small>
               <strong style={{display:"block",fontSize:24}}>{formatPrice(night?.price)}</strong>
-              <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(night.delaySeconds)} · 每 5 秒查詢` : nightError || "讀取中"}</small>
+              <small>{night ? `${night.contract} · ${new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · ${ageLabel(Math.max(0,Math.floor((clockNow-Date.parse(night.quoteTime))/1000)))} · 每 5 秒查詢` : nightError || (nightData?"前次報價已過期，等待更新":"讀取中")}</small>
             </div>
           </div>
           <div style={{border:"1px solid #64748b55",borderRadius:12,padding:14,margin:"0 0 14px"}}>
@@ -832,7 +837,7 @@ useEffect(()=>{
               <div><small>漲跌點數</small><strong style={{display:"block",fontSize:24,color:night?.change==null?"#94a3b8":night.change>=0?"#fb7969":"#42c4a5"}}>{night?.change==null?"—":(night.change>0?"+":"")+formatPrice(night.change)+" 點"}</strong></div>
               <div><small>漲跌幅</small><strong style={{display:"block",fontSize:24,color:night?.changePercent==null?"#94a3b8":night.changePercent>=0?"#fb7969":"#42c4a5"}}>{night?.changePercent==null?"—":(night.changePercent>0?"+":"")+night.changePercent.toFixed(2)+"%"}</strong></div>
             </div>
-            <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(night.delaySeconds)+" · "+night.dataSource:nightError||"正在讀取夜盤報價"}。{night?.change==null||night?.changePercent==null?"行情來源未提供可驗證的漲跌基準，暫不顯示漲跌數值。":"漲跌依行情來源提供的參考價計算。"}不以不完整取樣繪製夜盤走勢圖。</p>
+            <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(Math.max(0,Math.floor((clockNow-Date.parse(night.quoteTime))/1000)))+" · "+night.dataSource:nightError||(nightData?"前次報價已過期，等待更新":"正在讀取夜盤報價")}。{night?.change==null||night?.changePercent==null?"行情來源未提供可驗證的漲跌基準，暫不顯示漲跌數值。":"漲跌依行情來源提供的參考價計算。"}不以不完整取樣繪製夜盤走勢圖。</p>
           </div>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
@@ -879,7 +884,7 @@ useEffect(()=>{
       </section>
 
       <section className="stats-grid">
-        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
+        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
         <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人排行</span><strong>{rankDate || "待公布"}</strong><small>{rankDate ? "最新已取得交易日 · 盤後資料" : "等待官方日報，非盤中即時"}</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> {rankSide==="buy"?"買超":"賣超"}榜首</span><strong>{rows[0]?.name || "待更新"}</strong><small>{rows[0]?`${rows[0].symbol} · ${formatVolume(rows[0].netShares)} 股`:"尚無可驗證排名"}</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 三日法人動向</span><strong>{fiveLoading?"查詢中":fiveRows.length?fiveRows[0].name:"待確認"}</strong><small>{fiveRows.length?`三日合計 ${formatVolume(fiveRows[0].netShares)} 股`:"尚無完整三日排行"}</small></article>

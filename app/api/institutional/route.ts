@@ -1,3 +1,4 @@
+import {taiwanCalendar} from "../../../lib/trading-calendar";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 type Obj=Record<string,unknown>;
@@ -105,7 +106,8 @@ let lastGoodTwseAt=0;
 let pendingTwse:Promise<MarketData|null>|null=null;
 async function twse():Promise<MarketData|null>{
  const now=Date.now();
- const minDate=await confirmedCloseDate()??previousWeekdayDate();
+ const minDate=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
+  if(!minDate)return null;
  if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<120000)return lastGoodTwse;
  if(!pendingTwse)pendingTwse=fetchTwse(minDate).finally(()=>{pendingTwse=null;});
  const fresh=await pendingTwse;
@@ -135,7 +137,8 @@ async function tpex():Promise<MarketData|null>{
    if(foreign===null||trust===null||dealer===null||total===null||Math.abs(foreign+trust+dealer-total)>1)continue;
    rows.push({symbol,name:String(pick(r,["CompanyName","SecuritiesCompanyName","SecuritiesName","Name","證券名稱"])??symbol),market:"tpex",foreign,trust,dealer,total});
   }
-  return date&&rows.length?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
+  const expected=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
+   return date&&rows.length&&expected&&date>=expected&&date<=today()?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
  }catch{return null;}
 }
 export async function GET(request:Request){

@@ -24,5 +24,7 @@ jobs:
           node --check scripts/archive-sector-flow.cjs
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Market data regression tests
+        run: npm test
       - name: Production build
         run: npm run build
