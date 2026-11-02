@@ -389,7 +389,6 @@ useEffect(()=>{
       window.history.replaceState(null, "", window.location.pathname + window.location.hash);
     }
   }, []);
-  const [showPlan, setShowPlan] = useState(false);
   const [message, setMessage] = useState("");
   const [stockData, setStockData] = useState<StockResult | null>(null);
   const [loadingQuote, setLoadingQuote] = useState(false);
@@ -977,8 +976,7 @@ useEffect(()=>{
       </section>
 
 
-      <section className="membership" id="membership"><div><div className="eyebrow">MEMBERSHIP</div><h2>從基本資訊，到進階研究工具。</h2><p>規劃免費基本版與 Pro 會員方案。實際收費與付費權限需待金流和會員系統完成後啟用。</p></div><button className="btn btn-primary" onClick={() => setShowPlan(!showPlan)}>查看會員方案 <ArrowUpRight size={16}/></button>
-        {showPlan && <div className="plan-detail"><h3>Pro 會員（規劃中）</h3><p>進階歷史排行、個股追蹤、技術指標與 AI 研究摘要。</p><span className="tag tag-amber">尚未開放訂閱或收款</span></div>}
+      <section className="membership" id="membership"><div><div className="eyebrow">PRO RESEARCH · 會員免費體驗</div><h2>你的專屬研究工作台。</h2><p>自選股追蹤、研究筆記、5／10／20 日產業比較、均線與 RSI，以及可匯出的研究摘要。現有登入會員免費體驗，不需訂閱或付款。</p></div><a href="/pro" className="btn btn-primary">開啟 Pro 研究工作台 <ArrowUpRight size={16}/></a>
       </section>
 
 
