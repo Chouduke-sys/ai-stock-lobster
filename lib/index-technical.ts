@@ -23,7 +23,7 @@ async function latestTwseClose(lastCompletedDate:string):Promise<{date:string;cl
 }
 export async function getIndexTechnical(lastCompletedDate:string):Promise<TechnicalSignal>{
  const fallback:TechnicalSignal={body:"技術指標暫未取得可驗證行情，請以交易所公告為準。",sentiment:"neutral",verdict:"技術數據待更新",valid:false,date:null};
- const official=await latestTwseClose(lastCompletedDate);
+ let official:{date:string;close:number}|null=null;
  const taipeiNow=new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Taipei"}));
  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
  const weekday=taipeiNow.getDay();
@@ -48,7 +48,8 @@ export async function getIndexTechnical(lastCompletedDate:string):Promise<Techni
     if(bars.length<65)continue;
    const yahooLast=bars[bars.length-1];
    const yahooDate=new Date(yahooLast.t*1000).toLocaleDateString("en-CA",{timeZone:"Asia/Taipei"});
-   let officialOverride=false;
+   if(yahooDate<lastCompletedDate)official=await latestTwseClose(lastCompletedDate);
+    let officialOverride=false;
    if(official&&official.date>yahooDate){
     bars.push({t:Date.parse(official.date+"T13:30:00+08:00")/1000,close:official.close,volume:NaN});
     officialOverride=true;

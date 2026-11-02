@@ -15,7 +15,7 @@ function load(relative,overrides={},globals={}){
   }
   return require(id);
  };
- vm.runInNewContext(code,{module,exports:module.exports,require:req,console,URL,Response,Request,Headers,
+ vm.runInNewContext(code,{module,exports:module.exports,require:req,console,URL,URLSearchParams,Response,Request,Headers,
  AbortSignal,setTimeout,clearTimeout,Date,Intl,process,...globals},{filename});
  return module.exports;
 }

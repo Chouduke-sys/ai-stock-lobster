@@ -1,3 +1,4 @@
+import {getQuote} from "../../../../lib/yahoo-quote";
 import {taiwanCalendar} from "../../../../lib/trading-calendar";
 import {dailyChange} from "../../../../lib/market-data";
 import { NextResponse } from "next/server";
@@ -49,6 +50,17 @@ function missingIntradayQuote(message: string) {
 }
 
 export async function GET() {
+  try{
+   const q=await getQuote("臺灣加權股價指數","^TWII");
+   if(q.value!==null&&q.quoteDate===today()){
+    const delaySeconds=q.time?Math.max(0,Math.round((Date.now()-Date.parse(q.time))/1000)):null;
+    return NextResponse.json({status:"ok",name:"臺灣加權股價指數",date:q.quoteDate,value:q.value,
+     change:q.referencePrice===null?null:q.value-q.referencePrice,changePercent:q.changePct,
+     referenceDate:q.referenceDate,referencePrice:q.referencePrice,quoteTime:q.time,delaySeconds,
+     delayDescription:"Yahoo 公開行情，實際延遲依來源",dataSource:q.source,isRealtime:false,fetchedAt:new Date().toISOString(),recent:[]},
+     {headers:{"Cache-Control":"no-store"}});
+   }
+  }catch{}
   try {
     const response = await fetch("https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_t00.tw&json=1&delay=0", {
       cache: "no-store", headers: { Accept: "application/json", Referer: "https://mis.twse.com.tw/stock/" }, signal: AbortSignal.timeout(8000)

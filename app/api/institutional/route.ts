@@ -1,3 +1,5 @@
+import {yahooRank,finmindRank,type RankQuery,type RankResult} from "../../../lib/public-institutional";
+import {cachedProvider} from "../../../lib/provider-policy";
 import {taiwanCalendar} from "../../../lib/trading-calendar";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
@@ -23,33 +25,11 @@ function today(){
  const get=(t:string)=>p.find(x=>x.type===t)?.value??"";
  return get("year")+"-"+get("month")+"-"+get("day");
 }
-function previousWeekdayDate():string{
- const d=new Date(today()+"T00:00:00Z");
- do{d.setUTCDate(d.getUTCDate()-1);}while(d.getUTCDay()===0||d.getUTCDay()===6);
- return d.toISOString().slice(0,10);
-}
-// Anchor T86 to the latest VERIFIED TWSE closing session, not the calendar date.
-// A previous-day T86 must never be silently returned after today's close is published.
-async function confirmedCloseDate():Promise<string|null>{
- const month=today().slice(0,7).replace("-","")+"01";
- try{
-  const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(3500)});
-  if(!response.ok)return null;
-  const body=await response.json() as {stat?:string;fields?:string[];data?:string[][]};
-  if(body.stat!=="OK"||!Array.isArray(body.fields)||!Array.isArray(body.data))return null;
-  const di=body.fields.findIndex(x=>x.includes("日期"));
-  if(di<0)return null;
-  const dates=body.data.map(row=>parseDate(row[di])).filter((d):d is string=>!!d&&d<=today()).sort();
-  return dates.at(-1)??null;
- }catch{return null;}
-}
-async function fetchTwse(minDate:string):Promise<MarketData|null>{
- const start=new Date(today()+"T12:00:00+08:00");
- for(let i=0;i<8;i++){
-  const d=new Date(start.getTime()-i*86400000).toISOString().slice(0,10);
-  // Never fall back behind the most recent expected weekday session.
-  // On an exchange holiday, a temporary 503 is safer than a stale ranking.
-  if(d<minDate)break;
+async function fetchTwse(minDate:string,requestedDate?:string):Promise<MarketData|null>{
+ const dates=[...new Set([requestedDate??today(),minDate])];
+ for(const [i,d]of dates.entries()){
+  // Probe published sessions, not each calendar day across a long holiday.
+  if(d<minDate||d>today())continue;
   const url="https://www.twse.com.tw/rwd/zh/fund/T86?date="+d.replace(/-/g,"")+"&selectType=ALL&response=json";
   try{
    // T86 for recent sessions can intermittently fail or lag on one host.
@@ -81,6 +61,8 @@ async function fetchTwse(minDate:string):Promise<MarketData|null>{
    if(r.stat!=="OK"||!Array.isArray(r.fields)||!Array.isArray(r.data))continue;
    const names=["證券代號","證券名稱","外陸資買賣超股數(不含外資自營商)","投信買賣超股數","自營商買賣超股數","三大法人買賣超股數"];
    const indices=names.map(k=>(r.fields as string[]).indexOf(k));
+    const foreignDealerIndex=(r.fields as string[]).indexOf("外資自營商買賣超股數");
+    if(foreignDealerIndex<0)continue;
    if(indices.some(k=>k<0))continue;
    const rows:Item[]=[];
    for(const item of r.data){
@@ -89,33 +71,23 @@ async function fetchTwse(minDate:string):Promise<MarketData|null>{
     if(!/^\d{4}$/.test(symbol))continue;
     const values=indices.slice(2).map(j=>num(item[j]));
     if(values.some(v=>v===null))continue;
-    const [foreign,trust,dealer,total]=values as number[];
+    const [foreignExDealer,trust,dealer,total]=values as number[];
+    const foreignDealer=num(item[foreignDealerIndex]);
+    if(foreignDealer===null)continue;
+    const foreign=foreignExDealer+foreignDealer;
     if(Math.abs(foreign+trust+dealer-total)>1)continue;
     rows.push({symbol,name:String(item[indices[1]]??symbol).trim(),market:"twse",foreign,trust,dealer,total});
    }
-   const date=parseDate(r.date)??d;
+   const date=parseDate(r.date);
    if(rows.length&&date===d)return {date,rows,source:"TWSE T86"};
   }catch{continue;}
  }
  return null;
 }
-// Reuse the last verified dataset briefly on warm instances when TWSE is
-// intermittently unreachable. Never reuse data from before the prior weekday.
-let lastGoodTwse:MarketData|null=null;
-let lastGoodTwseAt=0;
-let pendingTwse:Promise<MarketData|null>|null=null;
-async function twse():Promise<MarketData|null>{
- const now=Date.now();
- const minDate=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
-  if(!minDate)return null;
- if(lastGoodTwse&&lastGoodTwse.date>=minDate&&now-lastGoodTwseAt<15000)return lastGoodTwse;
- if(!pendingTwse)pendingTwse=fetchTwse(minDate).finally(()=>{pendingTwse=null;});
- const fresh=await pendingTwse;
- if(fresh){lastGoodTwse=fresh;lastGoodTwseAt=Date.now();return fresh;}
- // Do not hide an outage behind a cached success response; the UI retains the dated last good result.
- return null;
+async function twse(minDate:string):Promise<MarketData|null>{
+ return cachedProvider("twse:institutional:"+minDate,30000,()=>fetchTwse(minDate));
 }
-async function tpex():Promise<MarketData|null>{
+async function tpex(minDate:string):Promise<MarketData|null>{
  try{
   const response=await fetch("https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading",{next:{revalidate:15},signal:AbortSignal.timeout(9000)});
   if(!response.ok)return null;
@@ -130,14 +102,17 @@ async function tpex():Promise<MarketData|null>{
    if(rowDate!==date)continue;
    const symbol=String(pick(r,["SecuritiesCompanyCode","SecuritiesCode","Code","證券代號"])??"").trim();
    if(!/^\d{4}$/.test(symbol))continue;
-   const foreign=num(pick(r,["Foreign Investors include Mainland Area Investors (Foreign Dealers excluded)-Difference","Foreign Investors include Mainland Area Investors (Foreign Dealers excluded) -Difference"]));
+   const aggregateForeign=num(pick(r,["ForeignInvestorsInclude MainlandAreaInvestors-Difference","ForeignInvestorsIncludeMainlandAreaInvestors-Difference"]));
+   const external=num(pick(r,["Foreign Investors include Mainland Area Investors (Foreign Dealers excluded)-Difference","Foreign Investors include Mainland Area Investors (Foreign Dealers excluded) -Difference"]));
+   const foreignDealer=num(pick(r,["ForeignDealers-Difference"]));
+   const foreign=aggregateForeign??(external!==null&&foreignDealer!==null?external+foreignDealer:null);
    const trust=num(pick(r,["SecuritiesInvestmentTrustCompanies-Difference"]));
    const dealer=num(pick(r,["Dealers-Difference"]));
    const total=num(pick(r,["TotalDifference"]));
    if(foreign===null||trust===null||dealer===null||total===null||Math.abs(foreign+trust+dealer-total)>1)continue;
    rows.push({symbol,name:String(pick(r,["CompanyName","SecuritiesCompanyName","SecuritiesName","Name","證券名稱"])??symbol),market:"tpex",foreign,trust,dealer,total});
   }
-  const expected=await confirmedCloseDate()??(await taiwanCalendar()).referenceDate;
+  const expected=minDate;
    return date&&rows.length&&expected&&date>=expected&&date<=today()?{date,rows,source:"TPEx 三大法人 OpenAPI"}:null;
  }catch{return null;}
 }
@@ -146,15 +121,28 @@ export async function GET(request:Request){
  const market=q.get("market")??"twse",investor=q.get("investor")??"all",side=q.get("side")??"buy";
  if(!["twse","tpex","all"].includes(market)||!["all","foreign","trust","dealer"].includes(investor)||!["buy","sell"].includes(side))
   return NextResponse.json({error:"查詢參數不正確"},{status:400});
- const [a,b]=await Promise.all([market!=="tpex"?twse():Promise.resolve(null),market!=="twse"?tpex():Promise.resolve(null)]);
+ const calendar=await taiwanCalendar();
+ const minDate=calendar.referenceDate;
+ if(!minDate)return NextResponse.json({status:"unavailable",error:"交易日期無法確認，暫不顯示未驗證排行"},{status:503});
+ const query={market,investor,side} as RankQuery;
+ const publicResults=(await Promise.all([yahooRank(query,minDate),finmindRank(query,minDate)])).filter((r):r is RankResult=>r!==null).sort((a,b)=>b.date.localeCompare(a.date)||(a.precision==="shares"?-1:1));
+ const primary=publicResults[0];
+ if(primary)return NextResponse.json({status:"ok",market,investor,side,dataDate:primary.date,rows:primary.rows,dataSource:primary.source,coverage:primary.coverage,precision:primary.precision,isRealtime:false,
+  publicationPending:primary.date<(calendar.latestCompletedDate??minDate),
+  note:primary.precision==="published_lots"?"來源以張公布，畫面換算為股；數字保留來源張數精度，並非逐股明細。":"具日期的全市場已公布法人明細。"},
+  {headers:{"Cache-Control":"no-store"}});
+ // Exchange endpoints are last-resort fallbacks, not prerequisites for public sources.
+ let [a,b]=await Promise.all([market!=="tpex"?twse(minDate):Promise.resolve(null),market!=="twse"?tpex(minDate):Promise.resolve(null)]);
+ if(market==="all"&&a&&b&&a.date!==b.date&&b.date<a.date&&b.date>=minDate)a=await fetchTwse(b.date,b.date);
  if((market==="twse"&&!a)||(market==="tpex"&&!b)||(market==="all"&&(!a||!b)))
-  return NextResponse.json({error:"官方法人資料尚未完整取得，請稍後重試",availableDates:{twse:a?.date??null,tpex:b?.date??null}},{status:503});
+  return NextResponse.json({status:"unavailable",error:"公開來源與交易所備援尚無足夠的同日法人資料，請稍後重試",availableDates:{twse:a?.date??null,tpex:b?.date??null}},{status:503});
  if(market==="all"&&a?.date!==b?.date)
   return NextResponse.json({error:"上市與上櫃資料日期不同，暫不合併排行",availableDates:{twse:a?.date,tpex:b?.date}},{status:409});
  const datasets=[a,b].filter((v):v is MarketData=>v!==null);
  const key=investor as "all"|"foreign"|"trust"|"dealer";
  const rows=datasets.flatMap(d=>d.rows.map(r=>({symbol:r.symbol,name:r.name,market:r.market,netShares:key==="all"?r.total:r[key]})))
+  .filter(row=>side==="buy"?row.netShares>0:row.netShares<0)
   .sort((x,y)=>side==="buy"?y.netShares-x.netShares:x.netShares-y.netShares).slice(0,5);
  if(!rows.length)return NextResponse.json({error:"沒有可驗證的法人排行"},{status:503});
- return NextResponse.json({status:"ok",market,investor,side,dataDate:datasets[0].date,rows,dataSource:datasets.map(d=>d.source).join(" + "),isRealtime:false});
+ return NextResponse.json({status:"ok",market,investor,side,dataDate:datasets[0].date,rows,dataSource:datasets.map(d=>d.source).join(" + "),isRealtime:false,precision:"shares",coverage:"market_wide",publicationPending:datasets[0].date<(calendar.latestCompletedDate??minDate),note:"已使用交易所備援；以資料所屬日期顯示，不將上一期標成今日。"});
 }

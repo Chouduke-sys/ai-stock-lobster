@@ -1,3 +1,5 @@
+import {getQuote} from "../../../../../lib/yahoo-quote";
+import {taipeiDate,taipeiMinute} from "../../../../../lib/market-data";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 // Avoid build-time prerendering of the closing index; fetch fresh official data at request time.
@@ -13,8 +15,8 @@ function dateOf(s?:string):string|null {
 }
 function number(s?:string){if(!s)return null;const n=Number(s.replaceAll(",","").trim());return Number.isFinite(n)?n:null;}
 type CloseRow={date:string;value:number;change:number|null;tradeVolume:number|null;tradeValue:number|null;transactions:number|null;source:string};
-async function openApiRows():Promise<CloseRow[]>{
- const response=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/FMTQIK",{next:{revalidate:15},signal:AbortSignal.timeout(8000)});
+async function openApiRows(timeoutMs=8000):Promise<CloseRow[]>{
+ const response=await fetch("https://openapi.twse.com.tw/v1/exchangeReport/FMTQIK",{next:{revalidate:15},signal:AbortSignal.timeout(timeoutMs)});
  if(!response.ok)throw Error("OpenAPI HTTP "+response.status);
  const body:unknown=await response.json();
  if(!Array.isArray(body))throw Error("OpenAPI response invalid");
@@ -23,9 +25,9 @@ async function openApiRows():Promise<CloseRow[]>{
   return date&&value!==null?[{date,value,change:number(r.Change),tradeVolume:number(r.TradeVolume),tradeValue:number(r.TradeValue),transactions:number(r.Transaction),source:"TWSE OpenAPI FMTQIK"}]:[];
  });
 }
-async function monthlyRows():Promise<CloseRow[]>{
+async function monthlyRows(timeoutMs=8000):Promise<CloseRow[]>{
  const month=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit"}).format(new Date()).replace("-","")+"01";
- const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(8000)});
+ const response=await fetch("https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?date="+month+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(timeoutMs)});
  if(!response.ok)throw Error("TWSE monthly HTTP "+response.status);
  const body=await response.json() as {stat?:string;fields?:string[];data?:string[][]};
  if(body.stat!=="OK"||!Array.isArray(body.fields)||!Array.isArray(body.data))throw Error("TWSE monthly response invalid");
@@ -38,9 +40,18 @@ async function monthlyRows():Promise<CloseRow[]>{
  });
 }
 export async function GET(){
- const results=await Promise.allSettled([openApiRows(),monthlyRows()]);
+ const q=await getQuote("加權指數","^TWII");
+ const today=taipeiDate();
+ const publicClose=q.value!==null&&q.quoteDate&&(q.quoteDate<today||taipeiMinute()>=810&&q.time&&Date.parse(q.time)>=Date.parse(today+"T13:30:00+08:00"))
+  ?{date:q.quoteDate,value:q.value,change:q.referencePrice===null?null:q.value-q.referencePrice}:null;
+ // Official statistics supplement public prices; a statistics outage must not hide a verified close.
+ const timeoutMs=publicClose?1500:6000;
+ const results=await Promise.allSettled([openApiRows(timeoutMs),monthlyRows(timeoutMs)]);
  const rows=results.flatMap(r=>r.status==="fulfilled"?r.value:[]).sort((a,b)=>b.date.localeCompare(a.date));
- const latest=rows[0];
+ const official=rows[0];
+ const latest=publicClose&&(!official||publicClose.date>=official.date)?{...publicClose,
+ tradeVolume:official?.date===publicClose.date?official.tradeVolume:null,tradeValue:official?.date===publicClose.date?official.tradeValue:null,transactions:official?.date===publicClose.date?official.transactions:null,
+ source:q.source+(official?.date===publicClose.date?" / TWSE 成交統計補充":"")}:official;
  if(!latest)return NextResponse.json({status:"unavailable",error:"證交所兩個官方資料來源目前均未提供可驗證成交金額"},{status:503,headers:{"Cache-Control":"no-store"}});
  return NextResponse.json({status:"ok",name:"加權指數收盤",date:latest.date,value:latest.value,change:latest.change,tradeVolume:latest.tradeVolume,tradeValue:latest.tradeValue,transactions:latest.transactions,dataSource:latest.source,isRealtime:false},{headers:{"Cache-Control":"public, s-maxage=5"}});
 }
