@@ -20,13 +20,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install history parser dependency
+        run: npm install --no-audit --no-fund
+      - name: Refresh official TWSE and TPEx history
+        run: node scripts/backfill-sector-history.cjs
       - name: Capture available verified sector turnover
+        continue-on-error: true
         run: node scripts/archive-sector-flow.cjs
       - name: Save dated archive
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/sector-flow-history.json
+          git add data/sector-flow-history.json data/sector-market-history.json
           if ! git diff --cached --quiet; then
             git commit -m "Archive dated industry turnover and capital rotation"
             git pull --rebase origin main

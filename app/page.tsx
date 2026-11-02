@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import SectorHistoryDetails from "./components/SectorHistoryDetails";
 import DesktopAtmosphere from "./components/DesktopAtmosphere";
 import {pollVisible,REFRESH_MS} from "../lib/live-polling";
 import {signalCounts,taipeiDate} from "../lib/market-data";
@@ -360,7 +361,7 @@ useEffect(()=>{
   useEffect(()=>{const controller=new AbortController();const load=async()=>{try{const r=await fetch("/api/market/daily-review",{cache:"no-store",signal:controller.signal});const data=r.ok?await r.json():null;if(!controller.signal.aborted&&data?.status==="ok")setDailyReview(data);}catch{}};const stop=pollVisible(load,REFRESH_MS.analysis);return()=>{controller.abort();stop();};},[]);
   
   const [newsTab,setNewsTab]=useState<"all"|"important">("all");
-  const [aiFlow,setAiFlow]=useState<{asOf:string;radar?:{hottest:{name:string;turnover:number;weeklyDelta:number|null;turnoverShare:number|null}[];emerging:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[];cooling:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[]};groups:{name:string;chain:string;turnover:number;weeklyChange:number|null;weeklyDelta:number|null;turnoverShare:number|null;leaderShare:number|null;historicalQuality:string;risingSessions:number|null;shareDelta:number|null;medianPriceMove:number|null;breadth:number|null;radarStatus:string;historyDays:number;historyDate:string|null;stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
+  const [aiFlow,setAiFlow]=useState<{asOf:string;sectorAsOf?:string;sectorHistoryStale?:boolean;historicalSessions?:number;sectorHistorySource?:string;radar?:{hottest:{name:string;turnover:number;weeklyDelta:number|null;turnoverShare:number|null}[];emerging:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[];cooling:{name:string;turnover:number;weeklyDelta:number|null;shareDelta:number|null;medianPriceMove:number|null}[]};groups:{name:string;chain:string;turnover:number;weeklyChange:number|null;weeklyDelta:number|null;turnoverShare:number|null;leaderShare:number|null;historicalQuality:string;risingSessions:number|null;shareDelta:number|null;medianPriceMove:number|null;breadth:number|null;radarStatus:string;historyDays:number;historyDate:string|null;priorAverage?:number|null;comparisonDates?:string[];historyReason?:string|null;observedStocks?:number;expectedStocks?:number;historySeries?:{date:string;turnover:number|null;share:number|null;observed:number}[];stocks:{symbol:string;name:string;value:number}[]}[];volumeLeaders:{symbol:string;name:string;volume:number;value:number}[];buyers:{symbol:string;name:string;shares:number;volume:number}[];institutionalDate:string|null;note:string}|null>(null);
   const [aiFlowError,setAiFlowError]=useState("");
   const [leaderNews,setLeaderNews]=useState<{symbol:string;name:string;title:string;url:string;publishedAt:string|null;source:string}[]>([]);
   const [leaderNewsError,setLeaderNewsError]=useState("");
@@ -378,21 +379,6 @@ useEffect(()=>{
     return()=>{controller.abort();stop();};
   },[leaderKey]);
 
-  const [sectorHistory,setSectorHistory]=useState<{date:string;groups:{name:string;turnover:number}[]}[]>([]);
-  useEffect(()=>{
-    try{const saved=JSON.parse(localStorage.getItem("lobster-sector-turnover-history-v1")||"[]") as {date:string;groups:{name:string;turnover:number}[]}[];if(Array.isArray(saved))setSectorHistory(saved.slice(-25));}catch{}
-  },[]);
-  useEffect(()=>{
-    if(!aiFlow?.groups?.length)return;
-    const date=aiFlow.asOf;
-    if(!/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(date))return;
-    setSectorHistory(previous=>{
-      const snapshot={date,groups:aiFlow.groups.map(g=>({name:g.name,turnover:g.turnover}))};
-      const next=[...previous.filter(x=>x.date!==date),snapshot].sort((a,b)=>a.date.localeCompare(b.date)).slice(-25);
-      try{localStorage.setItem("lobster-sector-turnover-history-v1",JSON.stringify(next));}catch{}
-      return next;
-    });
-  },[aiFlow]);
   const [newsError, setNewsError] = useState("");
   const [newsFetchedAt, setNewsFetchedAt] = useState<string|null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -724,17 +710,16 @@ useEffect(()=>{
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>
         {member ? <>
-        <p className="footnote">使用證交所近週歷史交易日成交金額，比較最新一日與先前交易日均值；歷史資料不足時維持灰色，不以瀏覽器快照替代官方歷史趨勢。成交金額變化代表交易熱度，不等於資金淨流入。</p>
+        <p className="footnote">使用證交所與櫃買中心每日收盤行情，依相同成分股比較最新已驗證交易日與前五個已驗證交易日均值。成交金額變化代表交易熱度，不等於資金淨流入。</p>
+        <p className="footnote">產業資料日：{aiFlow?.sectorAsOf??"等待官方資料"} · 已收錄 {aiFlow?.historicalSessions??0} 個交易日 · 上市＋上櫃 · 來源：TWSE／TPEx 官方每日收盤行情{aiFlow?.sectorHistoryStale?" · 最新交易日資料尚待補齊，目前顯示上列日期歷史":""}</p>
         <div className="sector-radar-grid">
-          {([{key:"hottest",title:"現在最熱的是誰？",description:"近一交易日成交金額最高的三大產業",empty:"歷史資料不足，暫不排名"},{key:"emerging",title:"下一個可能輪到誰？",description:"成交熱度連續增強、占比上升且價格漲幅尚不明顯",empty:"目前沒有符合全部條件的產業"},{key:"cooling",title:"誰正在退燒？",description:"短線賣壓升高：成交金額與市場占比下降，且代表股價格走弱",empty:"目前沒有符合全部條件的產業"}] as const).map(panel=><div className="sector-radar-panel" key={panel.key}><h3>{panel.title}</h3><p>{panel.description}</p>{aiFlow?.radar?.[panel.key]?.length?aiFlow.radar[panel.key].map((item,i)=><div className="sector-radar-entry" key={item.name}><strong>{i+1}. {item.name}{panel.key==="cooling"?" 🔴 短線賣壓升高":""}</strong><span>{(item.turnover/1e8).toFixed(1)} 億 · {item.weeklyDelta===null?"趨勢待確認":(item.weeklyDelta>=0?"+":"")+(item.weeklyDelta/1e8).toFixed(1)+" 億"}</span>{panel.key==="cooling"&&<small style={{display:"block",marginTop:4}}>短線賣壓升高，成交熱度與市場占比下降、代表股價格偏弱；不代表長期趨勢結束。觀察量縮止跌及法人賣壓是否減輕。</small>}</div>):<small>{panel.empty}</small>}</div>)}
+          {([{key:"hottest",title:"現在最熱的是誰？",description:"近一交易日成交金額最高的三大產業",empty:"歷史資料不足，暫不排名"},{key:"emerging",title:"下一個可能輪到誰？",description:"近三次比較至少兩次熱度增加、占比上升且價格漲幅尚不明顯",empty:"目前沒有符合全部條件的產業"},{key:"cooling",title:"誰正在退燒？",description:"短線賣壓升高：成交金額與市場占比下降，且代表股價格走弱",empty:"目前沒有符合全部條件的產業"}] as const).map(panel=><div className="sector-radar-panel" key={panel.key}><h3>{panel.title}</h3><p>{panel.description}</p>{aiFlow?.radar?.[panel.key]?.length?aiFlow.radar[panel.key].map((item,i)=><div className="sector-radar-entry" key={item.name}><strong>{i+1}. {item.name}{panel.key==="cooling"?" 🔴 短線賣壓升高":""}</strong><span>{(item.turnover/1e8).toFixed(1)} 億 · {item.weeklyDelta===null?"趨勢待確認":(item.weeklyDelta>=0?"+":"")+(item.weeklyDelta/1e8).toFixed(1)+" 億"}</span>{panel.key==="cooling"&&<small style={{display:"block",marginTop:4}}>短線賣壓升高，成交熱度與市場占比下降、代表股價格偏弱；不代表長期趨勢結束。觀察量縮止跌及法人賣壓是否減輕。</small>}</div>):<small>{panel.empty}</small>}</div>)}
         </div>
         {aiFlowError&&<p role="status" className="footnote">產業資料更新失敗：{aiFlowError}。保留前次成功資料，非目前新報價。</p>}
         <div className="sector-rotation-legend" aria-label="產業成交熱度變化顏色說明"><span className="rotation-fast-in">紅色｜快速集中</span><span className="rotation-slow-in">橘色｜緩慢增加</span><span className="rotation-slow-out">黃色｜緩慢減少</span><span className="rotation-fast-out">綠色｜快速減少</span><span className="rotation-unknown">灰色｜資料不足</span></div>
-        <p className="footnote">判讀門檻：最新成交金額相較近週前幾日均值，增加至少 50 億為快速集中、增加未滿 50 億為緩慢增加；減少未滿 50 億為緩慢減少、減少至少 50 億為快速減少。依成交金額增減億元排名，而非百分比。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
+        <p className="footnote">判讀門檻：最新已驗證交易日相較前五個已驗證交易日均值，增加至少 50 億為快速集中、增加未滿 50 億為緩慢增加；減少未滿 50 億為緩慢減少、減少至少 50 億為快速減少。依成交金額增減億元排名，而非百分比。這是交易熱度變化，不代表實際資金淨流入或流出。</p>
         <div className="sector-rotation-list">
           {aiFlow?.groups?.map((g,i)=>{
-            const older=sectorHistory.filter(h=>h.date!==aiFlow.asOf&&h.groups.some(x=>x.name===g.name)).slice(-1)[0];
-            const prior=older?.groups.find(x=>x.name===g.name)?.turnover;
             const delta=typeof g.weeklyDelta==="number"?g.weeklyDelta:null;
             const deltaYi=delta===null?null:delta/1e8;
             // Absolute TWD turnover change; percentage is not used for status or rank.
@@ -742,12 +727,13 @@ useEffect(()=>{
             const rotationLabel=deltaYi===null?"資料不足":deltaYi>=50?"成交熱度快速增加":deltaYi>0?"成交熱度緩慢增加":deltaYi<=-50?"成交熱度快速減少":"成交熱度緩慢減少";
             return <article className={"sector-rotation-row "+rotationClass} key={g.name}>
               <div><strong>{i+1}. {g.name}</strong><small>{g.chain} · {g.stocks.slice(0,3).map(x=>x.name).join("、")}</small></div>
-              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{typeof g.turnoverShare==="number"?"市場成交占比 "+g.turnoverShare.toFixed(1)+"% · ":""}{typeof g.leaderShare==="number"?"最大成分股占族群 "+g.leaderShare.toFixed(0)+"% · ":""}{deltaYi===null?"歷史資料累積中":(deltaYi>0?"+":"")+deltaYi.toFixed(1)+" 億（"+(typeof g.weeklyDelta==="number"?"較近週前幾日均值":"較 "+older?.date)+"）"}</small></div>
+              <div><span className={"rotation-status "+rotationClass}>{rotationLabel}</span><strong>{(g.turnover/1e8).toFixed(1)} 億</strong><small>{typeof g.turnoverShare==="number"?"市場成交占比 "+g.turnoverShare.toFixed(1)+"% · ":""}{typeof g.leaderShare==="number"?"最大成分股占族群 "+g.leaderShare.toFixed(0)+"% · ":""}{deltaYi===null?(g.historyReason??"官方歷史暫不可用"):(deltaYi>0?"+":"")+deltaYi.toFixed(1)+" 億（較前五日均值）"} · {g.historyDate} · 成分股 {g.observedStocks}/{g.expectedStocks}</small></div>
+              {g.historySeries?.length>0&&<SectorHistoryDetails name={g.name} series={g.historySeries} expectedStocks={g.expectedStocks} priorAverage={g.priorAverage??null} comparisonDates={g.comparisonDates??[]}/>}
             </article>;
           })}
           {!aiFlow?.groups?.length&&<p>{aiFlowError||"正在取得證交所產業成交資料…"}</p>}
         </div>
-        <p className="footnote">目前觀察族群依本站既有 AI 供應鏈清單分類，並非全市場所有產業。記憶體及其他產業將逐步補齊；單日漲跌與成交金額變動無法證明產業間存在直接資金轉移。</p>
+        <p className="footnote">目前涵蓋本站 14 個研究族群、63 檔上市上櫃成分股，並非交易所官方產業指數或全產業完整名單。相同股票可能屬於多個族群；市場占比以兩市場普通股成交金額為分母，各族群不可相加。單日變化無法證明產業間存在直接資金轉移。</p>
         </> : <p className="footnote"><LockKeyhole size={15} style={{verticalAlign:"middle"}}/> 登入後與每日 08:30 台股盤前分析一同解鎖，無需再次登入。</p>}
       </section>
       <section className="section sector-rotation-member" aria-label="會員 AI 盤後檢討">
