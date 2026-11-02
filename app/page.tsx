@@ -408,12 +408,12 @@ useEffect(()=>{
   const [nightHistorySource,setNightHistorySource]=useState("");
   // Night-session move is measured against the first available minute near
   // the 15:00 open, not the previous day close or the TAIEX index.
-  const nightSessionKey=night?.quoteTime?(()=>{
+  const currentNightSession=night?.quoteTime?(()=>{
     const p=parts(night.quoteTime);
     return p.hour<5?parts(new Date(Date.parse(night.quoteTime)-86400000).toISOString()).date:p.date;
   })():null;
-  const nightOpeningPoint=nightSessionKey?nightHistory
-    .filter(p=>p.session===nightSessionKey&&p.time.slice(11)>="15:00"&&p.time.slice(11)<="15:06"&&Number.isFinite(p.value)&&p.value>0)
+  const nightOpeningPoint=currentNightSession?nightHistory
+    .filter(p=>p.session===currentNightSession&&p.time.slice(11)>="15:00"&&p.time.slice(11)<="15:06"&&Number.isFinite(p.value)&&p.value>0)
     .sort((a,b)=>a.time.localeCompare(b.time))[0]:undefined;
   const nightOpenChange=night?.price!=null&&nightOpeningPoint?night.price-nightOpeningPoint.value:null;
   const nightOpenPercent=nightOpenChange!=null&&nightOpeningPoint?nightOpenChange/nightOpeningPoint.value*100:null;
