@@ -2,7 +2,7 @@
 ## 現階段
 - Admin: Google OAuth 登入後，後端以 ADMIN_EMAILS 白名單及 OAuth provider 雙重驗證；/admin 與 /api/admin/dashboard。
 - Free: 現有會員功能維持不變。
-- Pro: 目前只是規劃，尚未啟用付費或訂閱，不能當作付費授權系統。
+- Pro: `/pro` 研究工作台開放現有登入會員免費體驗；尚未啟用付費或訂閱，不能當作付費授權系統。功能與驗證見 `docs/pro-member-preview.md`。
 - 匿名事件：page_view；會員閱讀九大板塊：morning_brief_view。兩者分開計算。
 ## 上線前必備
 1. 設定 Vercel production 環境變數 ADMIN_EMAILS（管理者 Google 帳號 Email，可逗號分隔）。
