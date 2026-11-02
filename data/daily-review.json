@@ -94,5 +94,46 @@
       "verifiedAt": "2026-10-30T09:15:40.315Z",
       "source": "TWSE FMTQIK"
     }
+  },
+  {
+    "date": "2026-11-02",
+    "createdAt": "2026-11-02T01:45:37.751Z",
+    "prediction": "bearish",
+    "predictionLabel": "加權偏空",
+    "signals": [
+      {
+        "title": "美股與期貨",
+        "sentiment": "bullish"
+      },
+      {
+        "title": "外資與投信",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "融資融券",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "期貨與選擇權",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "匯率與利率",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "VIX 市場情緒",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "技術面與量能",
+        "sentiment": "bearish"
+      },
+      {
+        "title": "重大政策與科技",
+        "sentiment": "neutral"
+      }
+    ],
+    "outcome": null
   }
 ]
