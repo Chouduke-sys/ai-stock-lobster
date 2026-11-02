@@ -95,5 +95,5 @@ export async function GET(){
   const company=await companyEvents(monday,friday).catch(()=>[] as Event[]);
   const events=mergeEvents(monday,friday,macroEvents,company);
   return NextResponse.json({status:"ok",monday,friday,events,notice:"僅收錄重大市場事件、核心經濟數據、已確認大型企業財報及重點法說；美國選舉依官方日期，開票時間不預測。",fetchedAt:new Date().toISOString()},{headers:{"Cache-Control":"public, s-maxage=3600, stale-while-revalidate=1800"}});
- }catch(e){return NextResponse.json({status:"unavailable",monday,friday,events:[],error:e instanceof Error?e.message:"來源暫不可用"},{status:503});}
+ }catch(e){const company=await companyEvents(monday,friday).catch(()=>[] as Event[]);const events=mergeEvents(monday,friday,[],company);return NextResponse.json({status:"partial",monday,friday,events,error:e instanceof Error?e.message:"經濟數據來源暫不可用",notice:"經濟數據來源暫不可用；已保留官方已確認的重大事件與企業財報。"},{headers:{"Cache-Control":"public, s-maxage=300"}});}
 }
