@@ -363,7 +363,7 @@ export async function GET(request:Request){
   // Cross-check independently sourced signals instead of treating a vote count as a trend reversal.
   // All observations below are conditional on their underlying data being available.
   const divergenceNotes:string[]=[];
-  if(foreign!=null&&trust!=null&&Number.isFinite(foreign)&&Number.isFinite(trust)&&foreign*trust<0){
+  if(foreign!=null&&trust!=null&&Number.isFinite(foreign.value)&&Number.isFinite(trust.value)&&foreign.value*trust.value<0){
    divergenceNotes.push("外資與投信買賣方向相反，法人籌碼分歧，不能視為一致買盤");
   }
   if(broadStrong&&technicalWeak)divergenceNotes.push("外圍偏強但台股技術面偏弱，留意反彈遭遇賣壓");
