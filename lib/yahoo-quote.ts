@@ -1,11 +1,15 @@
+import {cachedProvider} from "./provider-policy";
 import {isQuoteFresh} from "./market-data";
 export type Quote={quoteDate:string|null;referenceDate:string|null;referencePrice:number|null;label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string;trend5d:number[];trendDates:string[]};
 type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;regularMarketTime?:number;exchangeTimezoneName?:string};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
 // Yahoo chartPreviousClose can refer to the start of the requested range rather than
 // the previous trading session. Use dated daily closes instead for daily % moves.
+const dateFormatters=new Map<string,Intl.DateTimeFormat>();
 function exchangeDate(timestamp:number,timeZone:string):string{
  try{
-  return new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(timestamp*1000));
+  let formatter=dateFormatters.get(timeZone);
+  if(!formatter){formatter=new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"});dateFormatters.set(timeZone,formatter);if(dateFormatters.size>32)dateFormatters.delete(dateFormatters.keys().next().value!);}
+  return formatter.format(new Date(timestamp*1000));
  }catch{return new Date(timestamp*1000).toISOString().slice(0,10);}
 }
 // A missing weekday candle must not turn a two-day move into a "daily" move.
@@ -17,14 +21,14 @@ function weekdaysBetween(from:string,to:string):number|null{
  for(let t=start+86400000;t<=end;t+=86400000){const d=new Date(t).getUTCDay();if(d!==0&&d!==6)count++;}
  return count;
 }
-export async function getQuote(label:string,symbol:string):Promise<Quote>{
+async function loadQuote(label:string,symbol:string):Promise<Quote>{
  const empty={quoteDate:null,referenceDate:null,referencePrice:null,label,symbol,value:null,changePct:null,time:null,source:"Yahoo Finance（非官方，可能延遲）",trend5d:[] as number[],trendDates:[] as string[]};
  try{
   // Five trading sessions can span more than five calendar days (weekends, holidays,
   // or an upstream delayed daily candle). Request a supported one-month window,
   // then keep only the latest five verified, exchange-dated points below.
   const url="https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?interval=1d&range=1mo";
-  const response=await fetch(url,{next:{revalidate:5},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
+  const response=await fetch(url,{next:{revalidate:10},signal:AbortSignal.timeout(4000),headers:{"User-Agent":"Mozilla/5.0"}});
   if(!response.ok)return empty;
   const body=await response.json() as ChartResponse;
   const result=body.chart?.result?.[0];
@@ -59,4 +63,11 @@ export async function getQuote(label:string,symbol:string):Promise<Quote>{
   if(!isQuoteFresh(quoteTime,maxAge))return empty;
   return {...empty,quoteDate,referencePrice:previousClose,referenceDate:previousClose===null?null:latest?.date===quoteDate?prior?.date??null:latest?.date??null,value:quoteIsValid?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:trend.map(p=>p.value),trendDates:trend.map(p=>p.date)};
  }catch{return empty;}
+}
+
+// Share parsing and upstream requests across routes in the same warm instance.
+// Cache keys are bounded by cachedProvider; no stale quote is served on failure.
+export async function getQuote(label:string,symbol:string):Promise<Quote>{
+ const value=await cachedProvider<Quote>("quote:v1:"+symbol,10000,()=>loadQuote(label,symbol));
+ return {...value!,label};
 }

@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../lib/response-cache";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ const timeOf = (row: MisRow): string | null => {
   return `${dateOf(row.d)}T${row.t}+08:00`;
 };
 
-export async function GET(_request: Request, context: { params: { symbol: string } }) {
+async function buildResponse(_request: Request, context: { params: { symbol: string } }) {
   const symbol = context.params.symbol;
   if (!/^\d{4,6}$/.test(symbol)) return NextResponse.json({ error: "股票代號格式錯誤" }, { status: 400 });
   try {
@@ -46,4 +47,10 @@ export async function GET(_request: Request, context: { params: { symbol: string
   } catch {
     return NextResponse.json({ error: "盤中報價暫時無法取得" }, { status: 502 });
   }
+}
+
+export async function GET(request:Request,context:{params:{symbol:string}}){
+ const symbol=context.params.symbol;
+ if(!/^\d{4,6}$/.test(symbol))return NextResponse.json({error:"股票代號格式錯誤"},{status:400});
+ return cachedResponse("stock:"+symbol,10000,()=>buildResponse(request,context));
 }

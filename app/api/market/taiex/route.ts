@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../lib/response-cache";
 import {getQuote} from "../../../../lib/yahoo-quote";
 import {taiwanCalendar} from "../../../../lib/trading-calendar";
 import {dailyChange} from "../../../../lib/market-data";
@@ -49,7 +50,7 @@ function missingIntradayQuote(message: string) {
   );
 }
 
-export async function GET() {
+async function buildResponse(){
   try{
    const q=await getQuote("臺灣加權股價指數","^TWII");
    if(q.value!==null&&q.quoteDate===today()){
@@ -87,3 +88,5 @@ export async function GET() {
     return await yahooToday()??missingIntradayQuote("加權指數盤中資料連線失敗");
   }
 }
+
+export async function GET(){return cachedResponse("app/api/market/taiex/route.ts",10000,buildResponse);}
