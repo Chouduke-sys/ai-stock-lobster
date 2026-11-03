@@ -360,8 +360,24 @@ export async function GET(request:Request){
    :futuresNegative?"等外資期貨空單收斂、盤中回測支撐不破再進場。"
    :score!==null&&score>=60?"等開盤回測支撐、量價維持強勢後再分批進場。"
    :"等開盤前30～60分鐘確認量價方向，回測支撐不破再分批進場。";
+  // Cross-check independently sourced signals instead of treating a vote count as a trend reversal.
+  // All observations below are conditional on their underlying data being available.
+  const divergenceNotes:string[]=[];
+  if(foreign!=null&&trust!=null&&Number.isFinite(foreign)&&Number.isFinite(trust)&&foreign*trust<0){
+   divergenceNotes.push("外資與投信買賣方向相反，法人籌碼分歧，不能視為一致買盤");
+  }
+  if(broadStrong&&technicalWeak)divergenceNotes.push("外圍偏強但台股技術面偏弱，留意反彈遭遇賣壓");
+  if(broadWeak&&technical.valid&&technical.sentiment==="bullish")divergenceNotes.push("外圍偏弱但台股技術面偏強，留意相對強勢能否延續");
+  if(futuresNegative&&foreignPositive)divergenceNotes.push("法人現貨訊號偏多但外資期貨淨部位偏空，現期貨方向不一致");
+  const marketStructure=lowCoverage
+   ?"市場結構：有效訊號覆蓋不足，無法判定反彈或反轉"
+   :technicalWeak&&broadWeak?"市場結構：空方訊號同步，暫以弱勢趨勢觀察"
+   :technicalWeak&&broadStrong?"市場結構：外圍反彈與台股技術弱勢背離，尚不足以確認反轉"
+   :technical.valid&&technical.sentiment==="bullish"&&broadStrong?"市場結構：外圍與技術訊號偏強，仍須盤中量價確認"
+   :"市場結構：訊號尚未形成一致趨勢，觀察量價及法人延續性";
+  const divergenceSummary=divergenceNotes.length?" 關鍵背離："+divergenceNotes.join("；")+"。":"";
   const exposure=recommendedAllocation===null?"倉位：資料不足，暫不提供數字。":"建議倉位 "+recommendedAllocation+"%（含融資曝險）。";
-  summary.body=scenario+" "+exposure+" "+timing+(coverage<75?" 關鍵籌碼尚未齊全，判斷信心較低。":"");
+  summary.body=scenario+" "+marketStructure+"。"+divergenceSummary+" "+exposure+" "+timing(coverage<75?" 關鍵籌碼尚未齊全，判斷信心較低。":"");
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
