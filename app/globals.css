@@ -928,3 +928,12 @@
  .site-shell[data-mobile-tab] > .topbar {padding-inline:12px}
  .topbar .nav-links a {padding:8px 7px;font-size:11px}
 }
+
+
+/* Keep the allocation explanation within the compact premarket conclusion. */
+.allocation-details{margin:8px 0 14px;border:1px solid #c49b594d;border-radius:10px;overflow:hidden;background:#13243a}
+.allocation-details>summary{cursor:pointer;list-style:none;padding:11px 14px;color:#e7c17e;font-size:13px;font-weight:650}
+.allocation-details>summary::-webkit-details-marker{display:none}
+.allocation-details[open]>summary{border-bottom:1px solid #c49b594d}
+.allocation-details>:not(summary){margin:12px}
+@media(max-width:720px){.allocation-details{margin:8px 0 12px}.allocation-details>summary{padding:10px 12px}}
