@@ -660,7 +660,7 @@ useEffect(()=>{
   }
 
   const [mobileTab,setMobileTab]=useState<"news"|"market"|"sectors"|"index"|"flows"|"charts"|"account">("news");
-  const selectMobileTab=(tab:typeof mobileTab)=>{setMobileTab(tab);window.scrollTo({top:0,behavior:"instant"});};
+  const selectMobileTab=(tab:typeof mobileTab)=>{setMobileTab(tab);if(tab==="account")setShowLogin(true);window.scrollTo({top:0,behavior:"instant"});};
   const showTaiwanNight=isNightTradingNow();
   const vixMood=vix?vixSentiment(vix.value):null;
   const currentIndexDay=parts(new Date().toISOString()).date;
@@ -673,15 +673,15 @@ useEffect(()=>{
           <span className="brand-mark brand-mark-custom"><img src={lobsterLogo.src} alt="AI股市龍蝦 Logo" onError={e=>{e.currentTarget.style.display="none";}} /></span>
           <span><strong>AI股市龍蝦</strong><small>AI STOCK INTELLIGENCE · TAIWAN</small></span>
         </a>
-        <nav className="nav-links" aria-label="電腦版主要功能"><a href="#desktop-news">新聞</a><a href="#desktop-market">今日台股</a><a href="#desktop-index">加權指數</a><a href="#desktop-flows">法人籌碼</a><a href="#desktop-sectors">熱門產業</a><a href="#charts">個股分析</a><a href="#membership">會員</a></nav>
+        <nav className="nav-links" aria-label="電腦版主要功能"><a href="#desktop-news">新聞</a><a href="#desktop-market">今日台股</a><a href="#desktop-index">加權指數</a><a href="#desktop-flows">法人籌碼</a><a href="#desktop-sectors">熱門產業</a><a href="#charts">個股分析</a><a href="#member-menu" aria-controls="member-menu" aria-expanded={showLogin} onClick={event=>{event.preventDefault();setShowLogin(true);}}>會員</a></nav>
         <button className="btn btn-outline login-btn" onClick={() => setShowLogin(!showLogin)}><LockKeyhole size={16}/> {member?"會員："+(member.name||member.email||"已登入"):"會員登入"}</button>
         <button className="icon-btn mobile-menu" aria-label="開啟登入面板" onClick={() => setShowLogin(!showLogin)}><Menu size={20}/></button>
       </header>
 
-      {showLogin && <section className="modal-card">
+      {showLogin && <section className="modal-card" id="member-menu" aria-label="會員選單">
         <button className="close-btn" onClick={() => setShowLogin(false)} aria-label="關閉"><X size={18}/></button>
         <h2>AI股市龍蝦會員</h2>
-        {member?<><p>已登入：{member.name||member.email||"會員"}。可以閱讀每日 08:30 盤前分析。{isAdmin&&<a href="/admin" className="btn btn-primary" style={{marginLeft:12}}>🦞 管理者後台</a>}</p><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Email 驗證碼登入，即可解鎖會員內容。</p>
+        {member?<><p>已登入：{member.name||member.email||"會員"}</p><nav className="member-switch-actions" aria-label="會員切換"><a href="/" className="btn btn-outline" aria-current="page" onClick={event=>{event.preventDefault();setShowLogin(false);}}>市場總覽</a><a href="/pro" className="btn btn-primary">研究工作台 ↗</a>{isAdmin&&<a href="/admin" className="btn btn-outline">管理者後台</a>}</nav><button className="btn btn-secondary" onClick={()=>{void signOut({callbackUrl:"/"});}}>登出會員</button></>:<><p>使用 Google 或 Email 驗證碼登入，即可解鎖會員內容。</p>
         {loginProviders.google&&<button className="btn btn-primary" onClick={()=>{startOAuth("google");}}>🔵 使用 Google 登入</button>}
         {loginProviders["email-code"]&&<div style={{display:"grid",gap:10,marginTop:14,maxWidth:390}}>
           <label htmlFor="lobster-email">✉️ 使用 Email 驗證碼登入</label>
@@ -976,8 +976,6 @@ useEffect(()=>{
       </section>
 
 
-      <section className="membership" id="membership"><div><div className="eyebrow">PRO RESEARCH · 會員免費體驗</div><h2>你的專屬研究工作台。</h2><p>自選股追蹤、研究筆記、5／10／20 日產業比較、均線與 RSI，以及可匯出的研究摘要。現有登入會員免費體驗，不需訂閱或付款。</p></div><a href="/pro" className="btn btn-primary">開啟 Pro 研究工作台 <ArrowUpRight size={16}/></a>
-      </section>
 
 
 
