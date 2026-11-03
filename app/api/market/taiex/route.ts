@@ -55,6 +55,7 @@ export async function GET() {
    if(q.value!==null&&q.quoteDate===today()){
     const delaySeconds=q.time?Math.max(0,Math.round((Date.now()-Date.parse(q.time))/1000)):null;
     return NextResponse.json({status:"ok",name:"臺灣加權股價指數",date:q.quoteDate,value:q.value,
+     openPrice:q.openPrice??null,openTime:q.openDate===q.quoteDate?q.openDate+"T09:00:00+08:00":null,
      change:q.referencePrice===null?null:q.value-q.referencePrice,changePercent:q.changePct,
      referenceDate:q.referenceDate,referencePrice:q.referencePrice,quoteTime:q.time,delaySeconds,
      delayDescription:"Yahoo 公開行情，實際延遲依來源",dataSource:q.source,isRealtime:false,fetchedAt:new Date().toISOString(),recent:[]},
@@ -78,7 +79,7 @@ export async function GET() {
     const quoteTime = row.t && /^\d{2}:\d{2}:\d{2}$/.test(row.t) ? `${date}T${row.t}+08:00` : null;
     const delaySeconds = quoteTime ? Math.max(0, Math.round((Date.now() - new Date(quoteTime).getTime()) / 1000)) : null;
     return NextResponse.json({
-      status: "ok", name: "臺灣加權股價指數", date, value, change, changePercent,
+      status: "ok", name: "臺灣加權股價指數", date, value, change, changePercent,openPrice:num(row.o),openTime:num(row.o)!>0?date+"T09:00:00+08:00":null,
       quoteTime, delaySeconds, delayDescription: delaySeconds === null ? "無法確認延遲" : `距資料時間 ${delaySeconds} 秒（不代表供應商延遲）`,
       dataSource: "TWSE MIS（非正式公開 API，供測試）", isRealtime: false,
       fetchedAt: new Date().toISOString(), recent: []

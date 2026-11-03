@@ -1,5 +1,6 @@
 "use client";
 
+import {calculateOpenChange,openingFromMinutes} from "../lib/open-relative-change";
 import lobsterLogo from "../ai_stock_lobster_logo.png";
 import AllocationAnalysis, {type AllocationProps} from "./components/AllocationAnalysis";
 import SectorHistoryDetails from "./components/SectorHistoryDetails";
@@ -28,9 +29,9 @@ type NewsRow={title:string;url:string;publishedAt:string|null;source:string;imag
 type RankRow = { symbol: string; name: string; netShares: number; market:"twse"|"tpex" };
 type HistoryRow = { date:string; open:number; high:number; low:number; close:number; volume:number; ma5:number|null; ma10:number|null; ma20:number|null; ma60:number|null; rsi14:number|null; dif:number|null; signal:number|null; histogram:number|null };
 type HistoryResult = { status:string; symbol:string; period:string; asOf:string; candles:HistoryRow[]; dataSource:string };
-type TaiexResult = { quoteTime?:string|null; status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
+type TaiexResult = {openPrice?:number|null;openTime?:string|null; quoteTime?:string|null; status: string; date: string | null; value: number | null; change: number | null; changePercent: number | null; delaySeconds?: number | null; recent: { date: string | null; value: number | null }[] };
 type CloseResult={status:string;date:string;value:number;change:number|null;tradeVolume:number|null;tradeValue:number|null;transactions:number|null;dataSource:string};
-type NightResult={status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;change?:number|null;changePercent?:number|null;referencePrice?:number|null;isClosed?:boolean};
+type NightResult={openPrice?:number|null;openTime?:string|null;contractVerified?:boolean;status:string;price:number;contract:string;quoteTime:string;delaySeconds:number;dataSource:string;change?:number|null;changePercent?:number|null;referencePrice?:number|null;isClosed?:boolean};
 type StockResult = {
   status: string;
   symbol: string;
@@ -81,7 +82,7 @@ function IntradayChart({points,reference}:{points:IntradayPoint[];reference:numb
  </svg><p className="footnote">{points.length?"最新取樣 "+points[points.length-1].time.slice(11)+" · "+formatPrice(points[points.length-1].price)+" 元":"尚無有效盤中報價"} · 固定 ±10% 漲跌幅；{reference?"以前收價為 0% 基準":"以前次有效取樣價為暫時基準"}</p></div>;
 }
 
-type Point={time:string;value:number;session:string;volume?:number|null};
+type Point={time:string;value:number;session:string;open?:number|null;volume?:number|null};
 function parts(iso:string){const p=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(iso));const v=(k:string)=>p.find(x=>x.type===k)?.value??"";return {date:v("year")+"-"+v("month")+"-"+v("day"),hour:Number(v("hour")),minute:Number(v("minute"))};}
 function isTaiexSessionNow():boolean{
  const now=parts(new Date().toISOString());
@@ -667,6 +668,12 @@ useEffect(()=>{
   const currentIndexDay=parts(new Date().toISOString()).date;
   const nightChartPoints=Array.from(new Map<string,Point>([...nightHistory,...nightPoints].filter(p=>p.session===nightSessionKey(new Date())).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
   const indexChartPoints=Array.from(new Map<string,Point>([...indexHistory,...dayPoints].filter(p=>p.session===currentIndexDay).map(p=>[p.time,p])).values()).sort((a,b)=>a.time.localeCompare(b.time));
+  const cashLatest=taiex?.value!=null&&taiex.quoteTime?{price:taiex.value,time:taiex.quoteTime,instrument:"^TWII"}:null;
+  const cashOpening=cashLatest?(taiex?.openPrice!=null&&taiex.openTime?{price:taiex.openPrice,time:taiex.openTime,instrument:"^TWII",source:"同日行情開盤價"}:openingFromMinutes(indexHistory,cashLatest,"cash","Yahoo 09:00 分鐘開價")):null;
+  const cashOpenMove=calculateOpenChange(cashLatest,cashOpening,"cash");
+  const nightLatest=night?{price:night.price,time:night.quoteTime,instrument:night.contractVerified===true?"TX":"WTX&",contract:night.contractVerified===true?night.contract:null}:null;
+  const nightOpening=nightLatest?(night?.openPrice!=null&&night.openTime?{...nightLatest,price:night.openPrice,time:night.openTime,source:"同合約夜盤開盤價"}:night?.contractVerified===false&&night.dataSource.includes("WTX&")?openingFromMinutes(nightHistory,nightLatest,"night","Yahoo 15:00 分鐘開價（近一連續商品）"):null):null;
+  const nightOpenMove=calculateOpenChange(nightLatest,nightOpening,"night");
   return (
     <><DesktopAtmosphere /><main className="site-shell" data-mobile-tab={mobileTab}>
       <header className="topbar">
@@ -775,7 +782,7 @@ useEffect(()=>{
         </div>
         <div className="hero-visual" id="desktop-index">
           <div className="visual-top"><span>MARKET FLOW</span><span className="tag tag-amber">{taiex ? "盤中行情測試資料" : loadingTaiex ? "載入中" : "暫無資料"}</span></div>
-          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 漲跌 ${formatPrice(taiex.change)} 點（${formatPrice(taiex.changePercent)}%）· ${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)} · 交易時段每 1 秒檢查報價 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
+          <div className="visual-stat"><span>台股加權指數</span><strong>{formatPrice(taiex?.value)}</strong><div className={"open-relative-move "+(cashOpenMove&&cashOpenMove.change<0?"open-relative-down":"open-relative-up")}><span>較開盤</span><b>{cashOpenMove?(cashOpenMove.change>0?"+":"")+formatPrice(cashOpenMove.change)+" 點（"+(cashOpenMove.changePercent>0?"+":"")+cashOpenMove.changePercent.toFixed(2)+"%）":"—"}</b><small>{cashOpenMove?"開盤基準 "+formatPrice(cashOpenMove.openingPrice)+" · "+cashOpenMove.source:"等待同日開盤價與有效最新報價；不以較晚取樣代替開盤"}</small></div><small>{taiex ? `${taiex.date ?? "日期未提供"}· ${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)} · 交易時段每 1 秒檢查報價 · 不保證逐秒新報價` : loadingTaiex ? "載入盤中行情中…" : taiexError}</small></div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,margin:"16px 0"}}>
             <div style={{padding:14,border:"1px solid #64748b55",borderRadius:12}}>
               <small>加權指數 · 最近收盤</small>
@@ -823,11 +830,11 @@ useEffect(()=>{
             <strong style={{fontSize:18}}>台指期夜盤 · 最新報價</strong>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:14,marginTop:12}}>
               <div><small>最新點數</small><strong style={{display:"block",fontSize:26}}>{formatPrice(night?.price)}</strong></div>
-              <div><small>漲跌點數</small><strong style={{display:"block",fontSize:24,color:night?.change==null?"#94a3b8":night.change>=0?"#fb7969":"#42c4a5"}}>{night?.change==null?"—":(night.change>0?"+":"")+formatPrice(night.change)+" 點"}</strong></div>
-              <div><small>漲跌幅</small><strong style={{display:"block",fontSize:24,color:night?.changePercent==null?"#94a3b8":night.changePercent>=0?"#fb7969":"#42c4a5"}}>{night?.changePercent==null?"—":(night.changePercent>0?"+":"")+night.changePercent.toFixed(2)+"%"}</strong></div>
+              <div><small>較夜盤開盤點數</small><strong style={{display:"block",fontSize:24,color:!nightOpenMove?"#94a3b8":nightOpenMove.change>=0?"#fb7969":"#42c4a5"}}>{nightOpenMove?(nightOpenMove.change>0?"+":"")+formatPrice(nightOpenMove.change)+" 點":"—"}</strong></div>
+              <div><small>較夜盤開盤幅度</small><strong style={{display:"block",fontSize:24,color:!nightOpenMove?"#94a3b8":nightOpenMove.changePercent>=0?"#fb7969":"#42c4a5"}}>{nightOpenMove?(nightOpenMove.changePercent>0?"+":"")+nightOpenMove.changePercent.toFixed(2)+"%":"—"}</strong></div>
             </div>
             {!night&&nightData&&<p role="status" className="footnote">最近成功報價：{formatPrice(nightData.price)} 點 · {new Date(nightData.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} · 更新失敗或已過期，非目前有效報價。</p>}
-             <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(Math.max(0,Math.floor((clockNow-Date.parse(night.quoteTime))/1000)))+" · "+night.dataSource:nightError||(nightData?"前次報價已過期，等待更新":"正在讀取夜盤報價")}。{night?.change==null||night?.changePercent==null?"行情來源未提供可驗證的漲跌基準，暫不顯示漲跌數值。":"漲跌依行情來源提供的參考價計算。"}不以不完整取樣繪製夜盤走勢圖。</p>
+             <p className="footnote" style={{margin:"10px 0 0"}}>{night?night.contract+" · 報價 "+new Date(night.quoteTime).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+" · "+ageLabel(Math.max(0,Math.floor((clockNow-Date.parse(night.quoteTime))/1000)))+" · "+night.dataSource:nightError||(nightData?"前次報價已過期，等待更新":"正在讀取夜盤報價")}。{nightOpenMove?"以開盤基準 "+formatPrice(nightOpenMove.openingPrice)+" 點自行計算 · "+nightOpenMove.source+"。":"等待相同夜盤時段／合約的開盤價；不混用日盤開價或前收價。"}不以不完整取樣繪製夜盤走勢圖。</p>
           </div>}
           <div className="visual-bottom"><span><i className="dot dot-red"></i> 台股官方資料</span><span><i className="dot dot-blue"></i> 全球行情 API</span></div>
 
@@ -878,7 +885,7 @@ useEffect(()=>{
       </section>
 
       <section className="stats-grid">
-        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · ${formatPrice(taiex.change)} 點（${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
+        <article className="stat-card"><span className="stat-label"><Activity size={16}/> 加權指數</span><strong>{formatPrice(taiex?.value)}</strong><small>{taiex ? `${taiex.date ?? "日期未提供"} · 較開盤 ${cashOpenMove?formatPrice(cashOpenMove.change):"—"} 點（${ageLabel(taiex.quoteTime?Math.max(0,Math.floor((clockNow-Date.parse(taiex.quoteTime))/1000)):taiex.delaySeconds)}）` : loadingTaiex ? "載入中" : taiexError || "暫無資料"}</small></article>
         <article className="stat-card"><span className="stat-label"><Landmark size={16}/> 三大法人排行</span><strong>{rankDate || "待公布"}</strong><small>{rankDate ? "最新已取得交易日 · 盤後資料" : "等待官方日報，非盤中即時"}</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowUpRight size={16}/> {rankSide==="buy"?"買超":"賣超"}榜首</span><strong>{rows[0]?.name || "待更新"}</strong><small>{rows[0]?`${rows[0].symbol} · ${formatVolume(rows[0].netShares)} 股`:"尚無可驗證排名"}</small></article>
         <article className="stat-card"><span className="stat-label"><ArrowDownRight size={16}/> 三日法人動向</span><strong>{fiveLoading?"查詢中":fiveRows.length?fiveRows[0].name:"待確認"}</strong><small>{fiveRows.length?`三日合計 ${formatVolume(fiveRows[0].netShares)} 股`:"尚無完整三日排行"}</small></article>
