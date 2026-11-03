@@ -1,6 +1,7 @@
 "use client";
 
 import lobsterLogo from "../ai_stock_lobster_logo.png";
+import AllocationAnalysis, {type AllocationProps} from "./components/AllocationAnalysis";
 import SectorHistoryDetails from "./components/SectorHistoryDetails";
 import DesktopAtmosphere from "./components/DesktopAtmosphere";
 import {pollVisible,REFRESH_MS} from "../lib/live-polling";
@@ -354,7 +355,7 @@ useEffect(()=>{
   const [importantNews,setImportantNews]=useState<NewsRow[]>([]);
   const [weekCalendar,setWeekCalendar]=useState<{monday:string;friday:string;events:{date:string;time:string;title:string;level:string;region:string;detail:string}[];status:string}|null>(null);
   useEffect(()=>{let active=true;async function load(){try{const r=await fetch("/api/market/week-calendar");const d=await r.json();if(active)setWeekCalendar(d);}catch{if(active)setWeekCalendar(null);}}void load();const timer=setInterval(()=>void load(),3600000);return()=>{active=false;clearInterval(timer);};},[]);
-  const [morningBriefData,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;sections:{title:string;body:string;available?:boolean;dataDate?:string|null;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
+  const [morningBriefData,setMorningBrief]=useState<{reportDate:string;generatedAt:string;stance:string;recommendedAllocation:number|null;riskAssessment?:AllocationProps["risk"];baseAllocation?:number|null;allocationBacktest?:AllocationProps["backtest"];sections:{title:string;body:string;available?:boolean;dataDate?:string|null;sentiment:"bullish"|"bearish"|"neutral";verdict:string}[];method:string;isAfterDailyCutoff:boolean}|null>(null);
   const [morningBriefError,setMorningBriefError]=useState("");
   const morningBrief=morningBriefData?.reportDate===taipeiDate(new Date(clockNow))?morningBriefData:null;
   const [dailyReviewError,setDailyReviewError]=useState("");
@@ -695,7 +696,7 @@ useEffect(()=>{
       </section>}
 
       <section className="section morning-brief" aria-label="台股持續更新分析" style={{margin:"20px 0 26px"}}>
-        <div className="section-heading"><div><div className="eyebrow">TAIWAN MARKET ANALYSIS · 持續更新</div><h2>台股最新市場分析</h2><p>涵蓋美股期貨、台指期、法人買賣、融資融券、期貨籌碼、匯率、VIX、技術面、重大政策與操作情境。</p></div><span className="tag tag-amber">每 30 秒檢查更新</span></div>
+        <div className="section-heading"><div><div className="eyebrow">DAILY 08:30 PRE-MARKET · 盤前觀察</div><h2>每日 8:30 盤前分析</h2><p>每日 8:30 盤前觀察，涵蓋全球市場、法人籌碼與風險。下方依最新已公布資料更新，非固定 8:30 封存快照。</p></div><span className="tag tag-amber">每 30 秒檢查更新</span></div>
         {!memberLoading&&!member&&<div className="morning-brief-preview">
           <div className="morning-brief-grid morning-brief-preview-grid" aria-hidden="true">
             {["美股與期貨","外資與投信","融資融券","期貨與選擇權","匯率與利率","VIX 市場情緒","技術面與量能","重大政策與科技","今日盤前小總結"].map((title,i)=><article className="morning-brief-item morning-brief-preview-card" key={title}><h3>{String(i+1).padStart(2,"0")}　{title}</h3><div className="morning-brief-skeleton-line"/><div className="morning-brief-skeleton-line short"/><span className="morning-brief-skeleton-badge">會員專屬分析</span></article>)}
@@ -705,7 +706,7 @@ useEffect(()=>{
         {memberLoading&&<p className="footnote">正在確認會員登入狀態…</p>}
         {member&&morningBriefError&&<p role="status" className="footnote">最新分析更新失敗：{morningBriefError}。以下若有內容，為前次成功取得的分析，資料時間請見各區塊。</p>}
         {member&&morningBrief?<><div className="morning-brief-summary"><div style={{display:"grid",gap:5,minWidth:0}}><strong>{morningBrief.stance}</strong><small style={{fontSize:12,lineHeight:1.6,color:"#c7d9ed",maxWidth:610}}>{(()=>{const {bullish:bull,bearish:bear,neutral,unavailable}=signalCounts(morningBrief.sections);return `八項獨立分析：利多 ${bull}／利空 ${bear}／中性 ${neutral}／待確認 ${unavailable}。${bull>bear?"多方訊號略占優勢，但仍須觀察量能與法人動向。":bear>bull?"空方訊號略占優勢，建議留意開盤後承接與風險控管。":"多空訊號相近，方向尚未明朗，先觀察量能與法人動向。"}${typeof morningBrief.recommendedAllocation==="number"?" 建議倉位上限 "+Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%。":""}`;})()}</small></div><small className="morning-brief-allocation">建議股票總倉水位：{typeof morningBrief.recommendedAllocation==="number"?Math.min(90,Math.max(0,morningBrief.recommendedAllocation))+"%":"資料不足，暫不提供數字"}</small><span>分析日期 {morningBrief.reportDate} · 最新分析 {new Date(morningBrief.generatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})}</span></div>
-        <div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p>{item.available===false&&<small>資料待確認，不列入有效訊號。</small>}{item.dataDate&&<small>資料日：{item.dataDate}</small>}</article>)}</div><p className="footnote">{morningBrief.method} · 畫面每 30 秒檢查最新分析；切回頁面或恢復連線時立即更新。盤前快照另外封存供回測使用。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
+        <AllocationAnalysis value={morningBrief.recommendedAllocation} risk={morningBrief.riskAssessment} base={morningBrief.baseAllocation} backtest={morningBrief.allocationBacktest} generatedAt={morningBrief.generatedAt}/><div className="morning-brief-grid">{morningBrief.sections.map((item,i)=><article key={item.title} className={"morning-brief-item morning-brief-"+item.sentiment}><div className="morning-brief-item-heading"><h3>{String(i+1).padStart(2,"0")}　{item.title}</h3><span className={"morning-brief-verdict "+item.sentiment}>{item.sentiment==="bullish"?"▲ ":item.sentiment==="bearish"?"▼ ":"● "}{item.verdict}</span></div><p>{item.body}</p>{item.available===false&&<small>資料待確認，不列入有效訊號。</small>}{item.dataDate&&<small>資料日：{item.dataDate}</small>}</article>)}</div><p className="footnote">{morningBrief.method} · 畫面每 30 秒檢查最新分析；切回頁面或恢復連線時立即更新。盤前快照另外封存供回測使用。</p></>:<p className="footnote">{morningBriefError||"正在整理盤前行情與籌碼資訊…"}</p>}
       </section>
       <section className="section sector-rotation-member" aria-label="會員產業資金輪動觀察">
         <div className="section-heading"><div><div className="eyebrow">SECTOR CAPITAL ROTATION · 產業資金輪動</div><h2>產業資金輪動-資金流入與退燒追蹤</h2><p>比較不同產業成交金額與歷史變化，觀察 PCB、記憶體、散熱及其他族群的交易熱度。</p></div></div>

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./desktop-motion.css";
 import "./sector-history.css";
+import "./allocation-analysis.css";
 
 export const metadata: Metadata = {
   title: "AI股市龍蝦｜台股法人與全球市場研究平台",
