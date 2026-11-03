@@ -1,7 +1,7 @@
 import {NextResponse} from "next/server";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
-type YahooChart={chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[];volume?:(number|null)[]}>}}>;error?:unknown}};
+type YahooChart={chart?:{result?:Array<{timestamp?:number[];indicators?:{quote?:Array<{open?:(number|null)[];close?:(number|null)[];volume?:(number|null)[]}>}}>;error?:unknown}};
 export async function GET(){
  for(const host of ["query1.finance.yahoo.com","query2.finance.yahoo.com"]){
   try{
@@ -18,7 +18,7 @@ export async function GET(){
     if(time>="05:00"&&time<"15:00")return [];
     const session=time<"05:00"?new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(dt.getTime()-86400000)):date;
     const volume=volumes[i];
-    return [{time:date+" "+time,session,value,volume:typeof volume==="number"&&volume>=0?volume:null}];
+    return [{time:date+" "+time,session,value,open:typeof chart?.indicators?.quote?.[0]?.open?.[i]==="number"&&chart.indicators.quote[0].open[i]>0?chart.indicators.quote[0].open[i]:null,volume:typeof volume==="number"&&volume>=0?volume:null}];
    });
    if(points.length>1)return NextResponse.json({status:"ok",points,source:"Yahoo Finance WTX& 台指期 1 分鐘歷史行情（可能延遲）"},{headers:{"Cache-Control":"public, s-maxage=60, stale-while-revalidate=60"}});
   }catch{}

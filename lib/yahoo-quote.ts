@@ -1,6 +1,6 @@
 import {isQuoteFresh} from "./market-data";
-export type Quote={quoteDate:string|null;referenceDate:string|null;referencePrice:number|null;label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string;trend5d:number[];trendDates:string[]};
-type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;regularMarketTime?:number;exchangeTimezoneName?:string};timestamp?:number[];indicators?:{quote?:Array<{close?:(number|null)[]}>}}>}};
+export type Quote={openPrice?:number|null;openDate?:string|null;quoteDate:string|null;referenceDate:string|null;referencePrice:number|null;label:string;symbol:string;value:number|null;changePct:number|null;time:string|null;source:string;trend5d:number[];trendDates:string[]};
+type ChartResponse={chart?:{result?:Array<{meta?:{regularMarketPrice?:number;regularMarketTime?:number;exchangeTimezoneName?:string};timestamp?:number[];indicators?:{quote?:Array<{open?:(number|null)[];close?:(number|null)[]}>}}>}};
 // Yahoo chartPreviousClose can refer to the start of the requested range rather than
 // the previous trading session. Use dated daily closes instead for daily % moves.
 function exchangeDate(timestamp:number,timeZone:string):string{
@@ -35,6 +35,9 @@ export async function getQuote(label:string,symbol:string):Promise<Quote>{
   const history=closes.flatMap((close,i)=>typeof close==="number"&&Number.isFinite(close)&&close>0&&typeof timestamps[i]==="number"?[{value:close,date:exchangeDate(timestamps[i],timeZone)}]:[]).slice(-5);
   const value=meta?.regularMarketPrice;
   const quoteDate=typeof meta?.regularMarketTime==="number"?exchangeDate(meta.regularMarketTime,timeZone):null;
+  const openIndex=timestamps.findIndex(stamp=>exchangeDate(stamp,timeZone)===quoteDate);
+  const rawOpen=openIndex>=0?result?.indicators?.quote?.[0]?.open?.[openIndex]:null;
+  const openPrice=typeof rawOpen==="number"&&Number.isFinite(rawOpen)&&rawOpen>0?rawOpen:null;
   const latest=history.at(-1);
   // If the chart includes the quote's trading session, compare with the prior
   // session; if the chart stops before it, the last close is the prior session.
@@ -57,6 +60,6 @@ export async function getQuote(label:string,symbol:string):Promise<Quote>{
   const quoteTime=meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null;
   const maxAge=/=F$/.test(symbol)?12*3600000:96*3600000;
   if(!isQuoteFresh(quoteTime,maxAge))return empty;
-  return {...empty,quoteDate,referencePrice:previousClose,referenceDate:previousClose===null?null:latest?.date===quoteDate?prior?.date??null:latest?.date??null,value:quoteIsValid?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:trend.map(p=>p.value),trendDates:trend.map(p=>p.date)};
+  return {...empty,openPrice,openDate:openPrice===null?null:quoteDate,quoteDate,referencePrice:previousClose,referenceDate:previousClose===null?null:latest?.date===quoteDate?prior?.date??null:latest?.date??null,value:quoteIsValid?value:null,changePct,time:meta?.regularMarketTime?new Date(meta.regularMarketTime*1000).toISOString():null,trend5d:trend.map(p=>p.value),trendDates:trend.map(p=>p.date)};
  }catch{return empty;}
 }

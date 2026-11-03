@@ -1,9 +1,10 @@
 import {taiwanCalendar} from "../../../../../lib/trading-calendar";
 import {taipeiMinute} from "../../../../../lib/market-data";
+import {calculateOpenChange} from "../../../../../lib/open-relative-change";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
-type Quote={symbol?:unknown;price?:unknown;quoteTime?:unknown;source?:unknown;contract?:unknown;referencePrice?:unknown;change?:unknown;changePercent?:unknown};
+type Quote={openPrice?:unknown;openTime?:unknown;symbol?:unknown;price?:unknown;quoteTime?:unknown;source?:unknown;contract?:unknown;referencePrice?:unknown;change?:unknown;changePercent?:unknown};
 function session(now:Date){
  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",hour:"2-digit",minute:"2-digit",hourCycle:"h23",weekday:"short"}).formatToParts(now);
  const hour=Number(parts.find(p=>p.type==="hour")?.value),minute=Number(parts.find(p=>p.type==="minute")?.value);
@@ -60,9 +61,10 @@ export async function GET(){
    const age=Math.round((now.getTime()-timestamp.getTime())/1000);
    if(!Number.isFinite(price)||price<=0||!Number.isFinite(age)||age< -30||age>120||data.symbol!=="TX"||typeof data.contract!=="string"||(!/^\d{4}(?:0[1-9]|1[0-2])$/.test(data.contract)||data.contract<new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit"}).format(now).replace("-","")))throw Error("報價無效或超過120秒");
    const reference=typeof data.referencePrice==="number"&&Number.isFinite(data.referencePrice)&&data.referencePrice>0?data.referencePrice:null;
+   const opening=typeof data.openPrice==="number"&&typeof data.openTime==="string"?calculateOpenChange({price,time:timestamp.toISOString(),instrument:"TX",contract:data.contract},{price:data.openPrice,time:data.openTime,instrument:"TX",contract:data.contract},"night"):null;
    const change=reference!==null?price-reference:typeof data.change==="number"&&Number.isFinite(data.change)?data.change:null;
    const changePercent=reference!==null&&change!==null?change/reference*100:typeof data.changePercent==="number"&&Number.isFinite(data.changePercent)?data.changePercent:null;
-   return NextResponse.json({status:"ok",name:"臺股期貨夜盤（TX）",price,change,changePercent,referencePrice:reference,contract:data.contract,contractVerified:true,quality:"verified",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(0,age),dataSource:typeof data.source==="string"?data.source:feed.name,isRealtime:age<=15},{headers:{"Cache-Control":"no-store"}});
+   return NextResponse.json({status:"ok",name:"臺股期貨夜盤（TX）",price,change,changePercent,openPrice:opening?.openingPrice??null,openTime:opening?.openingTime??null,referencePrice:reference,contract:data.contract,contractVerified:true,quality:"verified",quoteTime:timestamp.toISOString(),delaySeconds:Math.max(0,age),dataSource:typeof data.source==="string"?data.source:feed.name,isRealtime:age<=15},{headers:{"Cache-Control":"no-store"}});
   }catch(e){errors.push(feed.name+": "+(e instanceof Error?e.message:"連線失敗"));}
  }
  return await publicNightQuote(now)??NextResponse.json({status:"unavailable",error:"所有已設定夜盤行情來源暫不可用",providersTried:errors.map(x=>x.split(":")[0]),isRealtime:false},{status:502,headers:{"Cache-Control":"no-store"}});
