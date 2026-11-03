@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../lib/response-cache";
 export const dynamic="force-dynamic";
 import { NextResponse } from "next/server";
 export const runtime="nodejs";
@@ -84,7 +85,7 @@ function newsPriority(n:News):number{
  if(war.test(t))return 2;
  return 1;
 }
-export async function GET(){
+async function buildResponse(){
  try{
   const endpoint=process.env.FUTU_NEWS_API_URL||"https://ai-news-search.futunn.com/news_search";
   const base=new URL(endpoint);
@@ -114,3 +115,5 @@ export async function GET(){
   return NextResponse.json({status:"unavailable",error:"富途新聞來源目前沒有可用資料，請點擊富途新聞入口查看最新消息。",news:[],sourceUrl:"https://news.futunn.com/main"},{status:503});
  }
 }
+
+export async function GET(){return cachedResponse("app/api/news/futu/route.ts",300000,buildResponse);}

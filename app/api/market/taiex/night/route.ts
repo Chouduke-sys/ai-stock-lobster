@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../../lib/response-cache";
 import {taiwanCalendar} from "../../../../../lib/trading-calendar";
 import {taipeiMinute} from "../../../../../lib/market-data";
 import { NextResponse } from "next/server";
@@ -35,7 +36,7 @@ async function publicNightQuote(now:Date){
 
  return null;
 }
-export async function GET(){
+async function buildResponse(){
  const now=new Date();
  if(!session(now))return NextResponse.json({status:"closed",error:"目前非台指期夜盤交易時段（週一至週五 15:00～次日 05:00，休市日除外）",isRealtime:false},{status:409,headers:{"Cache-Control":"no-store"}});
 
@@ -68,3 +69,5 @@ export async function GET(){
  return await publicNightQuote(now)??NextResponse.json({status:"unavailable",error:"所有已設定夜盤行情來源暫不可用",providersTried:errors.map(x=>x.split(":")[0]),isRealtime:false},{status:502,headers:{"Cache-Control":"no-store"}});
 
 }
+
+export async function GET(){return cachedResponse("app/api/market/taiex/night/route.ts",10000,buildResponse);}

@@ -20,6 +20,6 @@ function load(relative,overrides={},globals={}){
  AbortSignal,setTimeout,clearTimeout,Date,Intl,process,...globals},{filename});
  return module.exports;
 }
-const response={NextResponse:{json:(body,init={})=>({status:init.status??200,body,headers:init.headers})}};
+const response={NextResponse:{json:(body,init={})=>({status:init.status??200,body,headers:init.headers,clone(){return response.NextResponse.json(body,init);}})}};
 function clock(iso){const RealDate=Date;return class extends RealDate{constructor(...args){super(...(args.length?args:[iso]));}static now(){return new RealDate(iso).getTime();}};}
 module.exports={load,response,clock};

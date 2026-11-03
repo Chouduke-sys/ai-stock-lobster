@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../lib/response-cache";
 import {finmindPublication} from "../../../../lib/finmind";
 import {parseTwseMargin} from "../../../../lib/twse-margin";
 import {parseTaifexPositioning} from "../../../../lib/taifex-positioning";
@@ -31,7 +32,7 @@ type MarginData={date:string;financingBalance:number|null;financingChange:number
 function numeric(raw:unknown):number|null{return strictNumber(raw);}
 async function yahooMargin():Promise<MarginData|null>{
  try{
-  const res=await fetch("https://tw.stock.yahoo.com/margin-balance",{next:{revalidate:15},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://tw.stock.yahoo.com/margin-balance",{next:{revalidate:300},signal:AbortSignal.timeout(7000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const plain=html.replace(new RegExp("<[^>]+>","g")," ").replace(new RegExp("&nbsp;|&#160;","g")," ").replace(/\s+/g," ");
@@ -50,7 +51,7 @@ async function yahooMargin():Promise<MarginData|null>{
 type HiStockMargin=MarginData & {borrowBalance:number|null;borrowChange:number|null};
 async function histockMargin():Promise<HiStockMargin|null>{
  try{
-  const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:15},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://histock.tw/stock/three.aspx?m=mg",{next:{revalidate:300},signal:AbortSignal.timeout(8000),headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const tables=extractHtmlTables(html);
@@ -91,7 +92,7 @@ async function latestMargin(referenceDate:string,fallbackDate?:string):Promise<M
  if(selected)return selected;
  for(const date of dates){
   try{
-   const res=await fetch("https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+date.replace(/-/g,"")+"&selectType=MS&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(4500)});
+   const res=await fetch("https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date="+date.replace(/-/g,"")+"&selectType=MS&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(4500)});
    const parsed=res.ok?parseTwseMargin(await res.json(),date):null;
    if(parsed)return parsed;
   }catch{}
@@ -106,7 +107,7 @@ async function institutionalPublication(referenceDate:string,fallbackDate?:strin
  ]};
  const results=await Promise.all(dates.map(async date=>{
   try{
-   const r=await fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+date.replace(/-/g,"")+"&response=json",{next:{revalidate:15},signal:AbortSignal.timeout(6500)});
+   const r=await fetch("https://www.twse.com.tw/rwd/zh/fund/BFI82U?date="+date.replace(/-/g,"")+"&response=json",{next:{revalidate:300},signal:AbortSignal.timeout(6500)});
    const body=r.ok?await r.json():null;
    return body?.stat==="OK"&&normalizedDate(body.date)===date&&Array.isArray(body.data)?body:null;
   }catch{return null;}
@@ -131,7 +132,7 @@ function normalizedDate(x:unknown):string|null{
 }
 async function taifexRows(path:string):Promise<Record<string,unknown>[]>{
  try{
-  const res=await fetch("https://openapi.taifex.com.tw/v1/"+path,{next:{revalidate:15},signal:AbortSignal.timeout(7000),headers:{"Accept":"application/json"}});
+  const res=await fetch("https://openapi.taifex.com.tw/v1/"+path,{next:{revalidate:300},signal:AbortSignal.timeout(7000),headers:{"Accept":"application/json"}});
   if(!res.ok)return [];
   const data=await res.json() as unknown;
   return Array.isArray(data)?data.filter((row):row is Record<string,unknown>=>typeof row==="object"&&row!==null&&!Array.isArray(row)):[];
@@ -155,7 +156,7 @@ async function latestFuturesOptions(referenceDate:string,fallbackDate?:string):P
 }
 async function wantgooPutCall():Promise<{date:string;volume:number;oi:number;source:string}|null>{
  try{
-  const res=await fetch("https://www.wantgoo.com/option/put-call-ratio",{next:{revalidate:15},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
+  const res=await fetch("https://www.wantgoo.com/option/put-call-ratio",{next:{revalidate:300},signal:AbortSignal.timeout(6500),headers:{"User-Agent":"Mozilla/5.0","Accept-Language":"zh-TW,zh;q=0.9"}});
   if(!res.ok)return null;
   const html=await res.text();
   const plain=html.replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ");
@@ -197,6 +198,12 @@ export async function GET(request:Request){
  }
  if(capture&&!cronAuthorized)return NextResponse.json({status:"forbidden",error:"只有盤前封存排程可產生快照"},{status:403});
  if(capture&&!captureWindow())return NextResponse.json({status:"outside_capture_window",error:"只允許於台北時間 08:30～08:59 產生盤前快照"},{status:409});
+ return live?cachedResponse("morning:live:"+reportDate,300000,()=>buildBrief(request,true,captureStartedAt))
+  :buildBrief(request,false,captureStartedAt);
+}
+// Called only after authentication and capture-window checks above.
+async function buildBrief(request:Request,live:boolean,captureStartedAt:Date){
+ const now=taipeiParts(),reportDate=now.date,capture=!live;
  const calendar=await taiwanCalendar();
  if(!calendar.referenceDate||(capture&&calendar.isTradingDay!==true))return NextResponse.json({status:"calendar_unavailable",error:"今日休市或官方交易日無法確認，拒絕產生預測"},{status:409});
  const referenceDate=live?(calendar.latestCompletedDate??calendar.referenceDate):calendar.referenceDate;
@@ -211,7 +218,7 @@ export async function GET(request:Request){
   backtestedAllocation(referenceDate),
   getIndexTechnical(referenceDate),
   fetchHiStockThree(),
-  fetch(new URL("/api/market/ai-flow",request.url),{next:{revalidate:15},signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null) as Promise<{status:string;asOf:string|null;historyStatus:string;asOfVerified:boolean;groups:{historyDate:string|null;historicalQuality:string;weeklyDelta:number|null;shareDelta:number|null}[]}|null>
+  fetch(new URL("/api/market/ai-flow",request.url),{next:{revalidate:300},signal:AbortSignal.timeout(8000)}).then(r=>r.ok?r.json():null).catch(()=>null) as Promise<{status:string;asOf:string|null;historyStatus:string;asOfVerified:boolean;groups:{historyDate:string|null;historicalQuality:string;weeklyDelta:number|null;shareDelta:number|null}[]}|null>
  ]);
  // Accept today's verified closing figures once published, without losing the prior session's figures.
  const marginReferenceDate=live?calendar.referenceDate:referenceDate;
@@ -381,5 +388,5 @@ export async function GET(request:Request){
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
- return NextResponse.json({status:"ok",view:live?"live":"capture",reportKind:live?"持續更新分析":"盤前封存",refreshAfterSeconds:live?30:null,modelVersion:"market-integrity-v2",captureStartedAt:captureStartedAt.toISOString(),reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:45 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections:sections.map((section,i)=>({...section,title:live&&i===8?"最新分析小總結":section.title,available:i===8?coverage>=50:available[i],dataDate:dates[i]??null})),allocationBacktest:allocationModel,policyNews:policySignals.items,inputs:{margin:validatedMargin,futures:validatedFutures,options:validatedWantgoo,institutional:{date:institutionDate,foreign,trust},technical,sectorFlow},source:"Yahoo Finance / TWSE / TAIFEX / HiStock / Wantgoo / Google News RSS",updatePolicy:live?"持續依來源已公布資料重算；此版本不納入盤前命中率。":"盤前固定快照；用於盤前命中率驗證。",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
+ return NextResponse.json({status:"ok",view:live?"live":"capture",reportKind:live?"持續更新分析":"盤前封存",refreshAfterSeconds:live?300:null,modelVersion:"market-integrity-v2",captureStartedAt:captureStartedAt.toISOString(),reportDate,referenceDate,dataComplete,missingData:missing,generatedAt:new Date().toISOString(),scheduledAt:"08:45 Asia/Taipei",isAfterDailyCutoff:now.minute>=510,stance:overallStance,recommendedAllocation,riskCap,baseAllocation,riskAssessment,quotes,sections:sections.map((section,i)=>({...section,title:live&&i===8?"最新分析小總結":section.title,available:i===8?coverage>=50:available[i],dataDate:dates[i]??null})),allocationBacktest:allocationModel,policyNews:policySignals.items,inputs:{margin:validatedMargin,futures:validatedFutures,options:validatedWantgoo,institutional:{date:institutionDate,foreign,trust},technical,sectorFlow},source:"Yahoo Finance / TWSE / TAIFEX / HiStock / Wantgoo / Google News RSS",updatePolicy:live?"持續依來源已公布資料重算；此版本不納入盤前命中率。":"盤前固定快照；用於盤前命中率驗證。",method:"依可取得數據產生規則式盤前分析，不是人工撰寫或經模型驗證的每日研究報告。部分行情可能延遲；資料不足的項目明確標示，不捏造籌碼數據。"},{headers:{"Cache-Control":"private, no-store"}});
 }
