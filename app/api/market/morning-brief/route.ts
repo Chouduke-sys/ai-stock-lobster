@@ -377,7 +377,7 @@ export async function GET(request:Request){
    :"市場結構：訊號尚未形成一致趨勢，觀察量價及法人延續性";
   const divergenceSummary=divergenceNotes.length?" 關鍵背離："+divergenceNotes.join("；")+"。":"";
   const exposure=recommendedAllocation===null?"倉位：資料不足，暫不提供數字。":"建議倉位 "+recommendedAllocation+"%（含融資曝險）。";
-  summary.body=scenario+" "+marketStructure+"。"+divergenceSummary+" "+exposure+" "+timing(coverage<75?" 關鍵籌碼尚未齊全，判斷信心較低。":"");
+  summary.body=scenario+" "+marketStructure+"。"+divergenceSummary+" "+exposure+" "+timing+(coverage<75?" 關鍵籌碼尚未齊全，判斷信心較低。":"");
   summary.sentiment=overallDirection;
   summary.verdict=overallLabel;
  }
