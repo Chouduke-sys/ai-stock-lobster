@@ -60,15 +60,16 @@ test("US futures endpoint shows current quote even when five-minute chart lags",
 });
 function target(){const listeners=new Map();return {listeners,addEventListener:(key,fn)=>listeners.set(key,fn),removeEventListener:key=>listeners.delete(key),emit:key=>listeners.get(key)?.()};}
 test("visible polling avoids overlap, resumes immediately and stops cleanly",async()=>{
- const doc={...target(),visibilityState:"visible"},win=target();let tick,cleared=false,calls=0,release;
- const polling=load("lib/live-polling.ts",{}, {document:doc,window:win,setInterval:fn=>(tick=fn,1),clearInterval:()=>cleared=true});
+ const doc={...target(),visibilityState:"visible"},win=target();let tick,cleared=false,calls=0,release,now=0;
+ class TestClock extends Date{static now(){return now;}}
+ const polling=load("lib/live-polling.ts",{}, {Date:TestClock,document:doc,window:win,setInterval:fn=>(tick=fn,1),clearInterval:()=>cleared=true});
  const stop=polling.pollVisible(()=>{calls++;return new Promise(resolve=>release=resolve);},1000);
  assert.equal(calls,1);tick();win.emit("focus");assert.equal(calls,1);
  release();await new Promise(setImmediate);
  doc.visibilityState="hidden";doc.emit("visibilitychange");tick();assert.equal(calls,1);
- doc.visibilityState="visible";doc.emit("visibilitychange");assert.equal(calls,2);
+ now=1000;doc.visibilityState="visible";doc.emit("visibilitychange");assert.equal(calls,2);
  release();await new Promise(setImmediate);
- win.emit("online");assert.equal(calls,3);
+ now=2000;win.emit("online");assert.equal(calls,3);
  stop();release();await Promise.resolve();tick();assert.equal(calls,3);
  assert.equal(cleared,true);assert.equal(doc.listeners.size,0);assert.equal(win.listeners.size,0);
 });
@@ -78,8 +79,8 @@ test("closed-session polling slows down while focus still refreshes immediately"
  const polling=load("lib/live-polling.ts",{}, {Date:TestClock,document:doc,window:win,setInterval:fn=>(tick=fn,1),clearInterval:()=>{}});
  const stop=polling.pollVisible(()=>{calls++;},()=>30000);
  await Promise.resolve();now=1000;tick();assert.equal(calls,1);
- win.emit("focus");assert.equal(calls,2);await Promise.resolve();
- now=32000;tick();assert.equal(calls,3);stop();
+ win.emit("focus");assert.equal(calls,1);now=5000;win.emit("focus");assert.equal(calls,2);await Promise.resolve();
+ now=35000;tick();assert.equal(calls,3);stop();
 });
 
 test("live view retains the previous published margin until new-session data arrives",async()=>{
@@ -103,4 +104,11 @@ test("global-market outage is explicit so the UI can retain its dated last good 
  const route=load("app/api/market/daily-analysis/route.ts",{"next/server":response,
  "../../../../lib/yahoo-quote":{getQuote:async()=>({value:null,changePct:null})}});
  const result=await route.GET();assert.equal(result.status,503);assert.equal(result.body.status,"unavailable");
+});
+
+test("a warmed shared live report never bypasses per-request authentication",async()=>{
+ let signedIn=true;const route=liveRoute({"next-auth":{getServerSession:async()=>signedIn?{user:{email:"fixture@example.invalid"}}:null}});
+ const url="https://site.invalid/api/market/morning-brief?view=live";
+ assert.equal((await route.GET(new Request(url))).status,200);signedIn=false;
+ assert.equal((await route.GET(new Request(url))).status,401);
 });

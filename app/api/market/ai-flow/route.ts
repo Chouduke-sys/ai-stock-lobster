@@ -1,3 +1,4 @@
+import {cachedResponse} from "../../../../lib/response-cache";
 import {sectors} from "../../../../lib/sector-universe";
 import {summarizeSectors} from "../../../../lib/sector-history";
 import {sectorHistory} from "../../../../lib/sector-history-provider";
@@ -95,7 +96,7 @@ async function marketQuotes():Promise<{rows:Quote[];source:string;quoteDate:stri
  }
  return {rows:primary,source,quoteDate,coverage:"ranking_partial"};
 }
-export async function GET(){
+async function buildResponse(){
  try{
   const [{rows,source,quoteDate,coverage},instRes,history,calendar]=await Promise.all([
    marketQuotes().catch(()=>({rows:[] as Quote[],source:"最新排行來源暫不可用",quoteDate:null,coverage:"unavailable"})),
@@ -124,6 +125,8 @@ export async function GET(){
   }
   buyers.sort((a,b)=>b.shares-a.shares);
   return NextResponse.json({status:"ok",asOf,asOfVerified,coverage,sectorAsOf,sectorExpectedDate,sectorHistoryStale,sectorHistorySource:"TWSE / TPEx 官方每日收盤行情",historyStatus:groups.some(g=>g.historicalQuality==="verified")?"available":"insufficient",historicalSessions:history.length,groups,radar,topSector:groups[0]??null,volumeLeaders,buyers:buyers.slice(0,15),institutionalDate:instDate,source:source+" / TWSE T86 / TWSE + TPEx 歷史",note:"族群按本站公開成分股清單計算成交金額，不等於淨資金流入；大戶以三大法人當日買超作代理，不等於主力或單一大戶。排行來源若僅涵蓋部分股票，產業排名可能不完整；無法驗證行情日期時不標示為今日資料；並非逐筆即時。"},
-   {headers:{"Cache-Control":"public, s-maxage=10"}});
+   {headers:{"Cache-Control":"public, s-maxage=300"}});
  }catch(e){return NextResponse.json({status:"unavailable",error:e instanceof Error?e.message:"暫無可驗證行情"},{status:503});}
 }
+
+export async function GET(){return cachedResponse("app/api/market/ai-flow/route.ts",300000,buildResponse);}

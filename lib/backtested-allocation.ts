@@ -1,3 +1,4 @@
+import {cachedProvider} from "./provider-policy";
 import {completedCloses,taipeiDate} from "./market-data";
 type Bar={date:string;close:number};
 type Model={riskOn:number;riskOff:number;lookback:number};
@@ -49,16 +50,18 @@ async function load(lastCompletedDate:string):Promise<Bar[]>{
  }
  return [];
 }
-export async function backtestedAllocation(lastCompletedDate:string):Promise<Backtest>{
+async function calculateAllocation(lastCompletedDate:string):Promise<Backtest>{
  const bars=await load(lastCompletedDate);
  const fallback:Backtest={allocation:null,date:null,sampleDays:bars.length,testDays:0,annualReturn:null,maxDrawdown:null,benchmarkAnnualReturn:null,reason:"歷史行情不足或無法取得，暫不提供回測最佳倉位。",model:"台灣加權指數動能擇時，滾動訓練／樣本外驗證"};
  if(bars.length<750)return fallback;
  const first=Math.max(505,bars.length-252);
  let equity=1,peak=1,maxDrawdown=0,bench=1,previousWeight=0;
+ const fitted=new Map<number,Model>();
  for(let i=first;i<bars.length;i++){
   // Monthly refit using only observations before test day.
   const fitEnd=i-(i-first)%21;
-  const model=select(bars,fitEnd);
+  let model=fitted.get(fitEnd);
+  if(!model){model=select(bars,fitEnd);fitted.set(fitEnd,model);}
   const w=weight(bars,i-1,model);
   const marketReturn=bars[i].close/bars[i-1].close-1;
   equity*=Math.max(0.01,1+w*marketReturn-Math.abs(w-previousWeight)*0.001);
@@ -68,4 +71,15 @@ export async function backtestedAllocation(lastCompletedDate:string):Promise<Bac
  const testDays=bars.length-first,chosen=select(bars,bars.length);
  const allocation=Math.min(90,Math.max(0,Math.round(weight(bars,bars.length-1,chosen)*100)));
  return {allocation,date:bars[bars.length-1].date,sampleDays:bars.length,testDays,annualReturn:(Math.pow(equity,252/testDays)-1)*100,maxDrawdown:maxDrawdown*100,benchmarkAnnualReturn:(Math.pow(bench,252/testDays)-1)*100,reason:"以過去約504交易日訓練動能參數，最近約252交易日逐月重新訓練做樣本外驗證；現有建議由最新已知收盤價及歷史訓練參數決定。",model:"僅為動能基礎模型績效，並非九項風險限縮後最終建議的績效。台灣加權指數20／60／120日動能，持股0%～100%候選水位，對外建議上限90%；成本假設每次100%換手0.1%，未含融資利息與稅費。"};
+}
+
+// Date-keyed results never cross completed sessions; failures retry after 30 seconds.
+export async function backtestedAllocation(lastCompletedDate:string):Promise<Backtest>{
+ let unavailable:Backtest|undefined;
+ const result=await cachedProvider<Backtest>("allocation:v2:"+lastCompletedDate,3600000,async()=>{
+  const value=await calculateAllocation(lastCompletedDate);
+  if(value.allocation===null){unavailable=value;return null;}
+  return value;
+ });
+ return result??unavailable??{allocation:null,date:null,sampleDays:0,testDays:0,annualReturn:null,maxDrawdown:null,benchmarkAnnualReturn:null,reason:"歷史行情暫不可用，稍後重試。",model:"台灣加權指數動能擇時，滾動訓練／樣本外驗證"};
 }

@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
+import {pollVisible} from "./live-polling";
 
 export type MinutePoint={time:string;price:number;date:string};
 type MinuteHistory={symbol:string;points:MinutePoint[];source:string};
@@ -19,7 +20,7 @@ export function useIntradayHistory(symbol:string):MinuteHistory {
     }
     void load();
     const timer=window.setInterval(()=>{void load();},60000);
-    return ()=>{controller.abort();window.clearInterval(timer);};
+    return ()=>{controller.abort();stop();};
   },[symbol]);
   return history.symbol===symbol?history:{symbol,points:[],source:""};
 }
